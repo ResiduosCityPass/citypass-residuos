@@ -29,6 +29,8 @@ erDiagram
         decimal lat
         decimal lng
         enum estado
+        decimal nivelLlenadoPct
+        decimal temperaturaC
         timestamp ultimaLecturaEn
     }
     SENSOR {
@@ -95,6 +97,11 @@ erDiagram
 | `EstadoParada` | `PENDIENTE`, `CONFIRMADA`, `OMITIDA` |
 
 ## Decisiones de modelado
+
+**Ultima lectura desnormalizada en `CONTENEDOR`.** Los campos `estado`, `nivelLlenadoPct` y
+`temperaturaC` duplican la ultima fila de `LECTURA`. Es deliberado, y por la misma razon que el
+estado: el mapa de CU-07 y el listado de contenedores tienen que responder sin hacer JOIN contra
+una tabla que crece ~48.000 filas por dia.
 
 **Estado derivado y persistido a la vez.** `CONTENEDOR.estado` podría calcularse siempre desde la
 última lectura, pero se persiste igual. Dos razones: el mapa de CU-07 necesita responder rápido sin
