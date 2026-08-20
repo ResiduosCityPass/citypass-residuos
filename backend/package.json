@@ -18,7 +18,8 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "typeorm": "typeorm-ts-node-commonjs -d src/config/data-source.ts",
     "migration:generate": "npm run typeorm -- migration:generate",
-    "migration:run": "npm run typeorm -- migration:run"
+    "migration:run": "npm run typeorm -- migration:run",
+    "token:dev": "ts-node -r tsconfig-paths/register src/scripts/generar-token-dev.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -31,6 +32,7 @@
     "@nestjs/typeorm": "^11.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
+    "dotenv": "^17.4.2",
     "pg": "^8.13.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
@@ -81,7 +83,9 @@
       "!**/main.ts",
       "!**/*.entity.ts",
       "!**/*.dto.ts",
-      "!**/data-source.ts"
+      "!**/data-source.ts",
+      "!**/scripts/**",
+      "!**/*.typeorm.repository.ts"
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node",
