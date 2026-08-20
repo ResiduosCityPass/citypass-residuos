@@ -1,0 +1,13 @@
+{
+  "name": "citypass-residuos-simulator",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Simulador de sensores IoT del modulo de Residuos (CU-04)",
+  "scripts": {
+    "seed": "node seed.js",
+    "start": "node simulador.js",
+    "saturacion": "node simulador.js --escenario saturacion",
+    "incendio": "node simulador.js --escenario incendio"
+  }
+}

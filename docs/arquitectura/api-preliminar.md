@@ -23,8 +23,12 @@ Ver la matriz completa en [ADR-005](../adr/ADR-005-seguridad-identidad.md).
 | `POST` | `/zonas` | Admin |
 | `GET` | `/zonas` | Admin, Operador |
 | `PATCH` | `/zonas/:id` | Admin |
+| `PATCH` | `/zonas/:id/bloqueo?bloqueada=true` | Admin, Operador |
+| `DELETE` | `/zonas/:id` | Admin |
 
 Cuerpo: `{ nombre, umbralCriticoPct, umbralTemperaturaC }`.
+
+`DELETE` responde `409 ZONA_CON_CONTENEDORES` si la zona todavía tiene contenedores asignados.
 
 ## CU-03 · Flota
 
@@ -42,7 +46,6 @@ Cuerpo: `{ nombre, umbralCriticoPct, umbralTemperaturaC }`.
 
 ```json
 {
-  "sensorId": "SN-0421",
   "nivelLlenadoPct": 87.4,
   "temperaturaC": 22.1,
   "bateriaPct": 64,
@@ -50,9 +53,29 @@ Cuerpo: `{ nombre, umbralCriticoPct, umbralTemperaturaC }`.
 }
 ```
 
-Es el endpoint más caliente del módulo. Al recibir la lectura, en la misma transacción:
-la valida, la persiste, actualiza el estado del contenedor y dispara la evaluación de reglas
-(CU-05 y CU-06). La publicación de eventos ocurre **después** del commit, vía outbox.
+> **El cuerpo no lleva `sensorId`.** La identidad del sensor sale de la API key del
+> header, no del payload. Si viniera en el cuerpo, un sensor podria reportar lecturas
+> en nombre de otro con solo cambiar un campo.
+
+Es el endpoint más caliente del módulo. Al recibir la lectura: la valida contra la anterior,
+la persiste, actualiza el sensor y el contenedor, y dispara la evaluación de reglas de CU-05 y CU-06.
+
+Devuelve la transición para que el llamador sepa qué pasó:
+
+```json
+{
+  "lecturaId": "...",
+  "contenedorId": "...",
+  "estadoAnterior": "NORMAL",
+  "estadoNuevo": "CRITICO",
+  "alertasGeneradas": ["SATURACION"]
+}
+```
+
+> **Pendiente Sprint 2:** envolver los guardados en una transacción y publicar vía tabla
+> `outbox` con reintentos. Hoy la publicación es directa: si el driver de eventos falla, la
+> lectura queda persistida y el estado actualizado igual —que es el comportamiento correcto—
+> pero el evento se pierde en vez de reintentarse.
 
 **Respuestas:** `202 Accepted` · `400` lectura fuera de rango · `401` API key inválida ·
 `404` sensor inexistente · `409` lectura duplicada o con timestamp anterior a la última registrada.
