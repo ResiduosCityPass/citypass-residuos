@@ -22,14 +22,14 @@ armado y CI/CD corriendo. Al cierre no se espera funcionalidad, se espera **capa
 |---|---|---|
 | Nicolás Damm | PM / Product Owner | Prioriza el backlog, es el enlace con las otras squads y con la cátedra |
 | Tomás Luraschi | Scrum Master | Facilita ceremonias, mantiene el board, destraba impedimentos |
-| Máximo Trufelman | Frontend | SPA React, mapa Leaflet (CU-07, CU-11) |
+| Máximo Trufelman | Frontend | SPA y mapa en tiempo real (CU-07, CU-11). Define el stack de frontend |
 | Francisco Isola | Backend | API NestJS, modelo de datos, motor de reglas, eventos |
 | Ramiro Souto | DevOps | Docker, CI/CD, despliegue cloud |
 | Adriel Pasik | Security / Backend | JWT y roles, integración con el Squad 2, apoyo en backend |
 
 ## Decisiones tomadas
 
-1. **Stack:** NestJS + TypeScript / PostgreSQL / React + Leaflet — [ADR-001](../adr/ADR-001-stack-tecnologico.md), [ADR-002](../adr/ADR-002-persistencia.md)
+1. **Stack de backend:** NestJS + TypeScript / PostgreSQL — [ADR-001](../adr/ADR-001-stack-tecnologico.md), [ADR-002](../adr/ADR-002-persistencia.md). El stack de frontend lo define Máximo en un ADR-006 propio.
 2. **Integración con el bus:** abstracción intercambiable, no esperamos al Squad 1 — [ADR-003](../adr/ADR-003-integracion-event-bus.md)
 3. **Alcance:** 11 CU relevados → 6 en Tier 1, recortes documentados, se agrega CU-12 — [ADR-004](../adr/ADR-004-alcance-y-recortes.md)
 4. **Seguridad:** guard global, todo protegido por default — [ADR-005](../adr/ADR-005-seguridad-identidad.md)
@@ -44,6 +44,7 @@ armado y CI/CD corriendo. Al cierre no se espera funcionalidad, se espera **capa
 | 4 | Contactar al **Squad 1** por el borrador de contrato del bus de eventos | Nicolás |
 | 5 | Contactar al **Squad 2** por el claim de rol y el algoritmo de firma del JWT | Adriel |
 | 6 | Contactar al **Squad 6** (Emergencias) por el consumo de `residuos.incendio.detectado` | Nicolás |
+| 7 | Definir el stack de frontend y escribir el ADR-006 | Máximo |
 
 > Las acciones 4, 5 y 6 son las de mayor riesgo del sprint. No bloquean el desarrollo — por diseño,
 > según ADR-003 y ADR-005 — pero cuanto antes se resuelvan, menos traducción hay que escribir en
@@ -61,6 +62,7 @@ armado y CI/CD corriendo. Al cierre no se espera funcionalidad, se espera **capa
 | — | Simulador de sensores | Francisco |
 | — | Guard JWT + roles con firma local | Adriel |
 | — | docker-compose + pipeline de CI con umbral de cobertura | Ramiro |
+| — | Definir stack de frontend (ADR-006) e inicializar el proyecto | Máximo |
 | CU-07 | Maqueta del mapa consumiendo `/mapa/contenedores` | Máximo |
 
 **Criterio de éxito del Sprint 1:** el simulador corre, las lecturas entran, un contenedor pasa a

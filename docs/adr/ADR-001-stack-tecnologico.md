@@ -1,4 +1,4 @@
-# ADR-001 — Stack tecnológico del módulo
+# ADR-001 — Stack tecnológico del backend
 
 - **Estado:** Aceptado
 - **Fecha:** 2026-08-20
@@ -6,7 +6,10 @@
 
 ## Contexto
 
-El Sprint 0 exige definir y asignar el stack antes del 27/08. El módulo debe exponer una API REST,
+El Sprint 0 exige definir y asignar el stack antes del 27/08. Este ADR cubre **solo el backend**:
+el stack de frontend lo define su responsable en un ADR propio (ver Consecuencias).
+
+El módulo debe exponer una API REST,
 publicar y consumir eventos asincrónicos, proteger endpoints con JWT, alcanzar 60% de cobertura de
 tests y desplegarse en la nube. El equipo tiene experiencia previa en JavaScript y Node.js;
 nadie tiene entorno Java instalado.
@@ -41,9 +44,7 @@ nadie tiene entorno Java instalado.
 
 ## Decisión
 
-**Backend: NestJS 11 + TypeScript sobre Node.js 22.**
-**Frontend: React 19 + Vite + Leaflet** (Leaflet sobre Google Maps porque no requiere API key ni
-tarjeta de crédito, y CU-07/CU-11 solo necesitan marcadores y filtros).
+**NestJS 11 + TypeScript sobre Node.js 22.**
 
 El costo de aprender TypeScript se paga una vez; el costo de sostener una arquitectura por
 convención en Express se paga en cada sprint y es lo que la rúbrica evalúa.
@@ -56,3 +57,8 @@ convención en Express se paga en cada sprint y es lo que la rúbrica evalúa.
 - Se adopta `strict: true` en TypeScript desde el inicio: es más barato que activarlo después.
 - La estructura de carpetas del backend refleja capas explícitas (`domain`, `application`,
   `infrastructure`) para que la separación de responsabilidades sea verificable, no declarativa.
+- **El stack de frontend queda deliberadamente sin definir en este ADR.** Es una decisión de
+  Máximo, que es quien lo va a construir y mantener. Se documentará en un ADR-006 propio.
+  El backend no impone nada: expone REST sobre HTTP con CORS habilitado, así que cualquier
+  tecnología de cliente sirve. Los contratos que el frontend necesita ya están escritos en
+  `docs/arquitectura/api-preliminar.md` y no dependen de esa elección.

@@ -25,7 +25,7 @@ dinámica de rutas de recolección.
 |---|---|---|
 | Backend | NestJS 11 + TypeScript | [ADR-001](docs/adr/ADR-001-stack-tecnologico.md) |
 | Persistencia | PostgreSQL 16 + TypeORM | [ADR-002](docs/adr/ADR-002-persistencia.md) |
-| Frontend | React 19 + Vite + Leaflet | [ADR-001](docs/adr/ADR-001-stack-tecnologico.md) |
+| Frontend | *A definir por su responsable* | ADR-006 (pendiente) |
 | Mensajería | RabbitMQ (local) → bus del Squad 1 | [ADR-003](docs/adr/ADR-003-integracion-event-bus.md) |
 | Identidad | JWT emitido por el Squad 2 (LDAP) | [ADR-005](docs/adr/ADR-005-seguridad-identidad.md) |
 | CI/CD | GitHub Actions | — |
@@ -34,7 +34,7 @@ dinámica de rutas de recolección.
 
 ```
 ├── backend/      API REST NestJS · dueño: Francisco (+ Adriel en seguridad)
-├── frontend/     SPA React + Leaflet · dueño: Máximo
+├── frontend/     SPA · dueño: Máximo (stack a definir)
 ├── simulator/    Simulador de sensores IoT que alimenta la API · dueño: Francisco
 ├── infra/        docker-compose, Dockerfiles, IaC · dueño: Ramiro
 ├── docs/

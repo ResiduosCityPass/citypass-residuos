@@ -8,8 +8,9 @@ Un ADR nunca se edita una vez aceptado: si la decisión cambia, se escribe uno n
 
 | ADR | Título | Estado |
 |---|---|---|
-| [001](ADR-001-stack-tecnologico.md) | Stack tecnológico del módulo | Aceptado |
+| [001](ADR-001-stack-tecnologico.md) | Stack tecnológico del backend | Aceptado |
 | [002](ADR-002-persistencia.md) | Motor de persistencia y acceso a datos | Aceptado |
 | [003](ADR-003-integracion-event-bus.md) | Estrategia de integración con el event bus | Aceptado |
 | [004](ADR-004-alcance-y-recortes.md) | Alcance funcional y recortes deliberados | Aceptado |
 | [005](ADR-005-seguridad-identidad.md) | Seguridad e identidad federada | Aceptado |
+| 006 | Stack tecnológico del frontend | **Pendiente** — lo escribe Máximo |
