@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  backend:
+    name: Backend — lint, build y tests
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      # El umbral de 60% esta configurado en package.json (coverageThreshold).
+      # Si la cobertura baja, este paso falla y el PR no se puede mergear.
+      # Dimension 6 de la rubrica.
+      - name: Tests con cobertura
+        run: npm run test:cov
+        env:
+          DB_HOST: localhost
+          DB_PORT: '5432'
+          DB_USER: citypass
+          DB_PASSWORD: citypass
+          DB_NAME: residuos
+          JWT_SECRET: ci-secret
+
+      - name: Publicar reporte de cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-backend
+          path: backend/coverage/
+          retention-days: 14

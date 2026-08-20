@@ -1,0 +1,44 @@
+# Entorno local del modulo de Residuos — Squad 4
+# Uso:  docker compose -f infra/docker-compose.yml up -d
+#
+# Duenio: Ramiro (DevOps).
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: citypass-residuos-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: citypass
+      POSTGRES_PASSWORD: citypass
+      POSTGRES_DB: residuos
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U citypass -d residuos']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Se activa en el Sprint 2, cuando pasemos el driver de eventos de
+  # inmemory a rabbitmq para validar el flujo asincronico end-to-end (ADR-003).
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: citypass-residuos-bus
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: citypass
+      RABBITMQ_DEFAULT_PASS: citypass
+    ports:
+      - '5672:5672'
+      - '15672:15672' # consola web: http://localhost:15672
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  postgres_data:
