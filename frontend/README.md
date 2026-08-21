@@ -1,15 +1,79 @@
 # Frontend — dueño: Máximo
 
-## El stack lo definís vos
+SPA del módulo de Residuos. Pantalla principal: el mapa de contenedores en tiempo real (CU-07).
 
-**No está decidido, y es tu decisión.** Sos quien lo va a construir y mantener durante los siete
-sprints, así que elegí con lo que rindas más.
+## Stack
 
-Cuando lo definas, escribí el **ADR-006** en `docs/adr/` siguiendo el mismo formato que los demás:
-**Contexto → Opciones consideradas → Decisión → Consecuencias**. No es burocracia nuestra, es
-requisito explícito de la cátedra: *"todas las decisiones de arquitectura deben documentarse
-mediante un ADR que muestre las opciones consideradas"*. Mostrar dos o tres alternativas con sus
-contras vale puntos; poner solo la elegida, no.
+**React 19 + Vite, en JavaScript**, con **Leaflet** (`react-leaflet`) sobre tiles de OpenStreetMap
+y **Vitest + Testing Library** para los tests. Las alternativas evaluadas y el porqué de cada
+descarte están en [ADR-006](../docs/adr/ADR-006-stack-frontend.md).
+
+## Cómo levantarlo
+
+El frontend no sirve de nada sin la API. Primero el backend:
+
+```bash
+docker compose -f infra/docker-compose.yml up -d postgres
+cd backend && npm install && npm run start:dev
+```
+
+Después el frontend, en otra terminal:
+
+```bash
+cd frontend && npm install && npm run dev
+```
+
+Queda en `http://localhost:5173`. La URL de la API se configura en `.env.local`
+(copiá `.env.example`); por defecto apunta a `http://localhost:3000/api/v1`.
+
+### Token
+
+Todos los endpoints están protegidos. Generá uno y pegalo en la barra de arriba de la pantalla:
+
+```bash
+cd backend && npm run token:dev -- ADMINISTRADOR
+```
+
+Dura 8 horas y queda guardado en `localStorage`. Cuando el Squad 2 publique el login federado,
+cambia de dónde sale el token; el header `Authorization: Bearer <jwt>` no cambia.
+
+### Datos para ver algo en el mapa
+
+```bash
+cd simulator && TOKEN=<tu-token> npm run seed   # 8 contenedores alrededor del Obelisco
+npm run saturacion                              # uno cruza el umbral y pasa a rojo en ~5s
+npm run incendio                                # dispara una alerta crítica de incendio
+```
+
+## Comandos
+
+| Comando | Qué hace |
+|---|---|
+| `npm run dev` | Dev server con HMR en el 5173 |
+| `npm run build` | Build estático a `dist/` (es lo que se dockeriza) |
+| `npm test` | Corre los tests una vez |
+| `npm run test:watch` | Tests en modo watch |
+| `npm run cobertura` | Tests + reporte de cobertura (umbral 60%, dimensión 6) |
+| `npm run lint` | Oxlint |
+
+## Estructura
+
+| Carpeta | Contiene |
+|---|---|
+| `src/api/` | `cliente.js` (token + errores) y `residuos.js` (una función por endpoint) |
+| `src/dominio/` | Enums, colores de estado y helpers del vocabulario del dominio |
+| `src/hooks/` | `useMapaEnVivo.js`: el polling del mapa |
+| `src/componentes/` | Componentes de presentación |
+
+**Toda llamada a la API pasa por `src/api/cliente.js`.** Es el único lugar que conoce el header de
+autenticación y el único que traduce errores. Los errores se ramifican por `code`, nunca por el
+texto de `message`.
+
+## Guía de la API
+
+El contrato completo —request y response de cada endpoint, con ejemplos reales— está en
+[docs/arquitectura/guia-frontend.md](../docs/arquitectura/guia-frontend.md). La sección 8 tiene las
+reglas de dominio que no son obvias; vale la pena leerla antes de tocar el mapa.
 
 ## Lo que el backend te impone (que es casi nada)
 
@@ -21,23 +85,6 @@ contras vale puntos; poner solo la elegida, no.
   el mensaje está en castellano y puede cambiar sin aviso.
 
 Eso es todo. Cualquier tecnología de cliente que sepa hacer `fetch` sirve.
-
-## Restricciones reales que sí conviene tener en cuenta al elegir
-
-1. **Necesitás un mapa.** CU-07 (mapa en tiempo real) y CU-11 (contenedores cercanos) son el
-   corazón de la dimensión 9 de la rúbrica. Fijate que la librería de mapas que elijas se integre
-   bien con el framework, y ojo con las que exigen API key con tarjeta de crédito asociada.
-2. **Hay que testear.** La dimensión 6 pide 60% de cobertura y aplica a todo el módulo, no solo al
-   backend. Elegí algo con un camino de testing que ya conozcas.
-3. **Hay que dockerizarlo.** Ramiro necesita poder empaquetarlo para el despliegue cloud
-   (dimensión 7). Cualquier cosa que produzca estáticos o corra en Node le sirve; avisale qué
-   elegiste así arma el `Dockerfile`.
-
-## No necesitás esperar al backend
-
-**Todos los contratos de endpoints ya están escritos** en
-[docs/arquitectura/api-preliminar.md](../docs/arquitectura/api-preliminar.md), con sus payloads,
-roles y códigos de error. Podés mockearlos y arrancar hoy mismo.
 
 ## Alcance
 
