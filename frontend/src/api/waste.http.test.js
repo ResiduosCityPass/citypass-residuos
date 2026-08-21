@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { setZoneBlocked, linkSensor, fetchMapContainers, deleteZone } from './waste.http.js';
+import {
+  setZoneBlocked,
+  linkSensor,
+  fetchMapContainers,
+  deleteZone,
+  fetchMyRoute,
+  confirmStop,
+  fetchNearbyContainers,
+} from './waste.http.js';
 import { saveToken } from './client.js';
 
 /**
@@ -52,5 +60,39 @@ describe('rutas contra la API real', () => {
     await fetchMapContainers();
 
     expect(calledOptions().headers.Authorization).toBe('Bearer un-jwt');
+  });
+
+  /* --- CU-10 ------------------------------------------------------------ */
+
+  it('confirmar una parada manda exactamente lat y lng', async () => {
+    await confirmStop('pd-02', { lat: -34.6, lng: -58.38 });
+
+    expect(calledPath()).toMatch(/\/paradas\/pd-02\/confirmar$/);
+    expect(calledOptions().method).toBe('PATCH');
+    expect(calledOptions().body).toBe('{"lat":-34.6,"lng":-58.38}');
+  });
+
+  /**
+   * La identidad del chofer sale del JWT. Este test existe para que agregarle
+   * un `?choferId=` a la firma rompa algo: si el chofer viajara por query
+   * string, cualquiera podria leer la ruta de otro cambiando un valor.
+   */
+  it('mi ruta no manda el chofer por query, ni cuando se lo pasan', async () => {
+    await fetchMyRoute('ldap:mgomez');
+
+    expect(calledPath()).toMatch(/\/rutas\/mias$/);
+    expect(calledPath()).not.toContain('chofer');
+  });
+
+  /* --- CU-11 ------------------------------------------------------------ */
+
+  it('los cercanos van al endpoint publico y sin Authorization', async () => {
+    await fetchNearbyContainers({ lat: -34.6, lng: -58.38, radioMetros: 1000, tipoResiduo: '' });
+
+    expect(calledPath()).toMatch(/\/publico\/contenedores\/cercanos\?/);
+    expect(calledPath()).toContain('radioMetros=1000');
+    // tipoResiduo vacio no ensucia el query string.
+    expect(calledPath()).not.toContain('tipoResiduo');
+    expect(calledOptions().headers.Authorization).toBeUndefined();
   });
 });

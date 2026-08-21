@@ -35,6 +35,21 @@ export const WASTE_TYPE_LABEL = {
   ORGANICO: 'Organico',
 };
 
+/**
+ * CU-11 · La vista ciudadana colorea por TIPO, no por estado: el payload
+ * publico no trae el estado y el nivel de llenado no es asunto del vecino.
+ *
+ * Hexadecimales y no variables CSS porque Leaflet los usa en `pathOptions`,
+ * que no resuelve custom properties. Son los mismos de tokens.css.
+ */
+export const WASTE_TYPE_COLOR = {
+  COMUN: '#68717D',      /* Gris Medio */
+  RECICLABLE: '#2563A6', /* Azul Institucional */
+  ORGANICO: '#4F8A72',   /* Verde Urbano */
+};
+
+export const colorForWasteType = (type) => WASTE_TYPE_COLOR[type] ?? WASTE_TYPE_COLOR.COMUN;
+
 export const colorForState = (state) => COLOR_BY_STATE[state] ?? COLOR_BY_STATE.FUERA_DE_SERVICIO;
 
 /**
@@ -171,6 +186,27 @@ export const STOP_STATE_LABEL = {
  * absurdo. Solo desde PROPUESTA se puede asignar.
  */
 export const canAssign = (route) => route.estado === 'PROPUESTA';
+
+/** Las rutas que un chofer todavia tiene que recorrer (CU-10). */
+export const isRouteLive = (route) => route?.estado === 'ASIGNADA' || route?.estado === 'EN_CURSO';
+
+/**
+ * CU-10 · Solo una parada PENDIENTE se puede confirmar.
+ *
+ * Igual que canAcknowledge y canResolve: esto es cortesia de la UI para no
+ * comerse un 409 PARADA_YA_CONFIRMADA, no seguridad. El backend valida igual.
+ *
+ * OMITIDA se muestra pero no se puede setear: no hay endpoint que la produzca.
+ */
+export const canConfirmStop = (stop) => stop?.estado === 'PENDIENTE';
+
+/** "2 de 3 vaciados" en la cabecera del chofer. */
+export function stopsProgress(paradas = []) {
+  return {
+    confirmed: paradas.filter((s) => s.estado === 'CONFIRMADA').length,
+    total: paradas.length,
+  };
+}
 
 /* ------------------------------------------------------------------------
  * Prediccion de saturacion (CU-12)

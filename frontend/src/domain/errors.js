@@ -42,6 +42,13 @@ export function generalMessage(error) {
       // mano. El mensaje lleva el comando exacto porque no hay otra forma de
       // conseguirlo y mandar a alguien a buscarlo a la documentacion es cruel.
       return 'Token ausente o vencido. Genera uno con: cd backend && npm run token:dev -- ADMINISTRADOR, y pegalo en el boton Token de la barra superior.';
+    case 'PARADA_FUERA_DE_RADIO':
+      // PROPUESTA de contrato: api-preliminar.md documenta el 403 de CU-10 pero
+      // no le puso `code`. Va antes del HTTP_403 generico porque no es un
+      // problema de permisos: el chofer tiene el rol, lo que no tiene es la
+      // cercania. Decirle "no tenes permisos" lo manda a buscar un problema de
+      // rol que no existe.
+      return error.message;
     case 'HTTP_403':
       return `No tenes permisos para esta accion. ${error.message}`;
     case 'SIN_CONEXION':

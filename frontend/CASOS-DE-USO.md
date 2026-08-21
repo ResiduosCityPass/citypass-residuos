@@ -23,11 +23,11 @@ Actualizado al **2026-08-21**.
 | CU-07 | Ver mapa en tiempo real | Mapa en vivo | Hecho | Implementado y verificado |
 | CU-08 | Generar ruta óptima | Rutas | Hecho | **Borrador** |
 | CU-09 | Asignar ruta a camión y chofer | Detalle de la ruta | Hecho | **Borrador** |
-| CU-10 | Confirmar vaciado | — | **Falta** | **Borrador** |
-| CU-11 | Consultar contenedores cercanos | — | **Falta** | **Borrador** |
+| CU-10 | Confirmar vaciado | Mi ruta (chofer) | Hecho | **Borrador** |
+| CU-11 | Consultar contenedores cercanos | Vista ciudadana | Hecho | **Borrador** |
 | CU-12 | Predecir saturación | Detalle del contenedor | Hecho | **Endpoint pendiente** |
 
-**9 diseñados · 1 sin pantalla · 2 pendientes.**
+**11 diseñados · 1 sin pantalla (CU-04, lo llaman los sensores).**
 
 ### Qué significa cada estado de contrato
 
@@ -54,6 +54,13 @@ Actualizado al **2026-08-21**.
 | `/flota` | Flota | CU-03 |
 | `/rutas` | Rutas | CU-08 |
 | `/rutas/:id` | Detalle de la ruta | CU-08 + CU-09 |
+
+Y dos que corren **fuera del Shell**, porque no son del operador:
+
+| Ruta | Pantalla | CU | Quién la usa |
+|---|---|---|---|
+| `/cerca` | Vista ciudadana | CU-11 | Cualquiera, sin login ni token |
+| `/chofer` | Mi ruta | CU-10 | El chofer, desde el celular |
 
 Las rutas están en castellano a propósito: espejan las del backend y las ve el usuario en la barra
 de direcciones. El resto del código está en inglés (ver [README](README.md#idioma-del-código)).
@@ -284,36 +291,97 @@ para elegir chofer y confirmar.
 
 ---
 
-# Los que no están
+# Los otros actores
 
-## CU-04 · Reportar nivel de llenado — sin pantalla
+Las dos pantallas que no son del operador. Corren **fuera del Shell**: `App.jsx` tiene el `<Routes>`
+por afuera y el Shell como *layout route*, así que estas rutas no montan sidebar, no montan barra
+superior, y —clave para CU-11— **no disparan el conteo de alertas**, que sin token sería un `401`
+en cada carga.
+
+## CU-11 · Consultar contenedores cercanos
+
+*"Tengo pilas usadas, ¿dónde las tiro?"*. La única pantalla pública del módulo: sin sidebar, sin
+login y sin token.
+
+**Dónde vive:** [`pages/NearbyContainersPage.jsx`](src/pages/NearbyContainersPage.jsx) ·
+[`components/public/NearbyMap.jsx`](src/components/public/NearbyMap.jsx) ·
+[`hooks/useGeolocation.js`](src/hooks/useGeolocation.js)
+
+**Consume:** `GET /publico/contenedores/cercanos?lat=&lng=&radioMetros=&tipoResiduo=` — **sin
+`Authorization`**, vía `apiPublic` en [`api/client.js`](src/api/client.js).
+
+**Reglas que resuelve la pantalla:**
+
+- **Lo que no muestra es tan parte del caso de uso como lo que muestra.** Ni nivel de llenado ni
+  alertas: eso es información operativa interna. El mock proyecta el payload **por lista explícita
+  de campos, nunca con un spread**, para que agregar mañana un campo al fixture no lo filtre por
+  accidente. Hay un test que falla si algún día se cuela.
+- **No pide el permiso de GPS al montar.** Un prompt de ubicación antes de que la persona entienda
+  qué pantalla está mirando es exactamente lo que se deniega. Se pide cuando aprieta el botón.
+- **Si deniega, el mensaje dice qué hacer** ("podés activarlo desde el candado de la barra de
+  direcciones"), no "permiso denegado" a secas, y se abre solo el formulario manual con tres
+  presets: Obelisco, Palermo y Chacarita, que son los tres clusters de los fixtures.
+- **No hay buscador de direcciones.** Geocodificar necesita un servicio externo, y eso significa
+  mandarle a un tercero dónde está parada la persona. Por la misma razón no hay link a Google Maps.
+- **Los marcadores se colorean por tipo de residuo, no por estado**: el estado no viene en este
+  payload y no debería.
+- **El radio es un `<select>`, no un slider.** Evita la tormenta de requests sin necesitar debounce.
+
+**Por qué la distancia la calcula el servidor:** ya tuvo que hacer Haversine para aplicar el filtro
+de radio; recalcularla en el cliente duplica la fórmula y las dos pueden discrepar justo en el
+borde. El cliente igual tiene `distanciaMetros ?? distanceMeters(origin, c)` por si el backend
+decide no mandar el campo, y reordena por su cuenta porque el contrato no promete orden.
+
+## CU-10 · Confirmar vaciado
+
+La pantalla del chofer, parado en la vereda con el celular en la mano: una columna de 520 px,
+botones de 44 px de alto mínimo y cabecera fija con el progreso.
+
+**Dónde vive:** [`pages/DriverStopsPage.jsx`](src/pages/DriverStopsPage.jsx) ·
+[`components/routes/RouteMap.jsx`](src/components/routes/RouteMap.jsx) (reusado con un prop `me`
+opcional) · [`hooks/useGeolocation.js`](src/hooks/useGeolocation.js)
+
+**Consume:** `GET /rutas/mias` · `PATCH /paradas/:id/confirmar`
+
+**Reglas que resuelve la pantalla:**
+
+- **`fetchMyRoute()` no toma argumentos.** La identidad del chofer sale del `sub` del JWT: si
+  viajara por query string, cualquiera podría leer la ruta de otro cambiando un valor. Hay un test
+  que verifica que no se agregue un `choferId` a la URL ni cuando se lo pasan.
+- **Se confirma con un solo tap.** `useGeolocation().request()` devuelve la posición además de
+  dejarla en el estado, así pedir la ubicación y mandarla son el mismo gesto. La posición se pide
+  **fresca en cada confirmación**: el chofer se movió entre una parada y la siguiente.
+- **El `403` y el `409` se tratan distinto porque son cosas distintas.** Fuera de radio, la pantalla
+  suma **a cuántos metros está** — el backend dice qué pasó, la UI dice cuánto falta. Una parada ya
+  confirmada es un `Notice` de información, no un error: casi siempre es un doble tap.
+- **No hay carga manual de coordenadas**, a diferencia de CU-11: dejarle escribir la posición al
+  chofer anula el único control que tiene este caso de uso.
+- **`OMITIDA` se muestra pero no se puede setear.** El estado existe en el enum y la lista lo pinta,
+  pero no hay endpoint que lo produzca. Es un pedido de contrato más.
+- **Recortado:** sin soporte offline (ADR-004). Es el ítem más caro del relevamiento y ninguna
+  dimensión de la rúbrica lo exige.
+
+**El toggle "Simular que estoy en el contenedor"** está gateado por `USING_MOCKS` y no puede estar
+de otra forma: en producción sería un bypass del único control del caso de uso. Existe porque los
+contenedores del seed están en CABA y cualquiera que pruebe la demo está a kilómetros, así que sin
+él el camino feliz no se puede mostrar. Con el toggle apagado se sigue demostrando el `403`.
+
+**Efecto que vale para la demo:** el `store` de los mocks es compartido, así que confirmar en
+`/chofer` deja el contenedor en 0% y `NORMAL` en `/contenedores` y en `/mapa`, cierra sus alertas de
+saturación en `/alertas`, y al cerrarse la ruta libera el camión en `/flota`. Las cinco pantallas
+cuentan la misma historia sin coordinarse.
+
+---
+
+# El que no tiene pantalla
+
+## CU-04 · Reportar nivel de llenado
 
 `POST /lecturas` lo llaman **los sensores**, autenticándose con el header `X-Sensor-Key`, no con
 JWT: un sensor es un dispositivo, no una persona con sesión. No hay nada que diseñar.
 
 Es el disparador de todo el dominio: cada lectura que entra actualiza el contenedor y dispara las
 reglas de CU-05 y CU-06. Es de donde salen los datos que se ven cambiar en el mapa.
-
-## CU-11 · Consultar contenedores cercanos — falta
-
-**Por qué no está:** es un layout entero aparte. Sin sidebar, sin login y sin token — es la vista
-pública para el ciudadano.
-
-**Qué necesitaría:** buscador de ubicación, radio en metros, filtro por tipo de residuo, mapa y
-lista de cercanos. Resuelto con la fórmula de Haversine sobre lat/lng.
-
-**Ojo:** no expone nivel de llenado ni alertas. Eso es información operativa interna.
-
-## CU-10 · Confirmar vaciado — falta
-
-**Por qué no está:** es una pantalla móvil, para el chofer en la calle. Otro layout y otro tipo de
-interacción.
-
-**Qué necesitaría:** la lista de paradas de "mi ruta", confirmar vaciado con validación de GPS por
-radio (100 m por defecto), y el manejo del `403` cuando el chofer está fuera del radio permitido.
-
-**Recortado:** sin soporte offline. Es el ítem más caro del relevamiento y ninguna dimensión de la
-rúbrica lo exige (ADR-004).
 
 ---
 
@@ -331,12 +399,16 @@ Con eso, las llamadas pasan a [`api/waste.http.js`](src/api/waste.http.js) y de 
 [`api/client.js`](src/api/client.js), que pone el token y normaliza los errores. **Las pantallas no
 se tocan.**
 
-Los mocks fallan con los mismos `code` estables que el backend
-(`ZONA_CON_CONTENEDORES`, `CONTENEDOR_YA_TIENE_SENSOR`, `ALERTA_NO_ABIERTA`, `HTTP_400` con
-`message` como array), así que las pantallas de error ya están diseñadas contra el comportamiento
-real y no contra un backend imaginario.
+La excepción es CU-11, que es público: sus llamadas van por `apiPublic`, que **no manda el header
+`Authorization` ni aunque haya un token guardado**. Un operador logueado que abre la vista ciudadana
+no filtra su identidad a un endpoint anónimo.
 
-Cuando las nueve estén conectadas se borra `src/mocks/`, se borra la variable, y `waste.js` vuelve
+Los mocks fallan con los mismos `code` estables que el backend
+(`ZONA_CON_CONTENEDORES`, `CONTENEDOR_YA_TIENE_SENSOR`, `ALERTA_NO_ABIERTA`, `PARADA_YA_CONFIRMADA`,
+`HTTP_400` con `message` como array), así que las pantallas de error ya están diseñadas contra el
+comportamiento real y no contra un backend imaginario.
+
+Cuando las once estén conectadas se borra `src/mocks/`, se borra la variable, y `waste.js` vuelve
 a ser un re-export de `waste.http.js`. Está documentado en
 [ADR-007](../docs/adr/ADR-007-design-system-y-mocks.md).
 
@@ -344,7 +416,7 @@ a ser un re-export de `waste.http.js`. Está documentado en
 
 # Pedidos de contrato pendientes
 
-Tres límites del backend que están **visibles en la UI a propósito**, en vez de disimulados:
+Cuatro límites del backend que están **visibles en la UI a propósito**, en vez de disimulados:
 
 1. **No hay forma de poner un contenedor en `FUERA_DE_SERVICIO`.** El estado existe en el enum y el
    motor de reglas lo respeta, pero `PATCH /contenedores/:id` no acepta `estado` y no hay otro
@@ -356,6 +428,26 @@ Tres límites del backend que están **visibles en la UI a propósito**, en vez 
    del directorio del Squad 2 ([ADR-005](../docs/adr/ADR-005-seguridad-identidad.md)), y CU-09
    necesita poblar un `<select>` con ellos. Hoy salen de datos falsos y la pantalla lo dice.
 
+4. **No hay endpoint para omitir una parada.** `EstadoParada.OMITIDA` existe en el enum del backend
+   y es un caso de negocio real (el chofer llegó y no pudo vaciar: auto mal estacionado, calle
+   cortada), pero el único endpoint documentado es `/confirmar`. La lista del chofer pinta el estado
+   y no lo puede producir.
+
+Y **cuatro huecos del contrato de CU-10 y CU-11** que hubo que llenar para poder escribir el mock.
+Están marcados con `PROPUESTA` en el código, así que un grep los encuentra a todos si Francisco
+elige distinto — lo que se rehace es el mock, no la pantalla:
+
+| Hueco | Lo que asumimos |
+|---|---|
+| `code` del `403` de radio | **`PARADA_FUERA_DE_RADIO`**, por simetría con `PARADA_YA_CONFIRMADA`, que ya está documentado y testeado en el backend |
+| Body del `200` de confirmar | La transición completa: `{paradaId, estado, confirmadaEn, contenedorId, estadoContenedor, nivelLlenadoPct, alertasCerradas[], rutaEstado, distanciaMetros}` |
+| Forma de `GET /rutas/mias` | El objeto expandido de `GET /rutas/:id`, o `200` con `null` si no hay ruta activa. No tener ruta es el estado normal de un chofer que terminó, no un error |
+| Proyección de CU-11 | `{id, codigo, lat, lng, tipoResiduo, distanciaMetros}` — el payload de CU-07 menos `estado` y `nivelLlenadoPct` |
+
+Y tres preguntas abiertas sobre el ciclo de vida de la ruta que el contrato no responde: ¿la primera
+confirmación la pasa a `EN_CURSO`? ¿la última a `COMPLETADA`? ¿eso libera el camión? El mock asume
+que sí a las tres.
+
 Hay otros tres pedidos que no se ven en pantalla pero encarecen el cliente: el payload del mapa no
 informa alertas (obliga a la segunda llamada), `GET /alertas` no trae el código del contenedor, y
 el payload del mapa no trae `zonaNombre` ni `umbralCriticoPct`.
@@ -364,20 +456,26 @@ el payload del mapa no trae `zonaNombre` ni `umbralCriticoPct`.
 
 # Estado de los tests
 
-**115 tests, todos en verde.** Cobertura: 81,5% de sentencias, 86,4% de líneas. El umbral que
-fuerza el CI es 60% (dimensión 6 de la rúbrica).
+**163 tests, todos en verde.** Cobertura: 82,4% de sentencias, 86,9% de líneas, 76,9% de ramas y
+75,3% de funciones. El umbral configurado en `vite.config.js` es 60% en las cuatro métricas
+(dimensión 6 de la rúbrica).
+
+> **Ojo:** ese umbral **no lo fuerza el CI todavía.** `.github/workflows/ci.yml` tiene un solo job,
+> `backend`. El del frontend hay que correrlo a mano con `npm run cobertura`.
 
 | Área | Tests |
 |---|---|
-| Dominio (estados, errores, alertas, predicción, flota) | 23 |
-| Cliente HTTP y rutas de la API | 12 |
-| Hook del mapa en vivo | 5 |
+| Dominio (estados, errores, alertas, predicción, flota, geo) | 38 |
+| Cliente HTTP y rutas de la API | 18 |
+| Hooks (mapa en vivo, geolocalización) | 10 |
 | Contenedores (listado, detalle, panel, API key, predicción) | 26 |
 | Zonas | 7 |
 | Alertas | 11 |
 | Flota | 6 |
 | Rutas | 14 |
-| Shell y navegación | 6 |
+| Vista ciudadana (CU-11) | 9 |
+| Mi ruta del chofer (CU-10) | 11 |
+| Shell y navegación | 8 |
 
 `src/mocks/` queda **fuera del cómputo de cobertura**: es andamiaje con fecha de vencimiento, y
 exigirle tests sería pagar por código que no llega a producción.

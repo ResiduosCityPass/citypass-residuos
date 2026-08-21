@@ -56,3 +56,10 @@ export const fetchDrivers = (...args) => source.fetchDrivers(...args);
 export const fetchAlerts = (...args) => source.fetchAlerts(...args);
 export const acknowledgeAlert = (...args) => source.acknowledgeAlert(...args);
 export const resolveAlert = (...args) => source.resolveAlert(...args);
+
+/* CU-10 · Confirmar vaciado */
+export const fetchMyRoute = (...args) => source.fetchMyRoute(...args);
+export const confirmStop = (...args) => source.confirmStop(...args);
+
+/* CU-11 · Consulta ciudadana */
+export const fetchNearbyContainers = (...args) => source.fetchNearbyContainers(...args);

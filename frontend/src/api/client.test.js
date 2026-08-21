@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { api, ApiError, saveToken, clearToken } from './client.js';
+import { api, apiPublic, ApiError, saveToken, clearToken } from './client.js';
 
 describe('cliente de la API', () => {
   beforeEach(() => {
@@ -82,5 +82,41 @@ describe('cliente de la API', () => {
 
     expect(error).toBeInstanceOf(ApiError);
     expect(error.code).toBe('SIN_CONEXION');
+  });
+
+  /**
+   * CU-11 es la unica pantalla publica del modulo. La asercion que importa no
+   * es que ande sin token: es que NO mande el header aunque haya uno guardado.
+   * Un operador logueado que abre la vista ciudadana no tiene que filtrar su
+   * identidad a un endpoint anonimo.
+   */
+  it('apiPublic no manda Authorization aunque haya un token guardado', async () => {
+    const fetchMock = respond([]);
+    saveToken('un-jwt');
+
+    await apiPublic.get('/publico/contenedores/cercanos', { lat: -34.6, lng: -58.38 });
+
+    const [, options] = fetchMock.mock.calls[0];
+    expect(options.headers.Authorization).toBeUndefined();
+  });
+
+  it('apiPublic saltea los filtros vacios igual que api.get', async () => {
+    const fetchMock = respond([]);
+
+    await apiPublic.get('/publico/contenedores/cercanos', {
+      lat: -34.6,
+      lng: -58.38,
+      tipoResiduo: '',
+    });
+
+    expect(fetchMock.mock.calls[0][0]).toMatch(/lat=-34.6&lng=-58.38$/);
+  });
+
+  it('`anonymous` no se filtra al fetch como opcion de RequestInit', async () => {
+    const fetchMock = respond([]);
+
+    await apiPublic.get('/publico/contenedores/cercanos');
+
+    expect(fetchMock.mock.calls[0][1]).not.toHaveProperty('anonymous');
   });
 });

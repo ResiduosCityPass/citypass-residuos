@@ -31,6 +31,17 @@ const WASTE_SECTIONS = [
   { to: '/rutas', icon: 'routes', label: 'Rutas', useCase: 'CU-08/09' },
 ];
 
+/**
+ * Las dos pantallas que no son del operador. Van en un bloque aparte y no
+ * entre las secciones de arriba porque son otro actor, no otra parte del
+ * panel: un ciudadano nunca ve este sidebar y un chofer entra desde el celular.
+ * Estan enlazadas igual para que la demo no obligue a tipear URLs.
+ */
+const OTHER_ACTOR_VIEWS = [
+  { to: '/cerca', icon: 'map', label: 'Vista ciudadana', useCase: 'CU-11' },
+  { to: '/chofer', icon: 'routes', label: 'Mi ruta (chofer)', useCase: 'CU-10' },
+];
+
 export default function Sidebar({ openAlerts = 0 }) {
   return (
     <nav className="sidebar" aria-label="Modulos de CityPass+">
@@ -52,6 +63,22 @@ export default function Sidebar({ openAlerts = 0 }) {
                   <span className="sidebar-badge">{openAlerts}</span>
                 )}
                 <span className="sidebar-cu">{section.useCase}</span>
+              </NavLink>
+            </li>
+          );
+        })}
+      </ul>
+
+      <p className="sidebar-heading">Otras vistas</p>
+      <ul className="sidebar-list">
+        {OTHER_ACTOR_VIEWS.map((view) => {
+          const Icon = Icons[view.icon];
+          return (
+            <li key={view.to}>
+              <NavLink to={view.to} className={({ isActive }) => `sidebar-item ${isActive ? 'active' : ''}`}>
+                <Icon />
+                <span>{view.label}</span>
+                <span className="sidebar-cu">{view.useCase}</span>
               </NavLink>
             </li>
           );

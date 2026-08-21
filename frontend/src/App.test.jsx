@@ -2,7 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from './App.jsx';
-import { fetchAlerts, fetchZones, fetchMapContainers, fetchContainers } from './api/waste.js';
+import {
+  fetchAlerts,
+  fetchZones,
+  fetchMapContainers,
+  fetchContainers,
+  fetchDrivers,
+  fetchMyRoute,
+} from './api/waste.js';
 
 vi.mock('./api/waste.js', () => ({
   USING_MOCKS: true,
@@ -21,10 +28,23 @@ vi.mock('./api/waste.js', () => ({
   deleteZone: vi.fn(),
   acknowledgeAlert: vi.fn(),
   resolveAlert: vi.fn(),
+  fetchDrivers: vi.fn(),
+  fetchMyRoute: vi.fn(),
+  confirmStop: vi.fn(),
+  fetchNearbyContainers: vi.fn(),
 }));
 
 vi.mock('./components/ContainersMap.jsx', () => ({
   default: () => <div data-testid="mapa" />,
+}));
+
+// Leaflet necesita un contenedor con tamano real, que jsdom no da.
+vi.mock('./components/public/NearbyMap.jsx', () => ({
+  default: () => <div data-testid="mapa-cercanos" />,
+}));
+
+vi.mock('./components/routes/RouteMap.jsx', () => ({
+  default: () => <div data-testid="mapa-ruta" />,
 }));
 
 const alert = (estado) => ({
@@ -41,10 +61,13 @@ const alert = (estado) => ({
 describe('shell de la aplicacion', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.history.pushState({}, '', '/');
     fetchMapContainers.mockResolvedValue([]);
     fetchContainers.mockResolvedValue([]);
     fetchZones.mockResolvedValue([]);
     fetchAlerts.mockResolvedValue([]);
+    fetchDrivers.mockResolvedValue([]);
+    fetchMyRoute.mockResolvedValue(null);
   });
 
   it('arranca en el mapa', async () => {
@@ -103,5 +126,28 @@ describe('shell de la aplicacion', () => {
     render(<App />);
 
     expect(await screen.findByRole('heading', { name: 'Mapa en tiempo real' })).toBeInTheDocument();
+  });
+
+  /**
+   * CU-11 vive fuera del Shell. Si quedara adentro, el useEffect del globo
+   * pediria /alertas sin token en cada carga: un 401 garantizado para alimentar
+   * un contador que el ciudadano no ve.
+   */
+  it('la vista ciudadana no pide alertas ni muestra el sidebar', async () => {
+    window.history.pushState({}, '', '/cerca');
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: /Donde tiro esto/ })).toBeInTheDocument();
+    expect(fetchAlerts).not.toHaveBeenCalled();
+    expect(screen.queryByRole('navigation', { name: /Modulos de CityPass/ })).not.toBeInTheDocument();
+  });
+
+  it('la vista del chofer tampoco monta el shell del operador', async () => {
+    window.history.pushState({}, '', '/chofer');
+    render(<App />);
+
+    await waitFor(() => expect(fetchMyRoute).toHaveBeenCalled());
+    expect(fetchAlerts).not.toHaveBeenCalled();
+    expect(screen.queryByRole('navigation', { name: /Modulos de CityPass/ })).not.toBeInTheDocument();
   });
 });

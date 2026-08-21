@@ -1,5 +1,6 @@
 import { ApiError } from '../api/client.js';
 import { ZONES, CONTAINERS, SENSORS, ALERTS, TRUCKS, DRIVERS, ROUTES, STOPS } from './data.js';
+import { DEPOT, distanceKm, distanceMeters } from '../domain/geo.js';
 
 /**
  * Servidor falso en memoria. Implementa las mismas firmas que api/waste.http.js
@@ -406,21 +407,6 @@ export function updateTruck(id, changes) {
 
 export const fetchDrivers = () => respond(store.drivers);
 
-/** Obelisco: de aca sale y vuelve el camion. */
-const DEPOT = { lat: -34.6037, lng: -58.3816 };
-
-/** Haversine en kilometros. Es la misma formula que usa CU-11. */
-function distanceKm(a, b) {
-  const R = 6371;
-  const toRad = (deg) => (deg * Math.PI) / 180;
-  const dLat = toRad(b.lat - a.lat);
-  const dLng = toRad(b.lng - a.lng);
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(h));
-}
-
 /** Litros que ocupa hoy un contenedor, segun su nivel de llenado. */
 const litersIn = (container) => (container.capacidadLitros * container.nivelLlenadoPct) / 100;
 
@@ -575,4 +561,149 @@ export function assignRoute(id, data = {}) {
   }
 
   return respond(expandRoute(route));
+}
+
+/* ========================================================================
+ * CU-10 · Confirmar vaciado
+ * ====================================================================== */
+
+/** Radio permitido, configuracion del servidor. El default del contrato son 100 m. */
+export const CONFIRM_RADIUS_M = 100;
+
+/**
+ * La ruta activa del chofer. En el backend la identidad sale del JWT; aca se
+ * acepta un id opcional solo para que el <select> de demo pueda cambiar de
+ * chofer. La implementacion HTTP tiene aridad cero y lo ignora.
+ *
+ * Devuelve `null` con exito cuando no hay ruta activa: un chofer que ya
+ * termino el turno no es un error.
+ */
+export function fetchMyRoute(driverId) {
+  const route = store.routes.find(
+    (r) => ['ASIGNADA', 'EN_CURSO'].includes(r.estado) && (!driverId || r.choferId === driverId),
+  );
+  return respond(route ? expandRoute(route) : null);
+}
+
+/**
+ * Confirma el vaciado de una parada validando la cercania del chofer.
+ *
+ * Ademas de marcar la parada, reproduce los efectos que el contrato le pide al
+ * backend: devuelve el contenedor a NORMAL, cierra sus alertas de saturacion
+ * abiertas, y mueve la ruta. Eso hace que confirmar en /chofer se vea al toque
+ * en /alertas, /mapa y /flota, que es como se demuestra el ciclo completo.
+ */
+export function confirmStop(id, position = {}) {
+  const stop = store.stops.find((s) => s.id === id);
+  if (!stop) return fail('PARADA_NO_ENCONTRADA', 404, `No existe la parada ${id}`);
+
+  if (stop.estado === 'CONFIRMADA') {
+    return fail('PARADA_YA_CONFIRMADA', 409, `La parada ${stop.orden} ya fue confirmada`);
+  }
+
+  const lat = Number(position.lat);
+  const lng = Number(position.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return fail('HTTP_400', 400, [
+      'lat must be a latitude string or number',
+      'lng must be a longitude string or number',
+    ]);
+  }
+
+  const container = store.containers.find((c) => c.id === stop.contenedorId);
+  const meters = Math.round(distanceMeters({ lat, lng }, container));
+
+  // PROPUESTA: api-preliminar.md documenta el 403 pero no le puso `code`.
+  if (meters > CONFIRM_RADIUS_M) {
+    return fail(
+      'PARADA_FUERA_DE_RADIO',
+      403,
+      `Estas a ${meters} m del contenedor ${container.codigo}. El maximo permitido es ${CONFIRM_RADIUS_M} m`,
+    );
+  }
+
+  stop.estado = 'CONFIRMADA';
+  stop.confirmadaEn = now();
+
+  container.nivelLlenadoPct = 0;
+  // Un contenedor fuera de servicio no vuelve a NORMAL por vaciarlo: lo que
+  // tiene roto es el sensor o la tapa, no el nivel.
+  if (container.estado !== 'FUERA_DE_SERVICIO') container.estado = 'NORMAL';
+  container.actualizadoEn = now();
+
+  const closed = store.alerts.filter(
+    (a) => a.contenedorId === container.id && a.tipo === 'SATURACION' && a.estado !== 'RESUELTA',
+  );
+  closed.forEach((a) => {
+    a.estado = 'RESUELTA';
+    a.resueltaEn = now();
+  });
+
+  // PROPUESTA: el contrato no dice nada del ciclo de vida de la ruta. La
+  // primera confirmacion la arranca, la ultima la cierra y libera el camion.
+  const route = store.routes.find((r) => r.id === stop.rutaId);
+  if (route.estado === 'ASIGNADA') route.estado = 'EN_CURSO';
+  if (routeStops(route.id).every((s) => s.estado !== 'PENDIENTE')) {
+    route.estado = 'COMPLETADA';
+    const truck = store.trucks.find((t) => t.id === route.camionId);
+    if (truck) {
+      truck.estado = 'DISPONIBLE';
+      truck.actualizadoEn = now();
+    }
+  }
+
+  // PROPUESTA de payload del 200: la transicion completa, para que el llamador
+  // sepa que paso sin tener que volver a pedir todo.
+  return respond({
+    paradaId: stop.id,
+    estado: stop.estado,
+    confirmadaEn: stop.confirmadaEn,
+    contenedorId: container.id,
+    estadoContenedor: container.estado,
+    nivelLlenadoPct: container.nivelLlenadoPct,
+    alertasCerradas: closed.map((a) => a.id),
+    rutaEstado: route.estado,
+    distanciaMetros: meters,
+  });
+}
+
+/* ========================================================================
+ * CU-11 · Consulta ciudadana (publico)
+ * ====================================================================== */
+
+const DEFAULT_RADIUS_M = 1000;
+
+export function fetchNearbyContainers(filters = {}) {
+  const lat = Number(filters.lat);
+  const lng = Number(filters.lng);
+
+  const errors = [];
+  if (!Number.isFinite(lat)) errors.push('lat must be a latitude string or number');
+  if (!Number.isFinite(lng)) errors.push('lng must be a longitude string or number');
+  if (errors.length > 0) return fail('HTTP_400', 400, errors);
+
+  const from = { lat, lng };
+  const radius = Number(filters.radioMetros ?? DEFAULT_RADIUS_M);
+
+  return respond(
+    active()
+      // Mandar a alguien caminando hasta un contenedor roto es peor que no
+      // listarlo. Filtrar POR el estado no es lo mismo que exponerlo.
+      .filter((c) => c.estado !== 'FUERA_DE_SERVICIO')
+      .filter((c) => !filters.tipoResiduo || c.tipoResiduo === filters.tipoResiduo)
+      .map((c) => ({ c, meters: Math.round(distanceMeters(from, c)) }))
+      .filter(({ meters }) => meters <= radius)
+      .sort((a, b) => a.meters - b.meters)
+      // Proyeccion por lista explicita de campos, NUNCA por rest: agregar
+      // manana un campo al fixture no puede filtrar nivelLlenadoPct ni estado
+      // a la vista publica por accidente. Ese es todo el punto de CU-11.
+      .map(({ c, meters }) => ({
+        id: c.id,
+        codigo: c.codigo,
+        lat: c.lat,
+        lng: c.lng,
+        tipoResiduo: c.tipoResiduo,
+        distanciaMetros: meters,
+      })),
+  );
 }

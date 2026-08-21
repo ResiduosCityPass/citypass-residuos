@@ -60,4 +60,21 @@ describe('generalMessage', () => {
 
     expect(generalMessage(error)).toContain('ADMINISTRADOR');
   });
+
+  /**
+   * El 403 de CU-10 no es un problema de permisos: el chofer tiene el rol, lo
+   * que no tiene es la cercania. Si cayera en el HTTP_403 generico, la pantalla
+   * le diria "no tenes permisos" y lo mandaria a buscar un problema que no
+   * existe, en vez de decirle que camine media cuadra.
+   */
+  it('estar fuera del radio no se cuenta como falta de permisos', () => {
+    const error = new ApiError({
+      code: 'PARADA_FUERA_DE_RADIO',
+      status: 403,
+      message: 'Estas a 340 m del contenedor CT-0010. El maximo permitido es 100 m',
+    });
+
+    expect(generalMessage(error)).toBe(error.message);
+    expect(generalMessage(error)).not.toMatch(/permisos/i);
+  });
 });

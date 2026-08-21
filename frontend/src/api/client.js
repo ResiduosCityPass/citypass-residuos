@@ -46,16 +46,18 @@ function toText(message) {
 }
 
 async function request(path, options = {}) {
-  const token = readToken();
+  // `anonymous` no es parte de RequestInit: se saca antes de llegar a fetch.
+  const { anonymous = false, ...init } = options;
+  const token = anonymous ? '' : readToken();
 
   let response;
   try {
     response = await fetch(`${BASE_URL}${path}`, {
-      ...options,
+      ...init,
       headers: {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...options.headers,
+        ...init.headers,
       },
     });
   } catch {
@@ -100,4 +102,20 @@ export const api = {
   post: (path, body) => request(path, { method: 'POST', body: JSON.stringify(body ?? {}) }),
   patch: (path, body) => request(path, { method: 'PATCH', body: JSON.stringify(body ?? {}) }),
   delete: (path) => request(path, { method: 'DELETE' }),
+};
+
+/**
+ * Endpoints marcados @Public() en el backend (ADR-005). Hoy solo CU-11.
+ *
+ * Existe como objeto aparte y no como una bandera de `api.get` para que la
+ * unica forma de mandar una llamada sin token sea escribir la palabra en el
+ * llamado: un tercer parametro posicional se pone en el lugar equivocado y
+ * nadie lo nota. Que no exista `apiPublic.post` tambien es a proposito: la
+ * vista ciudadana lee, no escribe.
+ *
+ * Sigue apuntando a BASE_URL. Si algun dia la vista ciudadana se despliega en
+ * otro origen, hay que parametrizarlo aca.
+ */
+export const apiPublic = {
+  get: (path, filters) => request(`${path}${query(filters)}`, { anonymous: true }),
 };

@@ -511,3 +511,174 @@
 .stop-body { flex: 1; min-width: 0; display: grid; gap: var(--space-2); }
 .stop-head { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .stop-fill { display: flex; align-items: center; gap: var(--space-2); }
+
+/* ------------------------------------------------------------------------
+ * CU-11 · Vista ciudadana (fuera del Shell)
+ * ---------------------------------------------------------------------- */
+
+.public-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+.public-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  background: var(--navy);
+  color: #fff;
+  font-family: var(--font-heading);
+}
+
+.public-brand { display: flex; align-items: center; gap: var(--space-2); margin-right: auto; }
+.public-brand .muted { color: var(--sky); }
+
+.public-main {
+  flex: 1;
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.public-main h1 { margin: 0; font-family: var(--font-heading); font-size: var(--font-size-2xl); }
+.public-lead { margin: 0; color: var(--text-muted); }
+
+.public-footer {
+  padding: var(--space-4) var(--space-5);
+  text-align: center;
+  border-top: 1px solid var(--border);
+  font-size: var(--font-size-sm);
+}
+
+.locate-empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  text-align: center;
+}
+
+.manual-origin { display: grid; gap: var(--space-3); justify-items: start; }
+.manual-origin > p, .manual-origin > .two-col { width: 100%; }
+.preset-row { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+
+.nearby-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: var(--space-4); }
+.nearby-side { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+
+/* .map es flex:1 + height:100%, asi que necesita un padre con altura resuelta.
+   Aca no lo hay: la altura se fija igual que en .map-route. */
+.map-public { height: 420px; flex: none; }
+
+.map-legend {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+}
+
+.map-legend li { display: flex; align-items: center; gap: var(--space-1); }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+
+.nearby-list { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-2); }
+
+.nearby-item button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.nearby-item button:hover { border-color: var(--border-strong); }
+.nearby-item.selected button { border-color: var(--accent); box-shadow: var(--shadow-sm); }
+
+.nearby-distance {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text-strong);
+  min-width: 64px;
+}
+
+/* ------------------------------------------------------------------------
+ * CU-10 · Pantalla del chofer (movil, fuera del Shell)
+ * ---------------------------------------------------------------------- */
+
+.driver-shell {
+  min-height: 100vh;
+  max-width: 520px;
+  margin: 0 auto;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+}
+
+.driver-header {
+  position: sticky;
+  top: 0;
+  /* Arriba de todo lo que dibuja Leaflet: sus paneles van a 400, los
+     controles a 800 y las esquinas .leaflet-top/.leaflet-bottom a 1000. Con
+     un valor menor, el mapa se dibuja encima de la cabecera al hacer scroll. */
+  z-index: 1100;
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--navy);
+  color: #fff;
+}
+
+.driver-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--font-heading);
+  font-size: var(--font-size-lg);
+}
+
+.driver-cu { font-size: var(--font-size-xs); color: var(--sky); font-family: var(--font-mono); }
+.driver-route-line { display: flex; align-items: center; gap: var(--space-2); }
+.driver-progress { margin: 0; font-size: var(--font-size-sm); color: var(--sky); }
+
+.driver-main { flex: 1; display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-4); }
+.demo-panel { display: grid; gap: var(--space-2); }
+.demo-gps { display: flex; align-items: center; gap: var(--space-2); font-size: var(--font-size-sm); }
+
+/* index.css le pone width:100% a todo input; un checkbox no. */
+.demo-gps input[type="checkbox"] { width: auto; flex: none; padding: 0; margin: 0; }
+
+.stop-actions { display: flex; gap: var(--space-2); margin-top: var(--space-1); }
+
+/* 44px es el minimo de area tactil que recomienda iOS. El chofer aprieta esto
+   con guantes, parado en la calle. */
+.stop-actions .btn { flex: 1; min-height: 44px; justify-content: center; }
+
+.stop-feedback { margin-top: var(--space-1); }
+
+@media (max-width: 900px) {
+  .nearby-layout { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 560px) {
+  .public-main { padding: var(--space-4); }
+  .driver-shell { max-width: none; }
+}

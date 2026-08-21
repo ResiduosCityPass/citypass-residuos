@@ -129,9 +129,13 @@ Eso es todo. Cualquier tecnología de cliente que sepa hacer `fetch` sirve.
 
 ## Alcance
 
-**9 de los 12 casos de uso están diseñados**, ninguno conectado todavía: todos corren contra los
-mocks. Faltan CU-11 (vista ciudadana) y CU-10 (pantalla del chofer); CU-04 no tiene pantalla
-porque lo llaman los sensores.
+**Los 11 casos de uso que tienen pantalla están diseñados**, ninguno conectado todavía: todos
+corren contra los mocks. El único de los 12 que no tiene pantalla es CU-04, porque lo llaman los
+sensores con `X-Sensor-Key`, no una persona con sesión.
+
+Nueve viven adentro del panel del operador. Las otras dos son de otros actores y corren fuera del
+Shell, sin sidebar: `/cerca` es la consulta ciudadana (CU-11), pública y sin token, y `/chofer` es
+la pantalla móvil del chofer (CU-10).
 
 El detalle —qué pantalla cubre cada caso de uso, en qué archivos vive, qué endpoint consume, qué
 reglas de dominio resuelve y qué límites del backend quedaron a la vista— está en

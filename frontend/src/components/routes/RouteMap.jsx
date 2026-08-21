@@ -11,8 +11,11 @@ const DEPOT = [-34.6037, -58.3816];
  * El orden es lo unico que la heuristica decide, asi que es lo que hay que
  * poder mirar. Cada marcador lleva su numero adentro; sin eso, un operador no
  * tiene forma de juzgar si la propuesta es razonable antes de confirmarla.
+ *
+ * `me` es opcional y lo usa CU-10: la posicion del chofer, para que vea de un
+ * vistazo a que parada esta cerca. El operador de CU-09 no lo pasa.
  */
-export default function RouteMap({ stops }) {
+export default function RouteMap({ stops, me = null }) {
   const points = stops
     .filter((s) => s.contenedor)
     .map((s) => [s.contenedor.lat, s.contenedor.lng]);
@@ -36,6 +39,17 @@ export default function RouteMap({ stops }) {
       >
         <Tooltip direction="top" offset={[0, -8]}>Depósito</Tooltip>
       </CircleMarker>
+
+      {me && (
+        <CircleMarker
+          center={[me.lat, me.lng]}
+          radius={7}
+          pathOptions={{ color: '#ffffff', weight: 2, fillColor: '#2563A6', fillOpacity: 1 }}
+          interactive={false}
+        >
+          <Tooltip direction="top" offset={[0, -8]} permanent>Estás acá</Tooltip>
+        </CircleMarker>
+      )}
 
       {stops.map((stop) =>
         stop.contenedor ? (

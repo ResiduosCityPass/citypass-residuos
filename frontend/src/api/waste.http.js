@@ -1,4 +1,4 @@
-import { api } from './client.js';
+import { api, apiPublic } from './client.js';
 
 /**
  * Implementacion real contra la API del backend.
@@ -112,3 +112,41 @@ export const assignRoute = (id, data) => api.patch(`/rutas/${id}/asignar`, data)
  * listarlos. Queda mockeado y anotado como pedido de contrato.
  */
 export const fetchDrivers = () => api.get('/choferes');
+
+/* --- CU-10 · Mi ruta y confirmar vaciado -------------------------------- */
+
+/**
+ * La ruta activa del chofer AUTENTICADO. La identidad sale del sub del JWT, no
+ * de un parametro: si el chofer viajara por query string, cualquiera podria
+ * leer la ruta de otro cambiando un valor. La firma no toma argumentos a
+ * proposito — si alguien le agrega `?choferId=`, abrio un agujero.
+ *
+ * PROPUESTA de contrato: api-preliminar.md documenta la ruta pero no la forma.
+ * Se asume el mismo objeto expandido de GET /rutas/:id, o `null` con 200
+ * cuando el chofer no tiene ruta activa. No tener ruta es el estado normal de
+ * alguien que termino el turno, no un error, asi que no es un 404.
+ */
+export const fetchMyRoute = () => api.get('/rutas/mias');
+
+/**
+ * CU-10. El cuerpo es exactamente `{ lat, lng }`: el radio permitido es
+ * configuracion del servidor, no algo que el cliente pueda mandar.
+ *
+ * Errores: 403 PARADA_FUERA_DE_RADIO (code PROPUESTO, ver domain/errors.js) y
+ * 409 PARADA_YA_CONFIRMADA.
+ */
+export const confirmStop = (id, position) => api.patch(`/paradas/${id}/confirmar`, position);
+
+/* --- CU-11 · Consulta ciudadana (publico, sin token) -------------------- */
+
+/**
+ * Unico endpoint del modulo que no manda Authorization: va por `apiPublic`.
+ *
+ * Filtros: { lat, lng, radioMetros, tipoResiduo }.
+ *
+ * PROPUESTA de contrato: la respuesta no esta especificada. Se asume el payload
+ * de CU-07 menos `estado` y `nivelLlenadoPct` (informacion operativa interna),
+ * mas `codigo` y `distanciaMetros`.
+ */
+export const fetchNearbyContainers = (filters) =>
+  apiPublic.get('/publico/contenedores/cercanos', filters);
