@@ -1,42 +1,74 @@
-:root {
-  --texto: #1b1f23;
-  --tenue: #6b7280;
-  --borde: #e4e7eb;
-  --fondo: #f7f8fa;
-  --panel: #ffffff;
-  --acento: #2563eb;
-  --error: #d64545;
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
-  color: var(--texto);
-}
+@import './styles/tokens.css';
+@import './styles/ui.css';
 
-* { box-sizing: border-box; }
+/**
+ * Estilos base. Todo lo visual sale de tokens.css: aca solo se aplica.
+ */
+
+*, *::before, *::after { box-sizing: border-box; }
 
 body {
   margin: 0;
-  background: var(--fondo);
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-base);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 
-button {
+h1, h2, h3, h4 {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  color: var(--text-strong);
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+h1 { font-size: var(--font-size-xl); }
+h2 { font-size: var(--font-size-lg); }
+h3 { font-size: var(--font-size-base); }
+
+/* Codigos operativos, UUIDs y API keys. Monoespaciada para que un CT-0001 y un
+   CT-0007 se distingan de un vistazo en una columna de tabla. */
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  letter-spacing: -0.02em;
+}
+
+.muted { color: var(--text-muted); font-size: var(--font-size-sm); margin: 0; }
+
+a { color: var(--accent); }
+
+input, select, textarea {
   font: inherit;
-  padding: 0.4rem 0.8rem;
-  border: 1px solid var(--acento);
-  border-radius: 6px;
-  background: var(--acento);
-  color: #fff;
-  cursor: pointer;
+  font-family: var(--font-ui);
+  width: 100%;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
 }
 
-button.secundario {
-  background: var(--panel);
-  color: var(--texto);
-  border-color: var(--borde);
+input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
 }
 
-input, select {
-  font: inherit;
-  padding: 0.4rem 0.6rem;
-  border: 1px solid var(--borde);
-  border-radius: 6px;
-  background: var(--panel);
+input:disabled, select:disabled {
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+/* Respeta a quien pidio menos movimiento en su sistema: el halo de incendio
+   late, y para alguien con sensibilidad vestibular eso no es un detalle. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

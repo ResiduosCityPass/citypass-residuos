@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
-import PanelContenedor from './PanelContenedor.jsx';
-import { obtenerContenedor, obtenerAlertas } from '../api/residuos.js';
+import ContainerPanel from './ContainerPanel.jsx';
+import { fetchContainer, fetchAlerts } from '../api/waste.js';
 
-vi.mock('../api/residuos.js', () => ({
-  obtenerContenedor: vi.fn(),
-  obtenerAlertas: vi.fn(),
+vi.mock('../api/waste.js', () => ({
+  fetchContainer: vi.fn(),
+  fetchAlerts: vi.fn(),
 }));
 
-const ZONA = {
+const ZONE = {
   id: 'z-1',
   nombre: 'Centro',
   umbralCriticoPct: 70,
@@ -16,11 +16,11 @@ const ZONA = {
   bloqueada: false,
 };
 
-const detalle = (extras = {}) => ({
+const detail = (extras = {}) => ({
   id: 'c-1',
   codigo: 'CT-0001',
   zonaId: 'z-1',
-  zona: ZONA,
+  zona: ZONE,
   tipoResiduo: 'COMUN',
   capacidadLitros: 1100,
   estado: 'CRITICO',
@@ -37,31 +37,31 @@ const detalle = (extras = {}) => ({
   ...extras,
 });
 
-describe('PanelContenedor', () => {
+describe('ContainerPanel', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('muestra el nivel contra el umbral de la zona, no el nivel solo', async () => {
-    obtenerContenedor.mockResolvedValue(detalle());
-    obtenerAlertas.mockResolvedValue([]);
+    fetchContainer.mockResolvedValue(detail());
+    fetchAlerts.mockResolvedValue([]);
 
-    render(<PanelContenedor contenedorId="c-1" onCerrar={() => {}} />);
+    render(<ContainerPanel containerId="c-1" onClose={() => {}} />);
 
     expect(await screen.findByText('CT-0001')).toBeInTheDocument();
     expect(screen.getByText(/94.14% de llenado · umbral de Centro: 70%/)).toBeInTheDocument();
   });
 
   it('avisa cuando el contenedor no tiene sensor, porque nunca va a cambiar de estado', async () => {
-    obtenerContenedor.mockResolvedValue(detalle({ sensor: null }));
-    obtenerAlertas.mockResolvedValue([]);
+    fetchContainer.mockResolvedValue(detail({ sensor: null }));
+    fetchAlerts.mockResolvedValue([]);
 
-    render(<PanelContenedor contenedorId="c-1" onCerrar={() => {}} />);
+    render(<ContainerPanel containerId="c-1" onClose={() => {}} />);
 
     expect(await screen.findByText(/Sin sensor vinculado/)).toBeInTheDocument();
   });
 
   it('lista las alertas y cuenta solo las que no estan resueltas', async () => {
-    obtenerContenedor.mockResolvedValue(detalle());
-    obtenerAlertas.mockResolvedValue([
+    fetchContainer.mockResolvedValue(detail());
+    fetchAlerts.mockResolvedValue([
       {
         id: 'a-1',
         tipo: 'INCENDIO',
@@ -80,7 +80,7 @@ describe('PanelContenedor', () => {
       },
     ]);
 
-    render(<PanelContenedor contenedorId="c-1" onCerrar={() => {}} />);
+    render(<ContainerPanel containerId="c-1" onClose={() => {}} />);
 
     expect(await screen.findByText('Alertas (1 sin resolver)')).toBeInTheDocument();
     expect(screen.getByText('INCENDIO')).toBeInTheDocument();
@@ -89,10 +89,10 @@ describe('PanelContenedor', () => {
   });
 
   it('muestra el mensaje del error de la API en lugar de quedar en blanco', async () => {
-    obtenerContenedor.mockRejectedValue({ code: 'CONTENEDOR_NO_ENCONTRADO', mensaje: 'No existe' });
-    obtenerAlertas.mockResolvedValue([]);
+    fetchContainer.mockRejectedValue({ code: 'CONTENEDOR_NO_ENCONTRADO', message: 'No existe' });
+    fetchAlerts.mockResolvedValue([]);
 
-    render(<PanelContenedor contenedorId="c-1" onCerrar={() => {}} />);
+    render(<ContainerPanel containerId="c-1" onClose={() => {}} />);
 
     await waitFor(() => expect(screen.getByText('No existe')).toBeInTheDocument());
   });

@@ -1,44 +1,44 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { api, ErrorApi, guardarToken, borrarToken } from './cliente.js';
+import { api, ApiError, saveToken, clearToken } from './client.js';
 
 describe('cliente de la API', () => {
   beforeEach(() => {
-    borrarToken();
+    clearToken();
     vi.restoreAllMocks();
   });
 
   afterEach(() => {
-    borrarToken();
+    clearToken();
   });
 
-  const responder = (cuerpo, { status = 200 } = {}) =>
+  const respond = (body, { status = 200 } = {}) =>
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: status >= 200 && status < 300,
       status,
-      json: async () => cuerpo,
+      json: async () => body,
     });
 
   it('manda el token en el header Authorization cuando hay uno guardado', async () => {
-    const fetchMock = responder([]);
-    guardarToken('un-jwt');
+    const fetchMock = respond([]);
+    saveToken('un-jwt');
 
     await api.get('/mapa/contenedores');
 
-    const [, opciones] = fetchMock.mock.calls[0];
-    expect(opciones.headers.Authorization).toBe('Bearer un-jwt');
+    const [, options] = fetchMock.mock.calls[0];
+    expect(options.headers.Authorization).toBe('Bearer un-jwt');
   });
 
   it('no manda el header si no hay token', async () => {
-    const fetchMock = responder([]);
+    const fetchMock = respond([]);
 
     await api.get('/zonas');
 
-    const [, opciones] = fetchMock.mock.calls[0];
-    expect(opciones.headers.Authorization).toBeUndefined();
+    const [, options] = fetchMock.mock.calls[0];
+    expect(options.headers.Authorization).toBeUndefined();
   });
 
   it('saltea los filtros vacios al armar el query string', async () => {
-    const fetchMock = responder([]);
+    const fetchMock = respond([]);
 
     await api.get('/mapa/contenedores', { zonaId: 'abc', tipoResiduo: '', estado: undefined });
 
@@ -47,7 +47,7 @@ describe('cliente de la API', () => {
   });
 
   it('expone el `code` del backend, que es lo estable del contrato', async () => {
-    responder(
+    respond(
       { statusCode: 409, code: 'ZONA_NOMBRE_DUPLICADO', message: 'Ya existe una zona' },
       { status: 409 },
     );
@@ -59,7 +59,7 @@ describe('cliente de la API', () => {
   });
 
   it('unifica el `message` de validacion, que viene como array de strings', async () => {
-    responder(
+    respond(
       { statusCode: 400, code: 'HTTP_400', message: ['lat must be a latitude', 'lng is required'] },
       { status: 400 },
     );
@@ -80,7 +80,7 @@ describe('cliente de la API', () => {
 
     const error = await api.get('/zonas').catch((e) => e);
 
-    expect(error).toBeInstanceOf(ErrorApi);
+    expect(error).toBeInstanceOf(ApiError);
     expect(error.code).toBe('SIN_CONEXION');
   });
 });

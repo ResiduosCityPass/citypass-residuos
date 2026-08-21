@@ -1,0 +1,221 @@
+/* Primitivas de src/components/ui/. Sin un solo hexadecimal: todo sale de tokens.css. */
+
+/* --- Button ------------------------------------------------------------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.5rem 0.95rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-weight: 500;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: filter 0.15s ease, background 0.15s ease;
+  white-space: nowrap;
+  /* La clase tambien la usan <Link> que hacen de boton: sin esto heredan el
+     subrayado y el color de enlace, y quedan a mitad de camino entre las dos cosas. */
+  text-decoration: none;
+}
+
+.btn:hover:not(:disabled) { filter: brightness(0.93); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.btn-primary { background: var(--blue); color: #fff; }
+.btn-secondary { background: var(--surface); color: var(--text-strong); border-color: var(--border-strong); }
+.btn-success { background: var(--green); color: #fff; }
+.btn-warning { background: var(--amber); color: var(--navy); }
+.btn-danger { background: var(--red); color: #fff; }
+.btn-ghost { background: transparent; color: var(--text-muted); }
+.btn-ghost:hover:not(:disabled) { background: var(--surface-sunken); filter: none; }
+
+.btn-sm { padding: 0.3rem 0.6rem; font-size: var(--font-size-sm); }
+
+/* --- Chip --------------------------------------------------------------- */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0.15rem 0.6rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.chip-neutral { background: var(--surface-sunken); color: var(--text-muted); border-color: var(--border); }
+.chip-info { background: var(--blue-soft); color: var(--blue); }
+.chip-success { background: var(--green-soft); color: var(--green); }
+.chip-warning { background: var(--amber-soft); color: #8a5d12; }
+.chip-danger { background: var(--red-soft); color: var(--red); }
+
+/* --- Notice ------------------------------------------------------------- */
+.notice {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+}
+
+/* Solo el titulo va en su propia linea. Un <strong> dentro del cuerpo es
+   enfasis en medio de una frase, y si tambien fuera `block` partiria el parrafo
+   en tres. */
+.notice-title { display: block; font-weight: 600; }
+.notice-body { margin-top: 0.15rem; }
+
+.notice-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.notice-success { background: var(--green-soft); border-color: var(--green); color: var(--green); }
+.notice-info { background: var(--blue-soft); border-color: var(--sky); color: var(--blue); }
+.notice-warning { background: var(--amber-soft); border-color: var(--amber); color: #8a5d12; }
+.notice-error { background: var(--red-soft); border-color: var(--red); color: var(--red); }
+
+/* --- Field -------------------------------------------------------------- */
+.field { display: grid; gap: var(--space-1); margin-bottom: var(--space-4); }
+.field label { font-size: var(--font-size-sm); font-weight: 500; color: var(--text-strong); }
+.field-required { color: var(--red); }
+.field-hint { margin: 0; font-size: var(--font-size-xs); color: var(--text-muted); }
+.field-error { margin: 0; font-size: var(--font-size-xs); color: var(--red); }
+.field-has-error input, .field-has-error select { border-color: var(--red); }
+
+/* --- Modal -------------------------------------------------------------- */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  background: rgb(20 36 48 / 0.45);
+}
+
+.modal {
+  max-width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-close {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 var(--space-1);
+}
+
+.modal-body { padding: var(--space-5); overflow-y: auto; }
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--border);
+  background: var(--surface-sunken);
+}
+
+/* --- Table -------------------------------------------------------------- */
+.table-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: auto;
+}
+
+.table { width: 100%; border-collapse: collapse; font-size: var(--font-size-sm); }
+
+.table th {
+  position: sticky;
+  top: 0;
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-sunken);
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  font-weight: 600;
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.table td { padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border); vertical-align: middle; }
+.table tbody tr:last-child td { border-bottom: none; }
+.row-clickable { cursor: pointer; }
+.row-clickable:hover { background: var(--surface-sunken); }
+
+.table-empty { padding: var(--space-6); text-align: center; color: var(--text-muted); }
+
+.skeleton {
+  display: block;
+  height: 12px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(90deg, var(--sand) 25%, var(--surface-sunken) 50%, var(--sand) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* --- FillBar ------------------------------------------------------------ */
+.fill-bar {
+  position: relative;
+  height: 12px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+}
+
+.fill-bar-compact { height: 7px; min-width: 90px; }
+
+.fill-bar-value {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  transition: width 0.4s ease;
+}
+
+/* La marca del umbral sobresale arriba y abajo a proposito: si quedara adentro
+   de la barra, el relleno la taparia justo cuando mas importa verla. */
+.fill-bar-threshold {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  background: var(--navy);
+  border-radius: 1px;
+}

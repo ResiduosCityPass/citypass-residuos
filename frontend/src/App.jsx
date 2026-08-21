@@ -1,131 +1,81 @@
-import { useEffect, useMemo, useState } from 'react';
-import BarraToken from './componentes/BarraToken.jsx';
-import MapaContenedores from './componentes/MapaContenedores.jsx';
-import PanelContenedor from './componentes/PanelContenedor.jsx';
-import { useMapaEnVivo, INTERVALO_POLLING_MS } from './hooks/useMapaEnVivo.js';
-import { obtenerZonas } from './api/residuos.js';
-import { leerToken } from './api/cliente.js';
-import { COLOR_POR_ESTADO, ETIQUETA_ESTADO, haceCuanto } from './dominio/estados.js';
+import { useCallback, useEffect, useState } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import Shell from './components/shell/Shell.jsx';
+import MapPage from './pages/MapPage.jsx';
+import ContainersPage from './pages/ContainersPage.jsx';
+import ContainerDetailPage from './pages/ContainerDetailPage.jsx';
+import ZonesPage from './pages/ZonesPage.jsx';
+import AlertsPage from './pages/AlertsPage.jsx';
+import FleetPage from './pages/FleetPage.jsx';
+import RoutesPage from './pages/RoutesPage.jsx';
+import RouteDetailPage from './pages/RouteDetailPage.jsx';
+import { fetchAlerts } from './api/waste.js';
 import './App.css';
 
-export default function App() {
-  const [versionToken, setVersionToken] = useState(0);
-  const [zonas, setZonas] = useState([]);
-  const [filtros, setFiltros] = useState({ zonaId: '', tipoResiduo: '', estado: '' });
-  const [seleccionadoId, setSeleccionadoId] = useState(null);
+/**
+ * Titulo de la barra superior segun la ruta. Vive en un solo lugar para que la
+ * pantalla no pueda decir una cosa y el sidebar marcar otra.
+ *
+ * Las rutas quedan en castellano: espejan las del backend y las ve el usuario
+ * en la barra de direcciones.
+ */
+const TITLES = {
+  '/mapa': ['Mapa en tiempo real', 'CU-07 · estado de los contenedores, minuto a minuto'],
+  '/contenedores': ['Contenedores', 'CU-01 · alta, edicion, baja y vinculacion de sensores'],
+  '/zonas': ['Zonas y umbrales', 'CU-02 · a partir de que nivel un contenedor es critico'],
+  '/alertas': ['Alertas', 'CU-05 / CU-06 · saturacion e incendio'],
+  '/flota': ['Flota', 'CU-03 · camiones, capacidad y disponibilidad'],
+  '/rutas': ['Rutas', 'CU-08 / CU-09 · generacion y asignacion'],
+};
 
-  const { contenedores, incendiosPorContenedor, cargando, error, actualizadoEn, refrescar } =
-    useMapaEnVivo(filtros);
+function titleFor(pathname) {
+  if (pathname.startsWith('/contenedores/')) return ['Detalle del contenedor', 'CU-01'];
+  if (pathname.startsWith('/rutas/')) return ['Detalle de la ruta', 'CU-08 / CU-09'];
+  return TITLES[pathname] ?? ['Residuos', ''];
+}
 
-  // El <select> de zonas sale de CU-02.
+function Application() {
+  const { pathname } = useLocation();
+  const [tokenVersion, setTokenVersion] = useState(0);
+  const [openAlerts, setOpenAlerts] = useState(0);
+  const [title, subtitle] = titleFor(pathname);
+
+  // El globo del sidebar cuenta lo que alguien todavia tiene que atender:
+  // ABIERTA y EN_ATENCION. Las resueltas ya no le piden nada a nadie.
+  const countAlerts = useCallback(() => {
+    fetchAlerts()
+      .then((alerts) => setOpenAlerts(alerts.filter((a) => a.estado !== 'RESUELTA').length))
+      .catch(() => setOpenAlerts(0));
+  }, []);
+
   useEffect(() => {
-    if (!leerToken()) return;
-    obtenerZonas().then(setZonas).catch(() => setZonas([]));
-  }, [versionToken]);
+    countAlerts();
+  }, [countAlerts, tokenVersion, pathname]);
 
-  const resumen = useMemo(() => {
-    const conteo = { NORMAL: 0, ADVERTENCIA: 0, CRITICO: 0, FUERA_DE_SERVICIO: 0 };
-    for (const c of contenedores) conteo[c.estado] = (conteo[c.estado] ?? 0) + 1;
-    return conteo;
-  }, [contenedores]);
-
-  const cantidadIncendios = Object.keys(incendiosPorContenedor).length;
-
-  const alCambiarToken = () => {
-    setVersionToken((v) => v + 1);
-    refrescar();
-  };
-
-  const cambiarFiltro = (campo) => (evento) =>
-    setFiltros((previos) => ({ ...previos, [campo]: evento.target.value }));
+  const onTokenChange = () => setTokenVersion((v) => v + 1);
 
   return (
-    <div className="app">
-      <header>
-        <div>
-          <h1>Mapa de contenedores</h1>
-          <p className="tenue">
-            CU-07 · se refresca solo cada {INTERVALO_POLLING_MS / 1000} s
-            {actualizadoEn && ` · actualizado ${haceCuanto(actualizadoEn.toISOString())}`}
-          </p>
-        </div>
-        <BarraToken onCambio={alCambiarToken} />
-      </header>
+    <Shell title={title} subtitle={subtitle} openAlerts={openAlerts} onTokenChange={onTokenChange}>
+      <Routes>
+        <Route path="/" element={<Navigate to="/mapa" replace />} />
+        <Route path="/mapa" element={<MapPage tokenVersion={tokenVersion} />} />
+        <Route path="/contenedores" element={<ContainersPage />} />
+        <Route path="/contenedores/:id" element={<ContainerDetailPage onAlertsChanged={countAlerts} />} />
+        <Route path="/zonas" element={<ZonesPage />} />
+        <Route path="/alertas" element={<AlertsPage onAlertsChanged={countAlerts} />} />
+        <Route path="/flota" element={<FleetPage />} />
+        <Route path="/rutas" element={<RoutesPage />} />
+        <Route path="/rutas/:id" element={<RouteDetailPage />} />
+        <Route path="*" element={<Navigate to="/mapa" replace />} />
+      </Routes>
+    </Shell>
+  );
+}
 
-      <div className="filtros">
-        <select value={filtros.zonaId} onChange={cambiarFiltro('zonaId')}>
-          <option value="">Todas las zonas</option>
-          {zonas.map((zona) => (
-            <option key={zona.id} value={zona.id}>
-              {zona.nombre} (umbral {zona.umbralCriticoPct}%)
-            </option>
-          ))}
-        </select>
-
-        <select value={filtros.tipoResiduo} onChange={cambiarFiltro('tipoResiduo')}>
-          <option value="">Todo tipo de residuo</option>
-          <option value="COMUN">Comun</option>
-          <option value="RECICLABLE">Reciclable</option>
-          <option value="ORGANICO">Organico</option>
-        </select>
-
-        <select value={filtros.estado} onChange={cambiarFiltro('estado')}>
-          <option value="">Todos los estados</option>
-          {Object.keys(COLOR_POR_ESTADO).map((estado) => (
-            <option key={estado} value={estado}>
-              {ETIQUETA_ESTADO[estado]}
-            </option>
-          ))}
-        </select>
-
-        <button className="secundario" onClick={refrescar}>Refrescar ahora</button>
-
-        <div className="leyenda">
-          {Object.entries(COLOR_POR_ESTADO).map(([estado, color]) => (
-            <span key={estado}>
-              <i style={{ background: color }} />
-              {ETIQUETA_ESTADO[estado]} ({resumen[estado] ?? 0})
-            </span>
-          ))}
-          <span>
-            <i className="i-incendio" />
-            Incendio abierto ({cantidadIncendios})
-          </span>
-        </div>
-      </div>
-
-      {error && (
-        <p className="error">
-          {error.code === 'HTTP_401'
-            ? 'Token ausente o vencido. Genera uno con: cd backend && npm run token:dev -- ADMINISTRADOR'
-            : `[${error.code}] ${error.mensaje}`}
-        </p>
-      )}
-
-      <main>
-        <MapaContenedores
-          contenedores={contenedores}
-          incendios={incendiosPorContenedor}
-          seleccionadoId={seleccionadoId}
-          onSeleccionar={setSeleccionadoId}
-        />
-        {seleccionadoId && (
-          <PanelContenedor
-            key={seleccionadoId}
-            contenedorId={seleccionadoId}
-            refrescadoEn={actualizadoEn}
-            onCerrar={() => setSeleccionadoId(null)}
-          />
-        )}
-      </main>
-
-      {cargando && <p className="tenue">Cargando contenedores…</p>}
-      {!cargando && !error && contenedores.length === 0 && (
-        <p className="tenue">
-          No hay contenedores para estos filtros. Si nunca sembraste datos:
-          cd simulator && TOKEN=&lt;tu-token&gt; npm run seed
-        </p>
-      )}
-    </div>
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Application />
+    </BrowserRouter>
   );
 }

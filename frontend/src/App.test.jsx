@@ -1,94 +1,107 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import App from './App.jsx';
-import { obtenerContenedoresDelMapa, obtenerAlertas, obtenerZonas } from './api/residuos.js';
-import { guardarToken, borrarToken } from './api/cliente.js';
+import { fetchAlerts, fetchZones, fetchMapContainers, fetchContainers } from './api/waste.js';
 
-vi.mock('./api/residuos.js', () => ({
-  obtenerContenedoresDelMapa: vi.fn(),
-  obtenerAlertas: vi.fn(),
-  obtenerZonas: vi.fn(),
-  obtenerContenedor: vi.fn(),
+vi.mock('./api/waste.js', () => ({
+  USING_MOCKS: true,
+  fetchMapContainers: vi.fn(),
+  fetchContainers: vi.fn(),
+  fetchContainer: vi.fn(),
+  fetchZones: vi.fn(),
+  fetchAlerts: vi.fn(),
+  createContainer: vi.fn(),
+  updateContainer: vi.fn(),
+  deleteContainer: vi.fn(),
+  linkSensor: vi.fn(),
+  createZone: vi.fn(),
+  updateZone: vi.fn(),
+  setZoneBlocked: vi.fn(),
+  deleteZone: vi.fn(),
+  acknowledgeAlert: vi.fn(),
+  resolveAlert: vi.fn(),
 }));
 
-// Leaflet necesita un contenedor con tamano real, que jsdom no tiene. La pantalla
-// se prueba con el mapa reemplazado por un stub; el mapa en si se verifica a mano.
-vi.mock('./componentes/MapaContenedores.jsx', () => ({
-  default: ({ contenedores }) => <div data-testid="mapa">{contenedores.length} marcadores</div>,
+vi.mock('./components/ContainersMap.jsx', () => ({
+  default: () => <div data-testid="mapa" />,
 }));
 
-const contenedor = (extras = {}) => ({
-  id: 'c-1',
-  codigo: 'CT-0001',
-  lat: -34.6,
-  lng: -58.38,
-  estado: 'NORMAL',
-  tipoResiduo: 'COMUN',
-  nivelLlenadoPct: 5,
-  ultimaLecturaEn: '2026-08-20T22:50:02.199Z',
-  ...extras,
+const alert = (estado) => ({
+  id: `al-${estado}`,
+  contenedorId: 'ct-1',
+  tipo: 'SATURACION',
+  severidad: 'MEDIA',
+  estado,
+  detalle: 'Nivel 76% supera el umbral 70%',
+  detectadaEn: new Date().toISOString(),
+  resueltaEn: null,
 });
 
-describe('pantalla del mapa', () => {
+describe('shell de la aplicacion', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    borrarToken();
-    obtenerZonas.mockResolvedValue([{ id: 'z-1', nombre: 'Centro', umbralCriticoPct: 70 }]);
+    fetchMapContainers.mockResolvedValue([]);
+    fetchContainers.mockResolvedValue([]);
+    fetchZones.mockResolvedValue([]);
+    fetchAlerts.mockResolvedValue([]);
   });
 
-  it('resume cuantos contenedores hay en cada estado', async () => {
-    obtenerContenedoresDelMapa.mockResolvedValue([
-      contenedor(),
-      contenedor({ id: 'c-2', estado: 'CRITICO' }),
-      contenedor({ id: 'c-3', estado: 'CRITICO' }),
-    ]);
-    obtenerAlertas.mockResolvedValue([]);
-
+  it('arranca en el mapa', async () => {
     render(<App />);
 
-    expect(await screen.findByText('3 marcadores')).toBeInTheDocument();
-    expect(screen.getByText(/Critico \(2\)/)).toBeInTheDocument();
-    expect(screen.getByText(/Normal \(1\)/)).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Mapa en tiempo real' })).toBeInTheDocument();
   });
 
-  it('cuenta los incendios abiertos aparte del estado del contenedor', async () => {
-    obtenerContenedoresDelMapa.mockResolvedValue([contenedor()]);
-    obtenerAlertas.mockResolvedValue([{ id: 'a-1', contenedorId: 'c-1', tipo: 'INCENDIO' }]);
-
+  it('navega entre las cuatro secciones del modulo', async () => {
+    const user = userEvent.setup();
     render(<App />);
 
-    // El contenedor sigue contando como NORMAL: el incendio no depende del llenado.
-    expect(await screen.findByText(/Normal \(1\)/)).toBeInTheDocument();
-    expect(screen.getByText(/Incendio abierto \(1\)/)).toBeInTheDocument();
+    await user.click(await screen.findByRole('link', { name: /Contenedores/ }));
+    expect(await screen.findByRole('heading', { name: 'Contenedores' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('link', { name: /Zonas y umbrales/ }));
+    expect(await screen.findByRole('heading', { name: 'Zonas y umbrales' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('link', { name: /Alertas/ }));
+    expect(await screen.findByRole('heading', { name: 'Alertas' })).toBeInTheDocument();
   });
 
-  it('ante un 401 explica como generar el token en lugar de mostrar el error crudo', async () => {
-    obtenerContenedoresDelMapa.mockRejectedValue({ code: 'HTTP_401', mensaje: 'Falta el header' });
-    obtenerAlertas.mockResolvedValue([]);
-
+  /**
+   * Los modulos de otros squads se muestran para dejar ver donde encaja
+   * Residuos dentro de CityPass+, pero no son navegables: no existen.
+   */
+  it('los modulos de otros squads no son enlaces', () => {
     render(<App />);
 
-    expect(await screen.findByText(/npm run token:dev/)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Movilidad/ })).not.toBeInTheDocument();
+    expect(screen.getByTitle(/Movilidad lo desarrolla el Squad 3/)).toBeInTheDocument();
   });
 
-  it('carga las zonas para el filtro cuando hay token', async () => {
-    guardarToken('un-jwt');
-    obtenerContenedoresDelMapa.mockResolvedValue([]);
-    obtenerAlertas.mockResolvedValue([]);
-
+  it('el globo cuenta solo las alertas que alguien todavia tiene que atender', async () => {
+    fetchAlerts.mockResolvedValue([alert('ABIERTA'), alert('EN_ATENCION'), alert('RESUELTA')]);
     render(<App />);
 
-    await waitFor(() => expect(obtenerZonas).toHaveBeenCalled());
-    expect(await screen.findByText('Centro (umbral 70%)')).toBeInTheDocument();
+    // La resuelta ya no le pide nada a nadie: quedan 2.
+    await waitFor(() => expect(screen.getByTitle('2 alertas sin resolver')).toBeInTheDocument());
   });
 
-  it('no pide las zonas si todavia no cargaste el token', async () => {
-    obtenerContenedoresDelMapa.mockResolvedValue([]);
-    obtenerAlertas.mockResolvedValue([]);
-
+  /**
+   * Un tablero de alertas creible con datos inventados y sin cartel es la clase
+   * de cosa que termina en una captura de pantalla de una demo.
+   */
+  it('avisa en pantalla cuando los datos son de demostracion', async () => {
     render(<App />);
 
-    await screen.findByTestId('mapa');
-    expect(obtenerZonas).not.toHaveBeenCalled();
+    expect(await screen.findByText('Datos de demostracion')).toBeInTheDocument();
+    // Con mocks no hay token que cargar: el parche de desarrollo se esconde.
+    expect(screen.queryByRole('button', { name: 'Token' })).not.toBeInTheDocument();
+  });
+
+  it('una ruta inexistente vuelve al mapa', async () => {
+    window.history.pushState({}, '', '/no-existe');
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'Mapa en tiempo real' })).toBeInTheDocument();
   });
 });
