@@ -25,6 +25,8 @@ import { RolesGuard } from './roles.guard';
         signOptions: {
           expiresIn: config.get<string>('JWT_EXPIRES_IN', '8h'),
           issuer: config.get<string>('JWT_ISSUER'),
+          audience: config.get<string>('JWT_AUDIENCE'),
+          algorithm: config.get<string>('JWT_ALGORITHM', 'HS256'),
         } as JwtModuleOptions['signOptions'],
       }),
     }),

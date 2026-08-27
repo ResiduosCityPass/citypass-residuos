@@ -38,6 +38,14 @@ class VariablesEntorno {
 
   @IsString()
   @IsOptional()
+  JWT_AUDIENCE: string = 'citypass-residuos-api';
+
+  @IsString()
+  @IsOptional()
+  JWT_ALGORITHM: string = 'HS256';
+
+  @IsString()
+  @IsOptional()
   EVENT_BUS_DRIVER: string = 'inmemory';
 }
 
