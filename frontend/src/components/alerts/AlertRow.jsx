@@ -37,6 +37,7 @@ export default function AlertRow({ alert, containerCode, onAction }) {
       await onAction(action, alert.id);
     } catch (e) {
       setError(e);
+    } finally {
       setSending(false);
     }
   };

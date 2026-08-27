@@ -45,7 +45,8 @@ export default function ContainerFormModal({ container, zones, onSave, onClose }
     try {
       // En edicion se mandan solo los campos editables; `codigo` nunca viaja.
       const { codigo, ...rest } = values;
-      await onSave(editing ? rest : { ...rest, ...(codigo ? { codigo } : {}) });
+      const payload = { ...rest, capacidadLitros: Number(rest.capacidadLitros) };
+      await onSave(editing ? payload : { ...payload, ...(codigo ? { codigo } : {}) });
     } catch (e) {
       setError(e);
       setSaving(false);
