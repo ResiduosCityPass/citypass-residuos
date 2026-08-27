@@ -1,15 +1,120 @@
 # Frontend — dueño: Máximo
 
-## El stack lo definís vos
+SPA del módulo de Residuos. Seis secciones: el mapa en tiempo real (CU-07), el ABM de
+contenedores (CU-01) con la predicción de saturación (CU-12), el de zonas y umbrales (CU-02), el
+tablero de alertas (CU-05/CU-06), la flota (CU-03) y las rutas (CU-08/CU-09).
 
-**No está decidido, y es tu decisión.** Sos quien lo va a construir y mantener durante los siete
-sprints, así que elegí con lo que rindas más.
+**Qué cubre cada pantalla, dónde vive y qué falta: [CASOS-DE-USO.md](CASOS-DE-USO.md).**
 
-Cuando lo definas, escribí el **ADR-006** en `docs/adr/` siguiendo el mismo formato que los demás:
-**Contexto → Opciones consideradas → Decisión → Consecuencias**. No es burocracia nuestra, es
-requisito explícito de la cátedra: *"todas las decisiones de arquitectura deben documentarse
-mediante un ADR que muestre las opciones consideradas"*. Mostrar dos o tres alternativas con sus
-contras vale puntos; poner solo la elegida, no.
+## Stack
+
+**React 19 + Vite, en JavaScript**, con **Leaflet** (`react-leaflet`) sobre tiles de OpenStreetMap
+y **Vitest + Testing Library** para los tests. Las alternativas evaluadas y el porqué de cada
+descarte están en [ADR-006](../docs/adr/ADR-006-stack-frontend.md).
+
+## Cómo levantarlo
+
+### Sin backend, con datos de demostración
+
+Para diseñar o mostrar las pantallas no hace falta ni la API ni Docker ni un token. Con
+`VITE_USE_MOCKS=true` en `.env.local` (así viene en `.env.example`):
+
+```bash
+cd frontend && npm install && npm run dev
+```
+
+Los datos salen de un servidor falso en memoria (`src/mocks/`) que responde con las mismas formas
+que la API y **falla con los mismos códigos de error**. Las mutaciones se ven: dar de alta un
+contenedor lo agrega a la tabla, resolver una alerta la mueve de estado. Se reinicia al recargar
+la página. La pantalla avisa con un cartel *Datos de demostración* para que nadie confunda una
+captura con datos reales. Ver [ADR-007](../docs/adr/ADR-007-design-system-y-mocks.md).
+
+### Contra la API real
+
+Poné `VITE_USE_MOCKS=false` y levantá el backend:
+
+```bash
+docker compose -f infra/docker-compose.yml up -d postgres
+cd backend && npm install && npm run start:dev
+```
+
+Después el frontend, en otra terminal:
+
+```bash
+cd frontend && npm install && npm run dev
+```
+
+Queda en `http://localhost:5173`. La URL de la API se configura en `.env.local`
+(copiá `.env.example`); por defecto apunta a `http://localhost:3000/api/v1`.
+
+### Token
+
+Todos los endpoints están protegidos. Generá uno y pegalo en la barra de arriba de la pantalla:
+
+```bash
+cd backend && npm run token:dev -- ADMINISTRADOR
+```
+
+Dura 8 horas y queda guardado en `localStorage`. Cuando el Squad 2 publique el login federado,
+cambia de dónde sale el token; el header `Authorization: Bearer <jwt>` no cambia.
+
+### Datos para ver algo en el mapa
+
+```bash
+cd simulator && TOKEN=<tu-token> npm run seed   # 8 contenedores alrededor del Obelisco
+npm run saturacion                              # uno cruza el umbral y pasa a rojo en ~5s
+npm run incendio                                # dispara una alerta crítica de incendio
+```
+
+## Comandos
+
+| Comando | Qué hace |
+|---|---|
+| `npm run dev` | Dev server con HMR en el 5173 |
+| `npm run build` | Build estático a `dist/` (es lo que se dockeriza) |
+| `npm test` | Corre los tests una vez |
+| `npm run test:watch` | Tests en modo watch |
+| `npm run cobertura` | Tests + reporte de cobertura (umbral 60%, dimensión 6) |
+| `npm run lint` | Oxlint |
+
+## Estructura
+
+| Carpeta | Contiene |
+|---|---|
+| `src/api/` | `client.js` (token + errores), `waste.http.js` (una función por endpoint) y `waste.js` (elige entre la API real y los mocks) |
+| `src/domain/` | Enums, colores de estado, reglas de las alertas y traducción de errores |
+| `src/hooks/` | `useLiveMap.js`: el polling del mapa |
+| `src/components/ui/` | Primitivas del design system: `Button`, `Field`, `Modal`, `Table`, `Chip`, `Notice`, `FillBar` |
+| `src/components/shell/` | Sidebar, barra superior e iconografía |
+| `src/components/{containers,zones,alerts,fleet,routes}/` | Componentes de cada caso de uso |
+| `src/components/` | Los que comparte más de una pantalla |
+| `src/pages/` | Una por ruta |
+| `src/styles/` | `tokens.css` (paleta y escalas) y `ui.css` |
+| `src/mocks/` | Datos falsos. **Andamiaje temporal:** se borra al conectar las pantallas |
+| `src/test/` | Setup de Vitest. Los tests viven al lado del archivo que prueban |
+
+**Ninguna pantalla importa datos de otro lado que `src/api/waste.js`**, y toda llamada real
+pasa por `src/api/client.js`. Es el único lugar que conoce el header de
+autenticación y el único que traduce errores. Los errores se ramifican por `code`, nunca por el
+texto de `message`.
+
+### Idioma del código
+
+Los identificadores —archivos, componentes, funciones, variables, clases CSS— están **en inglés**.
+Los comentarios, las descripciones de los tests y los textos que ve el usuario están **en
+castellano**.
+
+Lo que llega de la API se queda como está: nombres de campos (`nivelLlenadoPct`, `zonaId`),
+valores de enum (`CRITICO`, `EN_ATENCION`), códigos de error (`ZONA_CON_CONTENEDORES`) y las
+rutas (`/mapa/contenedores`). No son código nuestro, son el contrato del backend. Por eso vas a
+ver cosas como `fetchContainers()` devolviendo objetos con `nivelLlenadoPct` adentro: el
+vocabulario del dominio viene del contrato.
+
+## Guía de la API
+
+El contrato completo —request y response de cada endpoint, con ejemplos reales— está en
+[docs/arquitectura/guia-frontend.md](../docs/arquitectura/guia-frontend.md). La sección 8 tiene las
+reglas de dominio que no son obvias; vale la pena leerla antes de tocar el mapa.
 
 ## Lo que el backend te impone (que es casi nada)
 
@@ -22,39 +127,31 @@ contras vale puntos; poner solo la elegida, no.
 
 Eso es todo. Cualquier tecnología de cliente que sepa hacer `fetch` sirve.
 
-## Restricciones reales que sí conviene tener en cuenta al elegir
-
-1. **Necesitás un mapa.** CU-07 (mapa en tiempo real) y CU-11 (contenedores cercanos) son el
-   corazón de la dimensión 9 de la rúbrica. Fijate que la librería de mapas que elijas se integre
-   bien con el framework, y ojo con las que exigen API key con tarjeta de crédito asociada.
-2. **Hay que testear.** La dimensión 6 pide 60% de cobertura y aplica a todo el módulo, no solo al
-   backend. Elegí algo con un camino de testing que ya conozcas.
-3. **Hay que dockerizarlo.** Ramiro necesita poder empaquetarlo para el despliegue cloud
-   (dimensión 7). Cualquier cosa que produzca estáticos o corra en Node le sirve; avisale qué
-   elegiste así arma el `Dockerfile`.
-
-## No necesitás esperar al backend
-
-**Todos los contratos de endpoints ya están escritos** en
-[docs/arquitectura/api-preliminar.md](../docs/arquitectura/api-preliminar.md), con sus payloads,
-roles y códigos de error. Podés mockearlos y arrancar hoy mismo.
-
 ## Alcance
 
-| Pantalla | CU | Sprint | Consume |
-|---|---|---|---|
-| Mapa en tiempo real | CU-07 | 1-2 | `GET /mapa/contenedores` |
-| Alta y edición de contenedores | CU-01 | 2 | `/contenedores` |
-| Zonas y umbrales | CU-02 | 2 | `/zonas` |
-| Tablero de alertas | CU-05, CU-06 | 2 | `GET /alertas` |
-| Consulta ciudadana | CU-11 | 4 | `GET /publico/contenedores/cercanos` |
-| Propuesta y asignación de ruta | CU-08, CU-09 | 4 | `/rutas` |
+**Los 11 casos de uso que tienen pantalla están diseñados**, ninguno conectado todavía: todos
+corren contra los mocks. El único de los 12 que no tiene pantalla es CU-04, porque lo llaman los
+sensores con `X-Sensor-Key`, no una persona con sesión.
+
+Nueve viven adentro del panel del operador. Las otras dos son de otros actores y corren fuera del
+Shell, sin sidebar: `/cerca` es la consulta ciudadana (CU-11), pública y sin token, y `/chofer` es
+la pantalla móvil del chofer (CU-10).
+
+El detalle —qué pantalla cubre cada caso de uso, en qué archivos vive, qué endpoint consume, qué
+reglas de dominio resuelve y qué límites del backend quedaron a la vista— está en
+**[CASOS-DE-USO.md](CASOS-DE-USO.md)**.
 
 ## Notas de implementación
 
-- **Colores del mapa:** verde `NORMAL`, amarillo `ADVERTENCIA`, rojo `CRITICO`, gris
-  `FUERA_DE_SERVICIO`. Los valores exactos del enum están en
-  `backend/src/shared/domain/enums.ts`.
+- **Colores del mapa:** Verde Urbano `NORMAL`, Ámbar `ADVERTENCIA`, Rojo Emergencia `CRITICO`,
+  Gris Medio `FUERA_DE_SERVICIO`, según la paleta de CityPass+. Los valores exactos del enum están
+  en `backend/src/shared/domain/enums.ts`.
+- **Tres límites del backend están visibles en la UI a propósito:** no hay endpoint para listar
+  usuarios con rol `CHOFER`, así que el `<select>` de CU-09 se llena con datos falsos y la
+  pantalla lo dice; el botón "Poner fuera de
+  servicio" del detalle está deshabilitado porque `PATCH /contenedores/:id` no acepta `estado`, y
+  el listado no puede saber si un contenedor ya tiene sensor, así que deja intentar y muestra el
+  `409 CONTENEDOR_YA_TIENE_SENSOR`. Los tres son pedidos de contrato pendientes.
 - **Refresco:** polling cada 30s alcanza para el Hito 1. WebSocket es mejora del Sprint 5, si hay
   tiempo.
 - Si algo del contrato de la API no te cierra o te falta un campo, decilo antes de que lo
