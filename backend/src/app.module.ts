@@ -11,6 +11,7 @@ import { ContenedoresModule } from './modules/contenedores/contenedores.module';
 import { AlertasModule } from './modules/alertas/alertas.module';
 import { LecturasModule } from './modules/lecturas/lecturas.module';
 import { MapaModule } from './modules/mapa/mapa.module';
+import { PrediccionModule } from './modules/prediccion/prediccion.module';
 
 @Module({
   imports: [
@@ -30,7 +31,7 @@ import { MapaModule } from './modules/mapa/mapa.module';
     AlertasModule,
     LecturasModule,
     MapaModule,
-    // Sprint 2: PrediccionModule (CU-12)
+    PrediccionModule,
     // Sprint 4: FlotaModule (CU-03), RutasModule (CU-08..CU-10), PublicoModule (CU-11)
   ],
 })
