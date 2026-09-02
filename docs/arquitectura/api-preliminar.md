@@ -30,7 +30,7 @@ Cuerpo: `{ nombre, umbralCriticoPct, umbralTemperaturaC }`.
 
 `DELETE` responde `409 ZONA_CON_CONTENEDORES` si la zona todavía tiene contenedores asignados.
 
-## CU-03 · Flota
+## CU-03 · Flota — **implementado**
 
 | Método | Ruta | Rol |
 |---|---|---|

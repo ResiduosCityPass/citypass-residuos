@@ -62,7 +62,7 @@ erDiagram
         string patente
         int capacidadLitros
         enum tipoResiduoHabilitado
-        enum estadoCamion
+        enum estado
     }
     RUTA {
         uuid id PK

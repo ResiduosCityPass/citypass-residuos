@@ -1,4 +1,5 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { aplicarCambios } from '../../../shared/application/aplicar-cambios';
 import { ZonasService } from '../../zonas/application/zonas.service';
 import { generarApiKey, hashearApiKey } from '../domain/api-key';
 import { Contenedor } from '../domain/contenedor.entity';
@@ -71,7 +72,7 @@ export class ContenedoresService {
       await this.zonas.obtener(dto.zonaId);
     }
 
-    Object.assign(contenedor, dto);
+    aplicarCambios(contenedor, dto);
 
     return this.contenedores.guardar(contenedor);
   }

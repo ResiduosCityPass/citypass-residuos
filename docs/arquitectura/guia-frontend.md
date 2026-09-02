@@ -141,6 +141,9 @@ El operador la toma (`atender`) y después la cierra (`resolver`). No se puede s
 | `CONTENEDOR_CODIGO_DUPLICADO` | 409 | Ya hay un contenedor con ese código |
 | `CONTENEDOR_YA_TIENE_SENSOR` | 409 | Ese contenedor ya tiene un sensor vinculado |
 | `SENSOR_CODIGO_DUPLICADO` | 409 | Ya hay un sensor con ese código |
+| `CAMION_PATENTE_DUPLICADA` | 409 | Ya existe un camión con esa patente (CU-03) |
+| `CAMION_NO_ENCONTRADO` | 404 | El camión no existe (CU-03) |
+| `CAMION_EN_RUTA` | 409 | No se puede cambiar el estado de un camión en ruta (CU-03) |
 | `SIN_LECTURAS_SUFICIENTES` | 409 | No hay histórico suficiente para predecir (CU-12) |
 | `TENDENCIA_NO_CRECIENTE` | 409 | El contenedor no se está llenando, no hay saturación que predecir (CU-12) |
 | `ALERTA_NO_ENCONTRADA` | 404 | La alerta no existe |
@@ -590,6 +593,77 @@ listado conviene distinguirlo de uno que sí reporta y está realmente vacío.
 
 ---
 
+## 8a. CU-03 · Gestionar flota
+
+**Implementado y verificado.** ABM de camiones: patente, capacidad y qué tipo de residuo pueden
+levantar.
+
+### `GET /camiones`
+
+Roles: `ADMINISTRADOR`, `OPERADOR`. Query opcional: `estado`, `tipoResiduoHabilitado`.
+
+```json
+[
+  {
+    "id": "dd8404c1-2db2-4ad5-8f74-8052bd25d6f9",
+    "patente": "AB123CD",
+    "capacidadLitros": 18000,
+    "tipoResiduoHabilitado": "RECICLABLE",
+    "estado": "DISPONIBLE",
+    "creadoEn": "2026-09-02T22:47:24.949Z",
+    "actualizadoEn": "2026-09-02T22:51:31.461Z"
+  }
+]
+```
+
+### `POST /camiones`
+
+Rol: `ADMINISTRADOR`. Cuerpo: `{ patente, capacidadLitros, tipoResiduoHabilitado }`.
+
+| Campo | Reglas |
+|---|---|
+| `patente` | 6 a 20 caracteres. **Se normaliza**: `"  ab 123 cd  "` se guarda como `"AB123CD"` |
+| `capacidadLitros` | Entero de 1000 a 40000 |
+| `tipoResiduoHabilitado` | `COMUN`, `RECICLABLE` u `ORGANICO` |
+
+**`estado` no se acepta en el alta.** Todo camión nace `DISPONIBLE`: no hay ninguna ruta a la que
+pertenezca todavía.
+
+Patente repetida → `409 CAMION_PATENTE_DUPLICADA`. La detección es sobre la patente normalizada,
+así que `"ab 123 cd"` colisiona con `"AB123CD"`.
+
+### `PATCH /camiones/:id`
+
+Rol: `ADMINISTRADOR`. Solo los campos que cambian.
+
+> ### Una diferencia con tu mock
+>
+> **`estado` solo acepta `DISPONIBLE` o `MANTENIMIENTO`.** Mandar `EN_RUTA` a mano devuelve `400`.
+>
+> Tu mock lo permitía. Lo bloqueé porque abría una trampa sin salida: un camión marcado `EN_RUTA`
+> sin ruta asociada queda bloqueado —no se le puede cambiar el estado porque está en ruta— y no hay
+> ninguna ruta que cerrar para liberarlo. `EN_RUTA` lo fija la asignación de ruta de CU-09.
+>
+> En el formulario, ofrecé solo esas dos opciones.
+
+Si el camión ya está `EN_RUTA`, cualquier cambio de estado devuelve `409 CAMION_EN_RUTA` — pero
+**sí se pueden editar los demás campos**.
+
+### No hay `DELETE`, y es deliberado
+
+Un camión borrado seguiría colgando de las rutas históricas que ejecutó. Para sacarlo de
+circulación se lo pasa a `MANTENIMIENTO`. El endpoint no existe: devuelve `404`.
+
+### Errores
+
+| `code` | HTTP | Cuándo |
+|---|---|---|
+| `CAMION_PATENTE_DUPLICADA` | 409 | Ya hay un camión con esa patente normalizada |
+| `CAMION_NO_ENCONTRADO` | 404 | — |
+| `CAMION_EN_RUTA` | 409 | Se quiso cambiar el estado de un camión que está en ruta |
+
+---
+
 ## 8b. CU-12 · Predicción de saturación
 
 **Implementado y verificado contra la API real.** Estima cuántas horas faltan para que el
@@ -738,7 +812,6 @@ Para que no lo esperes ni lo mockees pensando que ya está:
 
 | CU | Qué falta | Cuándo |
 |---|---|---|
-| CU-03 | `/camiones` — gestión de flota | Sprint 4 |
 | CU-08 | `POST /rutas/generar` — generación de ruta | Sprint 4 |
 | CU-09 | `PATCH /rutas/:id/asignar` — asignar chofer | Sprint 4 |
 | CU-10 | `PATCH /paradas/:id/confirmar` — confirmar vaciado | Sprint 4 |
