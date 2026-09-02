@@ -13,6 +13,7 @@ export interface AlertaRepository {
   guardar(alerta: Alerta): Promise<Alerta>;
   buscarPorId(id: string): Promise<Alerta | null>;
   buscarAbierta(contenedorId: string, tipo: TipoAlerta): Promise<Alerta | null>;
+  /** Trae la relacion `contenedor` cargada: el listado expone su codigo. */
   listar(filtro: FiltroAlertas): Promise<Alerta[]>;
   listarAbiertasPorContenedor(contenedorId: string, tipo: TipoAlerta): Promise<Alerta[]>;
 }

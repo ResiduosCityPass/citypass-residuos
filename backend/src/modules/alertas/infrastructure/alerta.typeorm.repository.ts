@@ -38,7 +38,13 @@ export class AlertaTypeormRepository implements AlertaRepository {
     if (filtro.severidad) where.severidad = filtro.severidad;
     if (filtro.estado) where.estado = filtro.estado;
 
-    return this.repo.find({ where, order: { detectadaEn: 'DESC' } });
+    return this.repo.find({
+      where,
+      order: { detectadaEn: 'DESC' },
+      // El listado expone el codigo del contenedor. Sin esto, el frontend
+      // tenia que cruzarlo por su cuenta en cada fila de la tabla.
+      relations: { contenedor: true },
+    });
   }
 
   listarAbiertasPorContenedor(contenedorId: string, tipo: TipoAlerta): Promise<Alerta[]> {

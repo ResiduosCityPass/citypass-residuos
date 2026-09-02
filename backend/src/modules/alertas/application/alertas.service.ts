@@ -8,6 +8,27 @@ import { Alerta } from '../domain/alerta.entity';
 import { ALERTA_REPOSITORY, AlertaRepository, FiltroAlertas } from '../domain/alerta.repository';
 
 /**
+ * Alerta tal como la ve el tablero del operador: con el codigo legible del
+ * contenedor, que es lo que se muestra en la tabla.
+ *
+ * Se proyecta campo por campo en vez de devolver la entidad con la relacion
+ * anidada: el contenedor completo no le sirve a nadie en un listado y solo
+ * engorda la respuesta.
+ */
+export interface AlertaListada {
+  id: string;
+  contenedorId: string;
+  contenedorCodigo: string | null;
+  tipo: Alerta['tipo'];
+  severidad: Alerta['severidad'];
+  estado: Alerta['estado'];
+  detalle: string | null;
+  detectadaEn: Date;
+  resueltaEn: Date | null;
+  creadaEn: Date;
+}
+
+/**
  * Alertas del modulo (CU-05, CU-06).
  *
  * Es el unico lugar que crea alertas y publica sus eventos, para que la regla de
@@ -146,8 +167,21 @@ export class AlertasService {
     return abiertas.length;
   }
 
-  listar(filtro: FiltroAlertas): Promise<Alerta[]> {
-    return this.alertas.listar(filtro);
+  async listar(filtro: FiltroAlertas): Promise<AlertaListada[]> {
+    const alertas = await this.alertas.listar(filtro);
+
+    return alertas.map((alerta) => ({
+      id: alerta.id,
+      contenedorId: alerta.contenedorId,
+      contenedorCodigo: alerta.contenedor?.codigo ?? null,
+      tipo: alerta.tipo,
+      severidad: alerta.severidad,
+      estado: alerta.estado,
+      detalle: alerta.detalle,
+      detectadaEn: alerta.detectadaEn,
+      resueltaEn: alerta.resueltaEn,
+      creadaEn: alerta.creadaEn,
+    }));
   }
 
   async obtener(id: string): Promise<Alerta> {

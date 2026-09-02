@@ -66,6 +66,7 @@ describe('LecturasService (CU-04)', () => {
       buscarPorId: jest.fn(),
       buscarPorCodigo: jest.fn(),
       listar: jest.fn(),
+      listarConZona: jest.fn().mockResolvedValue([]),
       contar: jest.fn(),
     };
     sensores = {

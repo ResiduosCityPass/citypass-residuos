@@ -28,6 +28,18 @@ export class ContenedorTypeormRepository implements ContenedorRepository {
   }
 
   listar(filtro: FiltroContenedores): Promise<Contenedor[]> {
+    return this.repo.find({ where: this.armarWhere(filtro), order: { codigo: 'ASC' } });
+  }
+
+  listarConZona(filtro: FiltroContenedores): Promise<Contenedor[]> {
+    return this.repo.find({
+      where: this.armarWhere(filtro),
+      order: { codigo: 'ASC' },
+      relations: { zona: true },
+    });
+  }
+
+  private armarWhere(filtro: FiltroContenedores): FindOptionsWhere<Contenedor> {
     const where: FindOptionsWhere<Contenedor> = {};
 
     if (filtro.zonaId) where.zonaId = filtro.zonaId;
@@ -35,7 +47,7 @@ export class ContenedorTypeormRepository implements ContenedorRepository {
     if (filtro.estado) where.estado = filtro.estado;
     if (filtro.soloActivos) where.activo = true;
 
-    return this.repo.find({ where, order: { codigo: 'ASC' } });
+    return where;
   }
 
   contar(): Promise<number> {

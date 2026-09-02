@@ -42,6 +42,7 @@ describe('PrediccionService (CU-12)', () => {
       buscarPorId: jest.fn().mockResolvedValue(contenedorDe(40)),
       buscarPorCodigo: jest.fn(),
       listar: jest.fn(),
+      listarConZona: jest.fn().mockResolvedValue([]),
       contar: jest.fn(),
     };
     lecturas = {

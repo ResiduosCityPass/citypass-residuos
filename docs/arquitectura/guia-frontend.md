@@ -209,14 +209,31 @@ Se combinan: `?zonaId=63249e42-...&estado=CRITICO`
     "estado": "CRITICO",
     "tipoResiduo": "COMUN",
     "nivelLlenadoPct": 94.14,
-    "ultimaLecturaEn": "2026-08-20T22:50:02.199Z"
+    "ultimaLecturaEn": "2026-08-20T22:50:02.199Z",
+    "zonaNombre": "Centro",
+    "umbralCriticoPct": 70,
+    "incendioActivo": true
   }
 ]
 ```
 
+> **Tres campos nuevos** que resuelven pedidos concretos del frontend:
+>
+> - **`incendioActivo`** — evita la segunda llamada a `/alertas?tipo=INCENDIO&estado=ABIERTA` en
+>   cada refresco. Es `true` cuando el contenedor tiene un incendio abierto, **independientemente
+>   de su `estado`**: un contenedor `NORMAL` al 8% puede tener `incendioActivo: true`, porque el
+>   estado refleja el llenado y el incendio se evalúa contra la temperatura. Verificado con un
+>   contenedor real en `NORMAL` al 59,2% e `incendioActivo: true`.
+> - **`umbralCriticoPct`** — para dibujar la marca de referencia sobre la barra de llenado sin
+>   pedir la zona aparte.
+> - **`zonaNombre`** — para mostrarlo en el tooltip del marcador.
+>
+> El endpoint sigue resolviéndose en **dos consultas en total**, sin importar cuántos contenedores
+> haya: una para los contenedores y otra para todos los incendios abiertos.
+
 **Notas de implementación:**
 
-- El payload es deliberadamente flaco: solo lo necesario para pintar un marcador. Para el
+- El payload sigue siendo flaco: solo lo necesario para pintar un marcador. Para el
   panel de detalle al hacer click, pegale a `GET /contenedores/:id`, que trae zona y sensor.
 - `lat` y `lng` vienen como **número**, listos para Leaflet o lo que uses.
 - `nivelLlenadoPct` es la última lectura, con 2 decimales.
@@ -497,24 +514,24 @@ Roles: `ADMINISTRADOR`, `OPERADOR`
 ```json
 [
   {
-    "id": "9ba7ef38-004e-468d-b21f-2efe8eaa3f7c",
-    "contenedorId": "13479ceb-47ce-47c9-8006-b47604beddd1",
-    "tipo": "SATURACION",
-    "severidad": "MEDIA",
+    "id": "fe6dbdf4-488e-4bc8-bbf5-8fcdb8ee06df",
+    "contenedorId": "809d697e-05b4-4a4b-a0c2-95289e128cf2",
+    "contenedorCodigo": "CT-0007",
+    "tipo": "INCENDIO",
+    "severidad": "CRITICA",
     "estado": "ABIERTA",
-    "detalle": "Nivel 76% supera el umbral 70% de la zona Centro",
-    "detectadaEn": "2026-08-20T22:49:50.042Z",
+    "detalle": "Temperatura interna 88.5C supera el umbral 60C de la zona Centro",
+    "detectadaEn": "2026-09-02T22:33:52.673Z",
     "resueltaEn": null,
-    "creadaEn": "2026-08-20T22:49:50.043Z"
+    "creadaEn": "2026-09-02T22:33:52.679Z"
   }
 ]
 ```
 
+- **`contenedorCodigo` viene en la respuesta.** Ya no hace falta cruzarlo contra el listado de
+  contenedores para mostrar `CT-0007` en la tabla.
 - `detalle` es texto ya redactado para mostrarle al operador. Usalo tal cual.
 - `resueltaEn` es `null` mientras la alerta no esté cerrada.
-- La respuesta trae `contenedorId` pero **no el objeto contenedor**. Si querés mostrar el
-  código `CT-0001` en la tabla, cruzalo contra el listado de contenedores que ya tenés cargado
-  para el mapa, en vez de pedir el detalle uno por uno.
 
 ### `GET /alertas/:id`
 

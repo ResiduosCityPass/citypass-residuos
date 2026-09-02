@@ -30,6 +30,7 @@ describe('ContenedoresService (CU-01)', () => {
       buscarPorId: jest.fn(),
       buscarPorCodigo: jest.fn().mockResolvedValue(null),
       listar: jest.fn().mockResolvedValue([]),
+      listarConZona: jest.fn().mockResolvedValue([]),
       contar: jest.fn().mockResolvedValue(0),
     };
     sensores = {

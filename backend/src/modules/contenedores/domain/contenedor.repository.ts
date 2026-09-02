@@ -14,6 +14,8 @@ export interface ContenedorRepository {
   buscarPorId(id: string): Promise<Contenedor | null>;
   buscarPorCodigo(codigo: string): Promise<Contenedor | null>;
   listar(filtro: FiltroContenedores): Promise<Contenedor[]>;
+  /** Igual que `listar`, con la zona cargada. Lo usa el mapa (CU-07). */
+  listarConZona(filtro: FiltroContenedores): Promise<Contenedor[]>;
   contar(): Promise<number>;
 }
 
