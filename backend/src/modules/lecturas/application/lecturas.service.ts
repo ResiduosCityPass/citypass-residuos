@@ -1,6 +1,7 @@
 import { ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EstadoContenedor, TipoAlerta } from '../../../shared/domain/enums';
+import { ContextoTransaccional } from '../../../shared/persistence/contexto-transaccional';
 import { AlertasService } from '../../alertas/application/alertas.service';
 import { Contenedor } from '../../contenedores/domain/contenedor.entity';
 import {
@@ -37,12 +38,15 @@ export interface ResultadoIngesta {
  * Orquesta, en este orden: valida contra la ultima lectura, persiste, actualiza
  * el contenedor y el sensor, y recien despues evalua las reglas de CU-05 y CU-06.
  *
- * PENDIENTE SPRINT 2: envolver los guardados en una transaccion y mover la
- * publicacion de eventos a una tabla `outbox`, como define el contrato de
- * eventos. Hoy la publicacion es directa: si el driver falla, la lectura ya
- * quedo persistida y el estado actualizado, que es el comportamiento correcto
- * (la transaccion de negocio nunca se revierte por una falla de publicacion),
- * pero el evento se pierde en lugar de reintentarse.
+ * Todo el flujo corre dentro de una transaccion: la lectura, el estado del
+ * sensor, el del contenedor, las alertas y el evento en la tabla outbox se
+ * guardan juntos o no se guarda ninguno. Sin eso, un fallo en el medio dejaba
+ * el contenedor marcado critico sin su alerta, o la alerta sin el evento que
+ * la anuncia.
+ *
+ * La publicacion real la hace despues el despachador del outbox, fuera de esta
+ * transaccion: asi una falla del broker no revierte el cambio de negocio, y el
+ * evento se reintenta en vez de perderse (ADR-003).
  */
 @Injectable()
 export class LecturasService {
@@ -58,6 +62,7 @@ export class LecturasService {
     private readonly sensores: SensorRepository,
     private readonly zonas: ZonasService,
     private readonly alertas: AlertasService,
+    private readonly transaccion: ContextoTransaccional,
     config: ConfigService,
   ) {
     this.margenAdvertenciaPct = config.get<number>(
@@ -67,6 +72,18 @@ export class LecturasService {
   }
 
   async registrar(
+    sensor: Sensor,
+    datos: {
+      nivelLlenadoPct: number;
+      temperaturaC: number;
+      bateriaPct: number;
+      registradaEn?: Date;
+    },
+  ): Promise<ResultadoIngesta> {
+    return this.transaccion.ejecutar(() => this.registrarEnTransaccion(sensor, datos));
+  }
+
+  private async registrarEnTransaccion(
     sensor: Sensor,
     datos: {
       nivelLlenadoPct: number;

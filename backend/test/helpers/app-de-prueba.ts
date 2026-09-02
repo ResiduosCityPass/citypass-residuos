@@ -46,7 +46,7 @@ export async function crearAppDePrueba(): Promise<AppDePrueba> {
       // El orden importa menos con CASCADE, pero se listan igual de la hoja a
       // la raiz para que el dia que se saque el CASCADE esto siga andando.
       await dataSource.query(
-        'TRUNCATE TABLE "alerta", "lectura", "sensor", "contenedor", "camion", "zona" RESTART IDENTITY CASCADE',
+        'TRUNCATE TABLE "evento_pendiente", "alerta", "lectura", "sensor", "contenedor", "camion", "zona" RESTART IDENTITY CASCADE',
       );
     },
     cerrar: async () => {

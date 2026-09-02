@@ -72,10 +72,9 @@ Devuelve la transición para que el llamador sepa qué pasó:
 }
 ```
 
-> **Pendiente Sprint 2:** envolver los guardados en una transacción y publicar vía tabla
-> `outbox` con reintentos. Hoy la publicación es directa: si el driver de eventos falla, la
-> lectura queda persistida y el estado actualizado igual —que es el comportamiento correcto—
-> pero el evento se pierde en vez de reintentarse.
+> Todo el flujo corre en una transacción: la lectura, el sensor, el contenedor, las alertas y el
+> evento en la tabla outbox se guardan juntos o no se guarda ninguno. La publicación al bus la hace
+> después el despachador, fuera de la transacción, con reintentos.
 
 **Respuestas:** `202 Accepted` · `400` lectura fuera de rango · `401` API key inválida ·
 `404` sensor inexistente · `409` lectura duplicada o con timestamp anterior a la última registrada.

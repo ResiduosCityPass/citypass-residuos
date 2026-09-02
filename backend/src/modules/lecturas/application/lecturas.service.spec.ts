@@ -6,6 +6,7 @@ import { Contenedor } from '../../contenedores/domain/contenedor.entity';
 import { ContenedorRepository } from '../../contenedores/domain/contenedor.repository';
 import { Sensor } from '../../contenedores/domain/sensor.entity';
 import { SensorRepository } from '../../contenedores/domain/sensor.repository';
+import { ContextoTransaccional } from '../../../shared/persistence/contexto-transaccional';
 import { ZonasService } from '../../zonas/application/zonas.service';
 import { Zona } from '../../zonas/domain/zona.entity';
 import { Lectura } from '../domain/lectura.entity';
@@ -84,12 +85,21 @@ describe('LecturasService (CU-04)', () => {
       registrarBateriaBaja: jest.fn().mockResolvedValue({ id: 'a-3' }),
     };
 
+    // Doble del contexto transaccional: corre el bloque tal cual. La
+    // transaccion de verdad se verifica en los tests de integracion, que son
+    // los unicos que pueden comprobar que el rollback funciona.
+    const transaccion = {
+      ejecutar: <T>(bloque: () => Promise<T>) => bloque(),
+      managerActual: () => null,
+    } as unknown as ContextoTransaccional;
+
     service = new LecturasService(
       lecturas,
       contenedores,
       sensores,
       zonas as unknown as ZonasService,
       alertas as unknown as AlertasService,
+      transaccion,
       new ConfigService({}),
     );
   });

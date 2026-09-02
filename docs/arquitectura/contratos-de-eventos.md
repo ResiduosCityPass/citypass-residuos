@@ -131,8 +131,11 @@ Se emite cuando el chofer confirma la parada y el contenedor vuelve a estado nor
 
 ## Política de errores y reintentos
 
-- **Publicación:** si el broker no está disponible, el evento se persiste en una tabla `outbox` y se
-  reintenta con backoff exponencial. La transacción de negocio nunca se revierte por una falla de
-  publicación — el contenedor se marca crítico aunque el bus esté caído.
+- **Publicación:** implementada con outbox transaccional. El evento se escribe en la tabla
+  `evento_pendiente` dentro de la misma transacción que el cambio de negocio, y un despachador la
+  vacía después contra el broker con backoff exponencial. La transacción de negocio nunca se
+  revierte por una falla de publicación —el contenedor se marca crítico aunque el bus esté caído—
+  y el evento no se pierde: queda pendiente hasta que salga. Tras agotar los reintentos pasa a
+  `FALLIDO` y queda en la tabla para inspección.
 - **Consumo:** procesamiento idempotente por `eventId`. Tras 3 intentos fallidos el mensaje va a una
   *dead letter queue* para inspección manual.
