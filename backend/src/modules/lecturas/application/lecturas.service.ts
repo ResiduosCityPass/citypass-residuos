@@ -10,6 +10,7 @@ import {
 import { Sensor } from '../../contenedores/domain/sensor.entity';
 import { SENSOR_REPOSITORY, SensorRepository } from '../../contenedores/domain/sensor.repository';
 import { ZonasService } from '../../zonas/application/zonas.service';
+import { Zona } from '../../zonas/domain/zona.entity';
 import { Lectura } from '../domain/lectura.entity';
 import { LECTURA_REPOSITORY, LecturaRepository } from '../domain/lectura.repository';
 import {
@@ -96,10 +97,18 @@ export class LecturasService {
 
     await this.actualizarSensor(sensor, datos.bateriaPct, registradaEn);
 
+    // La zona se pide una unica vez y se pasa hacia abajo: evaluar el estado y
+    // evaluar las reglas necesitan los mismos umbrales. Consultarla dos veces
+    // duplicaba la lectura en el endpoint mas caliente del modulo, y abria la
+    // puerta a evaluar el estado y las alertas contra dos versiones distintas
+    // de la zona si alguien la editaba en el medio.
+    const zona = await this.zonas.obtener(contenedor.zonaId);
+
     const estadoAnterior = contenedor.estado;
-    const estadoNuevo = await this.actualizarContenedor(contenedor, lectura);
+    const estadoNuevo = await this.actualizarContenedor(contenedor, lectura, zona);
     const alertasGeneradas = await this.evaluarReglas(
       contenedor,
+      zona,
       estadoAnterior,
       estadoNuevo,
       datos.bateriaPct,
@@ -146,9 +155,8 @@ export class LecturasService {
   private async actualizarContenedor(
     contenedor: Contenedor,
     lectura: Lectura,
+    zona: Zona,
   ): Promise<EstadoContenedor> {
-    const zona = await this.zonas.obtener(contenedor.zonaId);
-
     const estadoNuevo = evaluarEstadoContenedor(
       lectura,
       zona,
@@ -169,11 +177,11 @@ export class LecturasService {
   /** CU-05 y CU-06. El contenedor ya viene con la ultima lectura aplicada. */
   private async evaluarReglas(
     contenedor: Contenedor,
+    zona: Zona,
     estadoAnterior: EstadoContenedor,
     estadoNuevo: EstadoContenedor,
     bateriaPct: number,
   ): Promise<TipoAlerta[]> {
-    const zona = await this.zonas.obtener(contenedor.zonaId);
     const generadas: TipoAlerta[] = [];
 
     // CU-06 primero: el incendio es de maxima prioridad y no depende del llenado.

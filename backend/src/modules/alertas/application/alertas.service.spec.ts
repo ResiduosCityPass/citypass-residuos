@@ -108,6 +108,31 @@ describe('AlertasService (CU-05, CU-06)', () => {
       );
       expect(eventos.publish).not.toHaveBeenCalled();
     });
+
+    it('no duplica si ya hay una alerta de bateria abierta', async () => {
+      repo.buscarAbierta.mockResolvedValue({ id: 'a-previa' } as Alerta);
+
+      // Sin esta guarda, un sensor con la bateria en 12% generaria una alerta
+      // nueva en cada lectura, o sea una cada quince minutos.
+      const resultado = await service.registrarBateriaBaja('c-1', 12);
+
+      expect(resultado).toBeNull();
+      expect(repo.crear).not.toHaveBeenCalled();
+    });
+
+    it('busca la alerta abierta del tipo BATERIA_BAJA, no de otro tipo', async () => {
+      await service.registrarBateriaBaja('c-1', 12);
+
+      expect(repo.buscarAbierta).toHaveBeenCalledWith('c-1', TipoAlerta.BATERIA_BAJA);
+    });
+
+    it('deja el nivel de bateria en el detalle para el operador', async () => {
+      await service.registrarBateriaBaja('c-1', 7);
+
+      expect(repo.crear).toHaveBeenCalledWith(
+        expect.objectContaining({ detalle: expect.stringContaining('7%') }),
+      );
+    });
   });
 
   describe('ciclo de vida', () => {

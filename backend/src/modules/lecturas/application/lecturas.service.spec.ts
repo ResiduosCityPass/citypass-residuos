@@ -119,6 +119,36 @@ describe('LecturasService (CU-04)', () => {
 
       await expect(service.registrar(sensorDe(), lecturaNormal)).rejects.toThrow(NotFoundException);
     });
+
+    it('consulta la zona una sola vez por lectura', async () => {
+      construir(contenedorDe());
+
+      await service.registrar(sensorDe(), lecturaNormal);
+
+      // Evaluar el estado y evaluar las reglas necesitan los mismos umbrales.
+      // Pedirlos dos veces duplicaba la consulta en el endpoint mas caliente del
+      // modulo, y permitia que una edicion de la zona en el medio dejara el estado
+      // y las alertas evaluados contra umbrales distintos.
+      expect(zonas.obtener).toHaveBeenCalledTimes(1);
+    });
+
+    it('evalua estado y alertas contra la misma zona', async () => {
+      construir(contenedorDe());
+
+      await service.registrar(sensorDe(), {
+        ...lecturaNormal,
+        nivelLlenadoPct: 87,
+        temperaturaC: 78,
+      });
+
+      expect(zonas.obtener).toHaveBeenCalledWith('z-1');
+      expect(alertas.registrarIncendio).toHaveBeenCalledWith(expect.anything(), ZONA_CENTRO);
+      expect(alertas.registrarSaturacion).toHaveBeenCalledWith(
+        expect.anything(),
+        ZONA_CENTRO,
+        expect.anything(),
+      );
+    });
   });
 
   describe('orden cronologico', () => {

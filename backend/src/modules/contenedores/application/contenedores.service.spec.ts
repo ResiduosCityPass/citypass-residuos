@@ -86,6 +86,62 @@ describe('ContenedoresService (CU-01)', () => {
     });
   });
 
+  describe('actualizar', () => {
+    it('aplica los cambios sobre el contenedor existente', async () => {
+      const contenedor = { id: 'c-1', zonaId: 'z-1', capacidadLitros: 1100 } as Contenedor;
+      contenedores.buscarPorId.mockResolvedValue(contenedor);
+
+      const resultado = await service.actualizar('c-1', { capacidadLitros: 2400 });
+
+      expect(resultado.capacidadLitros).toBe(2400);
+      expect(contenedores.guardar).toHaveBeenCalledWith(contenedor);
+    });
+
+    it('falla con 404 si el contenedor no existe', async () => {
+      contenedores.buscarPorId.mockResolvedValue(null);
+
+      await expect(service.actualizar('c-fantasma', { capacidadLitros: 2400 })).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(contenedores.guardar).not.toHaveBeenCalled();
+    });
+
+    it('valida que la zona nueva exista al mover el contenedor de zona', async () => {
+      contenedores.buscarPorId.mockResolvedValue({ id: 'c-1', zonaId: 'z-1' } as Contenedor);
+
+      await service.actualizar('c-1', { zonaId: 'z-2' });
+
+      expect(zonas.obtener).toHaveBeenCalledWith('z-2');
+    });
+
+    it('propaga el 404 si la zona nueva no existe, sin guardar nada', async () => {
+      contenedores.buscarPorId.mockResolvedValue({ id: 'c-1', zonaId: 'z-1' } as Contenedor);
+      zonas.obtener.mockRejectedValue(new NotFoundException());
+
+      await expect(service.actualizar('c-1', { zonaId: 'z-inexistente' })).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(contenedores.guardar).not.toHaveBeenCalled();
+    });
+
+    it('no revalida la zona si el zonaId enviado es el que ya tenia', async () => {
+      contenedores.buscarPorId.mockResolvedValue({ id: 'c-1', zonaId: 'z-1' } as Contenedor);
+
+      await service.actualizar('c-1', { zonaId: 'z-1' });
+
+      expect(zonas.obtener).not.toHaveBeenCalled();
+    });
+
+    it('mover de zona cambia los umbrales que se le aplican en la proxima lectura', async () => {
+      const contenedor = { id: 'c-1', zonaId: 'z-1' } as Contenedor;
+      contenedores.buscarPorId.mockResolvedValue(contenedor);
+
+      await service.actualizar('c-1', { zonaId: 'z-2' });
+
+      expect(contenedor.zonaId).toBe('z-2');
+    });
+  });
+
   describe('darDeBaja', () => {
     it('es baja logica: marca inactivo pero conserva la fila', async () => {
       const contenedor = { id: 'c-1', activo: true } as Contenedor;
