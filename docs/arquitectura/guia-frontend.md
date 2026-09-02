@@ -651,6 +651,62 @@ porque se ven en pantalla:
 
 ---
 
+## 8c. CU-11 · Consulta ciudadana — **público, sin token**
+
+**Implementado y verificado.** Es el único endpoint del módulo que se sirve sin `Authorization`.
+
+### `GET /publico/contenedores/cercanos`
+
+**Sin autenticación.** Mandá la llamada por `apiPublic`, sin el header — un operador logueado que
+abre la vista ciudadana no tiene por qué filtrar su identidad a un endpoint anónimo.
+
+| Param | Obligatorio | Reglas |
+|---|---|---|
+| `lat` | Sí | Latitud válida |
+| `lng` | Sí | Longitud válida |
+| `radioMetros` | No | Entero de 1 a 10000. Por defecto **1000** |
+| `tipoResiduo` | No | `COMUN`, `RECICLABLE` u `ORGANICO` |
+
+**Respuesta `200`** — array **ordenado por distancia ascendente**, captura real:
+
+```json
+[
+  {
+    "id": "c826c1e9-d11f-4701-b50d-7f50a3fd72d3",
+    "codigo": "CT-0009",
+    "lat": -34.604717,
+    "lng": -58.380911,
+    "tipoResiduo": "ORGANICO",
+    "distanciaMetros": 129
+  }
+]
+```
+
+Exactamente esos seis campos, siempre. `distanciaMetros` es un entero, calculado en el servidor
+por Haversine — verificado contra un cálculo independiente con diferencia menor a medio metro.
+
+### Lo que este endpoint deliberadamente NO devuelve
+
+Ni `estado`, ni `nivelLlenadoPct`, ni `temperaturaC`, ni alertas. Es información operativa interna
+del municipio y no tiene por qué estar en una vista anónima. La proyección es campo por campo en el
+backend, nunca un spread de la entidad, y **hay un test que falla si algún día se cuela un campo de
+más**.
+
+### Dos comportamientos que conviene conocer
+
+- **Los contenedores `FUERA_DE_SERVICIO` no aparecen.** Mandar a alguien caminando hasta un
+  contenedor roto es peor que no listarlo. Ojo con la diferencia: se filtra *por* el estado, pero no
+  se *expone* el estado. En el mapa del operador ese mismo contenedor sigue apareciendo.
+- **Si no hay nada en el radio devuelve `[]`, no un error.** No encontrar contenedores cerca es un
+  resultado válido, no un fallo.
+
+### Errores
+
+Solo validación: `400` con el array de `message` habitual si `lat`/`lng` faltan o son inválidas, o
+si `radioMetros` se pasa de 10000.
+
+---
+
 ## 9. CU-04 · Lecturas — para entender, no para llamar
 
 **Este endpoint no lo vas a usar desde el frontend.** Lo llaman los sensores. Te lo documento
@@ -686,7 +742,6 @@ Para que no lo esperes ni lo mockees pensando que ya está:
 | CU-08 | `POST /rutas/generar` — generación de ruta | Sprint 4 |
 | CU-09 | `PATCH /rutas/:id/asignar` — asignar chofer | Sprint 4 |
 | CU-10 | `PATCH /paradas/:id/confirmar` — confirmar vaciado | Sprint 4 |
-| CU-11 | `GET /publico/contenedores/cercanos` — consulta ciudadana, **sin token** | Sprint 4 |
 | — | WebSocket para el mapa. Por ahora, polling | Sprint 5 si hay tiempo |
 
 Los contratos preliminares de todos están en

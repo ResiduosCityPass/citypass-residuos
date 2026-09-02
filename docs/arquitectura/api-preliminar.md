@@ -124,15 +124,22 @@ alertas de saturación abiertas y publica `residuos.contenedor.vaciado`.
 
 **Respuestas:** `200` · `403` fuera del radio permitido · `409` parada ya confirmada.
 
-## CU-11 · Consulta ciudadana — **público**
+## CU-11 · Consulta ciudadana — **público, implementado**
 
 | Método | Ruta | Auth |
 |---|---|---|
 | `GET` | `/publico/contenedores/cercanos` | Ninguna |
 
-Query: `?lat=&lng=&radioMetros=1000&tipoResiduo=RECICLABLE`.
-Resuelto con fórmula de Haversine. No expone estado de llenado ni alertas: es información
-operativa interna.
+Query: `?lat=&lng=&radioMetros=1000&tipoResiduo=RECICLABLE`. `lat` y `lng` obligatorias;
+`radioMetros` por defecto 1000, máximo 10000.
+
+Devuelve `{id, codigo, lat, lng, tipoResiduo, distanciaMetros}` ordenado por distancia ascendente.
+Haversine en SQL plano, sin PostGIS (ADR-002).
+
+No expone estado de llenado, temperatura ni alertas: es información operativa interna. Los
+contenedores `FUERA_DE_SERVICIO` quedan excluidos del resultado, aunque el estado no se exponga.
+
+Detalle completo en la [guía de frontend](guia-frontend.md).
 
 ## CU-12 · Predicción de saturación — **implementado**
 
