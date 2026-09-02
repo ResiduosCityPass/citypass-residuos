@@ -781,6 +781,134 @@ si `radioMetros` se pasa de 10000.
 
 ---
 
+## 8d. CU-08, CU-09 y CU-10 · Rutas y recolección
+
+**Implementados y verificados de punta a punta.** Hay un test de integración que recorre el ciclo
+completo contra PostgreSQL: contenedor saturado → alerta → ruta → asignación → confirmación del
+chofer → contenedor en verde, alerta cerrada y camión liberado.
+
+### `POST /rutas/generar` — CU-08
+
+Roles: `ADMINISTRADOR`, `OPERADOR`. Cuerpo: `{ camionId, zonaId? }`.
+
+Devuelve `201` con la ruta expandida: camión y paradas (cada una con su contenedor).
+
+```json
+{
+  "id": "...",
+  "camionId": "...",
+  "camion": { "patente": "AB123CD", "capacidadLitros": 12000, "...": "..." },
+  "choferId": null,
+  "estado": "PROPUESTA",
+  "distanciaEstimadaKm": 1.8,
+  "litrosEstimados": 1936,
+  "paradas": [
+    { "id": "...", "orden": 1, "estado": "PENDIENTE", "confirmadaEn": null,
+      "contenedorId": "...", "contenedor": { "codigo": "CT-0001", "...": "..." } }
+  ],
+  "generadaEn": "...", "asignadaEn": null, "completadaEn": null
+}
+```
+
+**La ruta nace `PROPUESTA` y el camión sigue `DISPONIBLE`.** Es una propuesta, no un compromiso:
+el camión se toma recién al asignar.
+
+Reglas de la heurística, todas verificadas:
+
+- Vecino más cercano desde el depósito, respetando la capacidad del camión
+- Solo contenedores `CRITICO` del `tipoResiduoHabilitado` del camión
+- **Excluye los ya comprometidos en otra ruta viva** (`PROPUESTA`, `ASIGNADA` o `EN_CURSO`)
+- **Excluye las zonas bloqueadas**
+- La distancia incluye la vuelta al depósito
+
+Errores: `409 CAMION_NO_DISPONIBLE` · `409 RUTA_SIN_CONTENEDORES` (también cuando hay críticos pero
+ninguno entra en la capacidad) · `404 CAMION_NO_ENCONTRADO`.
+
+### `PATCH /rutas/:id/asignar` — CU-09
+
+Roles: `ADMINISTRADOR`, `OPERADOR`. Cuerpo: `{ choferId }`.
+
+Pasa la ruta a `ASIGNADA`, sella `asignadaEn` y **recién ahí el camión pasa a `EN_RUTA`**.
+
+Errores: `409 RUTA_NO_PROPUESTA` · `404 RUTA_NO_ENCONTRADA`.
+
+> ### Sobre `choferId` — y por qué no existe `GET /choferes`
+>
+> **No implementé ese endpoint, y no creo que deba implementarlo yo.** Los choferes son usuarios del
+> módulo de identidad del Squad 2, no entidades de Residuos. Inventar acá un padrón de choferes
+> significaría mantener una copia de sus datos y que se desincronice.
+>
+> `choferId` es un string libre: el `sub` del JWT del chofer. El backend **no lo valida contra
+> ningún padrón**, así que no vas a recibir `CHOFER_NO_ENCONTRADO` — ese código de tu mock no
+> existe del lado del servidor.
+>
+> Por la misma razón la ruta trae `choferId` pero **no un objeto `chofer`**: no tenemos su nombre.
+>
+> Hay que decidirlo en equipo con Nicolás y Adriel. Las opciones que veo: pedirle al Squad 2 un
+> endpoint de usuarios por rol, o que el operador escriba el identificador a mano. Mientras tanto
+> tu `<select>` puede seguir con datos falsos, y la pantalla ya aclara que es una limitación
+> conocida.
+
+### `GET /rutas/mias` — CU-10
+
+Rol: `CHOFER`. **Sin parámetros:** la identidad sale del `sub` del token. Si viajara por query
+string, cualquier chofer podría leer la ruta de otro.
+
+Devuelve la ruta expandida, o **cuerpo vacío con `200`** si no tiene ninguna activa. Tu
+`client.js` hace `response.json().catch(() => null)`, así que te llega `null` — que es exactamente
+lo que asumiste. Terminar el turno no es un error.
+
+### `PATCH /paradas/:id/confirmar` — CU-10
+
+Rol: `CHOFER`. Cuerpo: `{ lat, lng }`.
+
+Devuelve la transición completa, tal como la propusiste:
+
+```json
+{
+  "paradaId": "...",
+  "estado": "CONFIRMADA",
+  "confirmadaEn": "...",
+  "contenedorId": "...",
+  "estadoContenedor": "NORMAL",
+  "nivelLlenadoPct": 0,
+  "alertasCerradas": 1,
+  "rutaEstado": "EN_CURSO",
+  "distanciaMetros": 0
+}
+```
+
+> **Una diferencia con tu mock:** `alertasCerradas` es un **número**, no un array de ids. El id de
+> una alerta ya cerrada no le sirve a la pantalla, y devolverlo obligaba a cargar entidades enteras
+> solo para descartarlas.
+
+Reglas:
+
+- **Radio de 100 m**, configurable por entorno. Fuera de radio → `403 PARADA_FUERA_DE_RADIO`, y el
+  mensaje dice a cuántos metros estás.
+- **Un chofer solo confirma paradas de su propia ruta** → `403 PARADA_DE_OTRA_RUTA`. Es un código
+  nuevo que tu mock no tenía.
+- Doble confirmación → `409 PARADA_YA_CONFIRMADA`.
+- El contenedor vuelve a `NORMAL` y 0%, **salvo que esté `FUERA_DE_SERVICIO`**: lo que tiene roto
+  es el sensor o la tapa, no el nivel.
+- **La primera confirmación pasa la ruta a `EN_CURSO`; la última la cierra y libera el camión.**
+  Sin eso el camión quedaría `EN_RUTA` para siempre, y CU-03 no deja sacarlo de ese estado a mano.
+
+### Códigos nuevos
+
+| `code` | HTTP | Cuándo |
+|---|---|---|
+| `RUTA_NO_ENCONTRADA` | 404 | — |
+| `RUTA_NO_PROPUESTA` | 409 | Se quiso asignar una ruta que ya no es propuesta |
+| `RUTA_SIN_CONTENEDORES` | 409 | No hay críticos ruteables para ese camión |
+| `CAMION_NO_DISPONIBLE` | 409 | El camión está en ruta o en mantenimiento |
+| `PARADA_NO_ENCONTRADA` | 404 | — |
+| `PARADA_YA_CONFIRMADA` | 409 | — |
+| `PARADA_FUERA_DE_RADIO` | 403 | El chofer está a más de 100 m |
+| `PARADA_DE_OTRA_RUTA` | 403 | **Nuevo.** La parada no pertenece a la ruta activa del chofer |
+
+---
+
 ## 9. CU-04 · Lecturas — para entender, no para llamar
 
 **Este endpoint no lo vas a usar desde el frontend.** Lo llaman los sensores. Te lo documento
@@ -812,9 +940,6 @@ Para que no lo esperes ni lo mockees pensando que ya está:
 
 | CU | Qué falta | Cuándo |
 |---|---|---|
-| CU-08 | `POST /rutas/generar` — generación de ruta | Sprint 4 |
-| CU-09 | `PATCH /rutas/:id/asignar` — asignar chofer | Sprint 4 |
-| CU-10 | `PATCH /paradas/:id/confirmar` — confirmar vaciado | Sprint 4 |
 | — | WebSocket para el mapa. Por ahora, polling | Sprint 5 si hay tiempo |
 
 Los contratos preliminares de todos están en

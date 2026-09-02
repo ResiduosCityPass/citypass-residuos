@@ -99,7 +99,7 @@ Payload liviano pensado para renderizar marcadores: `id`, `lat`, `lng`, `estado`
 > Para el Hito 1 el mapa refresca por *polling* cada 30s. La actualización push por WebSocket
 > queda como mejora del Sprint 5, si hay tiempo.
 
-## CU-08 / CU-09 · Rutas
+## CU-08 / CU-09 · Rutas — **implementados**
 
 | Método | Ruta | Rol |
 |---|---|---|
@@ -111,7 +111,7 @@ Payload liviano pensado para renderizar marcadores: `id`, `lat`, `lng`, `estado`
 La separación entre generar y asignar es deliberada: **mantiene a una persona en el medio**, que es
 exactamente lo que pide CU-09 por si la heurística propone algo absurdo.
 
-## CU-10 · Confirmar vaciado
+## CU-10 · Confirmar vaciado — **implementado**
 
 | Método | Ruta | Rol |
 |---|---|---|

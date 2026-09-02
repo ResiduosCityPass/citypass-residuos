@@ -83,6 +83,17 @@ export class FlotaService {
     return this.camiones.guardar(camion);
   }
 
+  /**
+   * Guarda el estado del camion sin pasar por las reglas de `actualizar`.
+   *
+   * Lo usa el ciclo de vida de las rutas: asignar una ruta pone el camion
+   * EN_RUTA y completarla lo libera, y esas transiciones son justamente las que
+   * `actualizar` bloquea para que nadie las haga a mano.
+   */
+  guardarEstado(camion: Camion): Promise<Camion> {
+    return this.camiones.guardar(camion);
+  }
+
   private async verificarPatenteLibre(patente: string): Promise<void> {
     const existente = await this.camiones.buscarPorPatente(patente);
 

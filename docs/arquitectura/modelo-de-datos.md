@@ -68,16 +68,19 @@ erDiagram
         uuid id PK
         uuid camionId FK
         string choferId
-        enum estadoRuta
+        enum estado
         decimal distanciaEstimadaKm
+        int litrosEstimados
         timestamp generadaEn
+        timestamp asignadaEn
+        timestamp completadaEn
     }
     PARADA {
         uuid id PK
         uuid rutaId FK
         uuid contenedorId FK
         int orden
-        enum estadoParada
+        enum estado
         timestamp confirmadaEn
     }
 ```
@@ -126,6 +129,10 @@ distinto tipo (saturado y con batería baja a la vez) y necesitamos su ciclo de 
 **`SENSOR` es entidad aparte aunque la relación sea 1:1.** El sensor tiene ciclo de vida propio:
 se rompe, se reemplaza, se recalibra. Además guarda su `apiKeyHash`, que es una credencial y no
 debe convivir con datos de ubicación pública ([ADR-005](../adr/ADR-005-seguridad-identidad.md)).
+
+**`RUTA.choferId` es un string, no una clave foránea.** Los choferes son usuarios del módulo de
+identidad del Squad 2, no entidades nuestras: se guarda el `sub` de su JWT. Mantener una copia de
+sus datos acá solo garantizaría que se desincronice.
 
 **Preparado para los alcances completos.** `ZONA` puede recibir una columna `geometry` (PostGIS)
 sin migrar datos si algún día se implementa CU-02 completo, y `PARADA.confirmadaEn` ya contempla

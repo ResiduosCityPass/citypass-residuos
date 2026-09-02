@@ -14,6 +14,7 @@ import { MapaModule } from './modules/mapa/mapa.module';
 import { PrediccionModule } from './modules/prediccion/prediccion.module';
 import { PublicoModule } from './modules/publico/publico.module';
 import { FlotaModule } from './modules/flota/flota.module';
+import { RutasModule } from './modules/rutas/rutas.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { FlotaModule } from './modules/flota/flota.module';
     PrediccionModule,
     PublicoModule,
     FlotaModule,
+    RutasModule,
     // Sprint 4: FlotaModule (CU-03), RutasModule (CU-08..CU-10), PublicoModule (CU-11)
   ],
 })
