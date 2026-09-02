@@ -141,6 +141,8 @@ El operador la toma (`atender`) y después la cierra (`resolver`). No se puede s
 | `CONTENEDOR_CODIGO_DUPLICADO` | 409 | Ya hay un contenedor con ese código |
 | `CONTENEDOR_YA_TIENE_SENSOR` | 409 | Ese contenedor ya tiene un sensor vinculado |
 | `SENSOR_CODIGO_DUPLICADO` | 409 | Ya hay un sensor con ese código |
+| `SIN_LECTURAS_SUFICIENTES` | 409 | No hay histórico suficiente para predecir (CU-12) |
+| `TENDENCIA_NO_CRECIENTE` | 409 | El contenedor no se está llenando, no hay saturación que predecir (CU-12) |
 | `ALERTA_NO_ENCONTRADA` | 404 | La alerta no existe |
 | `ALERTA_NO_ABIERTA` | 409 | Quisiste atender una alerta que ya no está `ABIERTA` |
 | `ALERTA_YA_RESUELTA` | 409 | Quisiste resolver una alerta ya cerrada |
@@ -571,6 +573,67 @@ listado conviene distinguirlo de uno que sí reporta y está realmente vacío.
 
 ---
 
+## 8b. CU-12 · Predicción de saturación
+
+**Implementado y verificado contra la API real.** Estima cuántas horas faltan para que el
+contenedor cruce el umbral de su zona.
+
+### `GET /contenedores/:id/prediccion`
+
+Roles: `ADMINISTRADOR`, `OPERADOR`
+
+**Respuesta `200`** — captura real:
+
+```json
+{
+  "contenedorId": "809d697e-05b4-4a4b-a0c2-95289e128cf2",
+  "codigo": "CT-0007",
+  "nivelActualPct": 58.45,
+  "umbralCriticoPct": 70,
+  "tasaLlenadoPctPorHora": 8.02,
+  "horasHastaUmbral": 1.44,
+  "saturacionEstimadaEn": "2026-09-02T23:51:21.213Z",
+  "confianza": 0.997,
+  "muestrasUsadas": 25
+}
+```
+
+| Campo | Qué es |
+|---|---|
+| `nivelActualPct` | Última lectura del contenedor |
+| `umbralCriticoPct` | Umbral de su zona. Se incluye para no tener que pedir la zona aparte |
+| `tasaLlenadoPctPorHora` | Pendiente de la recta ajustada. Puntos porcentuales por hora |
+| `horasHastaUmbral` | Cuánto falta. **Es `0` si ya lo cruzó**, nunca negativo |
+| `saturacionEstimadaEn` | Momento estimado del cruce, en ISO |
+| `confianza` | R² del ajuste, entre 0 y 1 |
+| `muestrasUsadas` | Cuántas lecturas entraron en la regresión |
+
+### Errores
+
+| `code` | HTTP | Cuándo |
+|---|---|---|
+| `SIN_LECTURAS_SUFICIENTES` | 409 | Menos de 3 lecturas en el ciclo actual. Un contenedor recién dado de alta cae acá |
+| `TENDENCIA_NO_CRECIENTE` | 409 | **Código nuevo.** El contenedor no se está llenando, así que no hay saturación que predecir |
+| `CONTENEDOR_NO_ENCONTRADO` | 404 | — |
+
+> `TENDENCIA_NO_CRECIENTE` es un código que no estaba en el contrato original. Se agregó porque
+> devolver una fecha de saturación para un contenedor que se está vaciando sería inventar un futuro.
+> La tarjeta del frontend ya lo maneja bien: muestra el `message` para los códigos que no conoce.
+
+### Cómo se calcula, para que puedas explicarlo
+
+Regresión lineal por mínimos cuadrados sobre el histórico de lecturas. Dos cosas que conviene saber
+porque se ven en pantalla:
+
+1. **Solo se ajusta sobre el ciclo de llenado actual.** Si la ventana de lecturas cruza un vaciado,
+   la serie sube, cae a cero y vuelve a subir, y la recta sobre eso no describe nada. Por eso
+   `muestrasUsadas` puede ser mucho menor que el total de lecturas del contenedor: verificado con un
+   contenedor de 24 lecturas que reportó `muestrasUsadas: 12`, las posteriores al vaciado.
+2. **La `confianza` es el R² real del ajuste**, no un número decorativo. Un llenado errático da
+   valores por debajo de 0,5, y ahí es correcto mostrar el aviso de no planificar con ese número.
+
+---
+
 ## 9. CU-04 · Lecturas — para entender, no para llamar
 
 **Este endpoint no lo vas a usar desde el frontend.** Lo llaman los sensores. Te lo documento
@@ -602,7 +665,6 @@ Para que no lo esperes ni lo mockees pensando que ya está:
 
 | CU | Qué falta | Cuándo |
 |---|---|---|
-| CU-12 | `GET /contenedores/:id/prediccion` — predicción de saturación | Sprint 2 |
 | CU-03 | `/camiones` — gestión de flota | Sprint 4 |
 | CU-08 | `POST /rutas/generar` — generación de ruta | Sprint 4 |
 | CU-09 | `PATCH /rutas/:id/asignar` — asignar chofer | Sprint 4 |

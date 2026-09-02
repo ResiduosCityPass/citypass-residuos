@@ -134,7 +134,7 @@ Query: `?lat=&lng=&radioMetros=1000&tipoResiduo=RECICLABLE`.
 Resuelto con fórmula de Haversine. No expone estado de llenado ni alertas: es información
 operativa interna.
 
-## CU-12 · Predicción de saturación
+## CU-12 · Predicción de saturación — **implementado**
 
 | Método | Ruta | Rol |
 |---|---|---|
@@ -142,15 +142,25 @@ operativa interna.
 
 ```json
 {
-  "contenedorId": "CT-0421",
-  "nivelActualPct": 62.3,
-  "tasaLlenadoPctPorHora": 3.1,
-  "horasHastaUmbral": 2.5,
-  "saturacionEstimadaEn": "2026-09-15T17:00:00.000Z",
-  "confianza": 0.87,
-  "muestrasUsadas": 96
+  "contenedorId": "809d697e-05b4-4a4b-a0c2-95289e128cf2",
+  "codigo": "CT-0007",
+  "nivelActualPct": 58.45,
+  "umbralCriticoPct": 70,
+  "tasaLlenadoPctPorHora": 8.02,
+  "horasHastaUmbral": 1.44,
+  "saturacionEstimadaEn": "2026-09-02T23:51:21.213Z",
+  "confianza": 0.997,
+  "muestrasUsadas": 25
 }
 ```
+
+`contenedorId` es el UUID, por consistencia con el resto de la API; el código legible va en
+`codigo`. `horasHastaUmbral` es `0` si el umbral ya se cruzó, nunca negativo.
+
+**Errores:** `409 SIN_LECTURAS_SUFICIENTES` (menos de 3 lecturas en el ciclo actual) ·
+`409 TENDENCIA_NO_CRECIENTE` (el contenedor no se está llenando) · `404 CONTENEDOR_NO_ENCONTRADO`.
+
+El detalle del modelo está en la [guía de frontend](guia-frontend.md).
 
 ## Manejo de errores
 
