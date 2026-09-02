@@ -77,12 +77,42 @@ Esta separación es lo que evalúa la dimensión 1 de la rúbrica. Dos reglas pr
    `infrastructure/`. Es lo que permite que los tests unitarios pasen un doble en lugar de
    levantar Postgres (ver ADR-002).
 
+## Migraciones
+
+El esquema lo definen las migraciones, no `synchronize` ([ADR-002](../docs/adr/ADR-002-persistencia.md)).
+
+```bash
+npm run migration:run
+```
+
+Para generar una nueva después de cambiar una entidad:
+
+```bash
+npm run migration:generate -- src/migrations/NombreDescriptivo
+```
+
+TypeORM compara las entidades contra el esquema **real** de tu base, así que generá siempre con
+las migraciones ya aplicadas: si generás contra una base desactualizada, la migración va a incluir
+cambios que ya existen.
+
+Una verificación que conviene hacer siempre: después de aplicar la migración, corré
+`migration:generate` otra vez. Si dice *"No changes in database schema were found"*, la migración
+reproduce exactamente las entidades. Si genera algo, quedó incompleta.
+
+> **`DB_SYNCHRONIZE=true` no se usa.** Está como escape para levantar una base descartable rápido,
+> pero si dos personas corren con synchronize, cada una termina con el esquema que le dejó su
+> última rama y nadie se entera hasta el deploy.
+
 ## Tests
 
 ```bash
 npm test            # unitarios
-npm run test:cov    # con reporte de cobertura
+npm run test:cov    # unitarios con reporte de cobertura
+npm run test:e2e    # integración contra PostgreSQL real
 ```
+
+Los de integración necesitan Docker levantado. Crean su propia base (`residuos_test`), le aplican
+las migraciones y truncan las tablas entre casos: **no tocan tu base de desarrollo**.
 
 El umbral de cobertura está fijado en **60%** en `package.json` (`coverageThreshold`). Si la
 cobertura baja de ahí, `npm run test:cov` falla y el CI corta el merge. Es intencional: la
@@ -97,7 +127,12 @@ el Sprint 1 que recuperarlo en septiembre.
 La exclusión que sí hay que justificar es la de los adaptadores de TypeORM: son delegación
 directa al ORM, sin una sola rama condicional. Un test unitario ahí verifica que un mock
 devuelve lo que le pedimos que devuelva —o sea, verifica el mock— no que el SQL sea correcto.
-Lo que los cubre de verdad son **tests de integración contra Postgres, planificados para el
-Sprint 2**, que es exactamente lo que la cátedra pide bajo "unitarios e integrales".
 
-Mantenerlos dentro del cómputo con tests de mentira daría un número más alto y menos verdadero.
+**Lo que los cubre son los tests de integración de `test/`**, que corren contra PostgreSQL real y
+ya existen. Ahí se verifica lo que ningún doble puede: que las columnas `numeric` vuelvan como
+número y no como string, que la fórmula de Haversine de CU-11 dé la distancia correcta, que la
+restricción de unicidad la aplique la base, que `apiKeyHash` no se filtre en ninguna respuesta, y
+que los guards globales protejan de verdad una vez armado el contenedor de inyección.
+
+Mantener los adaptadores dentro del cómputo unitario con tests de mentira daría un número más alto
+y menos verdadero.
