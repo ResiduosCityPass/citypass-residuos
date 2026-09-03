@@ -3,12 +3,14 @@
 ## Entorno local
 
 ```bash
-docker compose -f infra/docker-compose.yml up -d
+docker compose -f infra/docker-compose.yml up -d --build
 docker compose -f infra/docker-compose.yml ps
 ```
 
 | Servicio | Puerto | Credenciales |
 |---|---|---|
+| Frontend | 8080 | `http://localhost:8080` |
+| Backend API | 3000 | Health: `http://localhost:3000/api/v1/health` |
 | PostgreSQL 16 | 5432 | `citypass` / `citypass` / db `residuos` |
 | RabbitMQ | 5672 (AMQP), 15672 (consola) | `citypass` / `citypass` |
 
@@ -19,9 +21,9 @@ RabbitMQ está declarado pero no se usa hasta el Sprint 2: hasta entonces el bac
 
 | # | Tarea | Sprint | Estado |
 |---|---|---|---|
-| 1 | Proteger `main` y `develop`: PR obligatorio, CI en verde, sin bypass | 0 | Pendiente |
+| 1 | Proteger `main` y `develop`: PR obligatorio, CI en verde, sin bypass | 0 | Guía lista en [`docs/devops/proteccion-ramas.md`](../docs/devops/proteccion-ramas.md) |
 | 2 | `Dockerfile` multi-stage para el backend | 1 | **Hecho** — ver abajo |
-| 3 | `Dockerfile` para el frontend (React + Vite: build y servir estáticos) | 2 | Pendiente |
+| 3 | `Dockerfile` para el frontend (React + Vite: build y servir estáticos) | 2 | **Hecho** — ver abajo |
 | 4 | Job de deploy en el pipeline | 3 | Pendiente |
 | 5 | Elegir destino cloud y escribirlo como IaC — la dimensión 7 pide *infraestructura como código*, no despliegue manual | 3-4 | Pendiente |
 
@@ -40,31 +42,7 @@ Verificado: arranca, se conecta a Postgres, responde la API, el `HEALTHCHECK` pa
 **corre como usuario `node` y no como root**, y las migraciones se pueden ejecutar desde la imagen.
 Pesa 404 MB, que es lo normal para NestJS con TypeORM.
 
-### Para sumarla al compose
-
-```yaml
-  api:
-    build: ../backend
-    container_name: citypass-residuos-api
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      DB_HOST: postgres
-      DB_PORT: '5432'
-      DB_USER: citypass
-      DB_PASSWORD: citypass
-      DB_NAME: residuos
-      # Corre las migraciones al arrancar. En un entorno desplegado suele
-      # preferirse un job aparte, para que un rollback de la app no dependa
-      # de haber revertido el esquema.
-      DB_MIGRATIONS_RUN: 'true'
-      JWT_SECRET: cambiar-en-produccion
-      EVENT_BUS_DRIVER: inmemory
-    ports:
-      - '3000:3000'
-```
+Ya está sumada al `docker-compose.yml` como servicio `api`.
 
 ### Migraciones en un entorno desplegado
 
@@ -89,6 +67,19 @@ Dos caminos, y conviene elegir a conciencia:
   a los 10 segundos. Eso cortaría al despachador del outbox en medio de un lote.
 - **Usuario `node`.** Correr como root es innecesario y es de lo primero que mira cualquier
   revisión de seguridad.
+
+## Imagen del frontend
+
+Está en [`frontend/Dockerfile`](../frontend/Dockerfile). Compila React + Vite y sirve el resultado
+con nginx.
+
+```bash
+docker build -t citypass-residuos-frontend ./frontend
+```
+
+Las variables `VITE_*` se inyectan al compilar la imagen. Para local, el compose deja
+`VITE_API_URL=http://localhost:3000/api/v1`, así el navegador llama al backend publicado en el
+puerto 3000.
 
 Toda decisión de infraestructura que tenga más de una opción razonable necesita su ADR
 en `docs/adr/`. Es requisito explícito de la cátedra.

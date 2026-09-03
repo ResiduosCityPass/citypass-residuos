@@ -1,9 +1,53 @@
 # Entorno local del modulo de Residuos — Squad 4
-# Uso:  docker compose -f infra/docker-compose.yml up -d
+# Uso:  docker compose -f infra/docker-compose.yml up -d --build
 #
 # Duenio: Ramiro (DevOps).
 
+name: citypass-residuos
+
 services:
+  api:
+    build: ../backend
+    container_name: citypass-residuos-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: '3000'
+      API_PREFIX: api/v1
+      DB_HOST: postgres
+      DB_PORT: '5432'
+      DB_USER: citypass
+      DB_PASSWORD: citypass
+      DB_NAME: residuos
+      DB_SYNCHRONIZE: 'false'
+      DB_MIGRATIONS_RUN: 'true'
+      JWT_SECRET: dev-only-cambiar-en-produccion
+      JWT_ISSUER: https://idp.citypass.local
+      JWT_AUDIENCE: citypass-residuos-api
+      JWT_ALGORITHM: HS256
+      EVENT_BUS_DRIVER: inmemory
+      RABBITMQ_URL: amqp://citypass:citypass@rabbitmq:5672
+      EVENT_BUS_EXCHANGE: citypass.events
+    ports:
+      - '3000:3000'
+
+  frontend:
+    build:
+      context: ../frontend
+      args:
+        VITE_API_URL: http://localhost:3000/api/v1
+        VITE_USE_MOCKS: 'false'
+        VITE_SIMULAR_GPS: 'false'
+    container_name: citypass-residuos-frontend
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - '8080:80'
+
   postgres:
     image: postgres:16-alpine
     container_name: citypass-residuos-db
