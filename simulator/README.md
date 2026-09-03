@@ -1,25 +1,63 @@
 # Simulador de sensores IoT
 
 Alimenta `POST /api/v1/lecturas` como si fueran los sensores reales instalados dentro de los
-contenedores. Sin esto no hay forma de demostrar CU-04, CU-05 ni CU-06: el módulo entero se
+contenedores. **Sin esto no se puede demostrar CU-04, CU-05 ni CU-06:** el módulo entero se
 dispara a partir de las lecturas.
 
-Se implementa en el Sprint 1, después de que exista el endpoint de ingesta.
+No tiene dependencias: usa el `fetch` nativo de Node 22.
 
-## Comportamiento previsto
+## Puesta en marcha
 
-- Lee la lista de contenedores registrados y su API key de sensor.
-- Emite una lectura por contenedor cada N segundos (configurable; en producción el intervalo real
-  es de 15 minutos, para la demo conviene mucho menos).
-- El nivel de llenado crece de forma monótona con ruido aleatorio, y se reinicia a un valor bajo
-  cuando el contenedor es vaciado. Esa monotonía es lo que hace que la regresión lineal de CU-12
-  tenga algo que predecir.
-- Modos de escenario para la demo:
-  - `normal` — llenado gradual
-  - `saturacion` — fuerza a un contenedor a superar el umbral, dispara CU-05
-  - `incendio` — sube la temperatura de golpe, dispara CU-06
-  - `sensor-caido` — deja de reportar, dispara la alerta de sensor sin señal
+Con el backend corriendo, generá un token de administrador y sembrá el escenario:
 
-Los modos de escenario importan más de lo que parecen: en la demo final hay que poder provocar
-un incendio a voluntad para mostrar la integración con Emergencias (Squad 6). Esperar a que
+```bash
+cd ../backend && npm run token:dev -- ADMINISTRADOR
+```
+
+```bash
+TOKEN=<el-token-de-arriba> npm run seed
+```
+
+El seed crea una zona (umbral 70%), 4 contenedores alrededor del Obelisco y sus sensores, y
+guarda las API keys en `sensores.json` —que está en `.gitignore`, porque son credenciales.
+
+Después:
+
+```bash
+npm start
+```
+
+## Escenarios
+
+El primer contenedor de la lista es el que sufre el escenario; el resto se llena normal.
+
+| Comando | Qué provoca |
+|---|---|
+| `npm start` | Llenado gradual de todos |
+| `npm run saturacion` | Fuerza a CT-0001 por encima del umbral → dispara **CU-05** |
+| `npm run incendio` | Dispara la temperatura de CT-0001 → dispara **CU-06** |
+| `node simulador.js --escenario bateria` | Descarga el sensor de CT-0001 |
+
+Opciones: `--intervalo <segundos>` (por defecto 5). En producción el intervalo real es de 15
+minutos; para la demo conviene mucho menos.
+
+Los escenarios importan más de lo que parece: **en la demo final hay que poder provocar un
+incendio a voluntad** para mostrar la integración con Emergencias (Squad 6). Esperar a que
 ocurra por azar no es una opción.
+
+## Cómo se lee la salida
+
+```
+[07:49:49] escenario: saturacion
+  CT-0001   76.0%   20.9C  bat 100% NORMAL -> CRITICO  ALERTAS: SATURACION
+  CT-0002    5.3%   25.6C  bat 100%
+```
+
+La columna de transición y la de alertas solo aparecen cuando algo cambió. Si CT-0001 sigue
+subiendo por encima del umbral y **no** vuelve a aparecer `ALERTAS`, la deduplicación de CU-05
+está funcionando: el evento se emite solo en la transición, no en cada lectura.
+
+## Comportamiento del modelo
+
+El nivel de llenado crece de forma monótona con ruido (entre 0,5% y 3% por ciclo). Esa monotonía
+es deliberada: es lo que le da algo que predecir a la regresión lineal de CU-12.

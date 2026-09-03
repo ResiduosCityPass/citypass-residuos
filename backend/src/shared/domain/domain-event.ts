@@ -26,6 +26,7 @@ export const EventTypes = {
   CONTENEDOR_VACIADO: 'residuos.contenedor.vaciado',
   RUTA_GENERADA: 'residuos.ruta.generada',
   RUTA_ASIGNADA: 'residuos.ruta.asignada',
+  PARADA_OMITIDA: 'residuos.parada.omitida',
 } as const;
 
 export type EventType = (typeof EventTypes)[keyof typeof EventTypes];

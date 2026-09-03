@@ -6,6 +6,15 @@ import { validarEntorno } from './config/env.validation';
 import { AuthModule } from './shared/auth/auth.module';
 import { EventsModule } from './shared/events/events.module';
 import { HealthModule } from './modules/health/health.module';
+import { ZonasModule } from './modules/zonas/zonas.module';
+import { ContenedoresModule } from './modules/contenedores/contenedores.module';
+import { AlertasModule } from './modules/alertas/alertas.module';
+import { LecturasModule } from './modules/lecturas/lecturas.module';
+import { MapaModule } from './modules/mapa/mapa.module';
+import { PrediccionModule } from './modules/prediccion/prediccion.module';
+import { PublicoModule } from './modules/publico/publico.module';
+import { FlotaModule } from './modules/flota/flota.module';
+import { RutasModule } from './modules/rutas/rutas.module';
 
 @Module({
   imports: [
@@ -20,9 +29,15 @@ import { HealthModule } from './modules/health/health.module';
     AuthModule,
     EventsModule,
     HealthModule,
-    // Sprint 1: ContenedoresModule (CU-01), ZonasModule (CU-02), LecturasModule (CU-04),
-    //           AlertasModule (CU-05, CU-06)
-    // Sprint 2: MapaModule (CU-07), PrediccionModule (CU-12)
+    ZonasModule,
+    ContenedoresModule,
+    AlertasModule,
+    LecturasModule,
+    MapaModule,
+    PrediccionModule,
+    PublicoModule,
+    FlotaModule,
+    RutasModule,
     // Sprint 4: FlotaModule (CU-03), RutasModule (CU-08..CU-10), PublicoModule (CU-11)
   ],
 })

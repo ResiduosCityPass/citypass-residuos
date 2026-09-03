@@ -29,6 +29,8 @@ erDiagram
         decimal lat
         decimal lng
         enum estado
+        decimal nivelLlenadoPct
+        decimal temperaturaC
         timestamp ultimaLecturaEn
     }
     SENSOR {
@@ -60,23 +62,28 @@ erDiagram
         string patente
         int capacidadLitros
         enum tipoResiduoHabilitado
-        enum estadoCamion
+        enum estado
     }
     RUTA {
         uuid id PK
         uuid camionId FK
         string choferId
-        enum estadoRuta
+        enum estado
         decimal distanciaEstimadaKm
+        int litrosEstimados
         timestamp generadaEn
+        timestamp asignadaEn
+        timestamp completadaEn
     }
     PARADA {
         uuid id PK
         uuid rutaId FK
         uuid contenedorId FK
         int orden
-        enum estadoParada
+        enum estado
         timestamp confirmadaEn
+        timestamp omitidaEn
+        string motivo
     }
 ```
 
@@ -95,6 +102,11 @@ erDiagram
 | `EstadoParada` | `PENDIENTE`, `CONFIRMADA`, `OMITIDA` |
 
 ## Decisiones de modelado
+
+**Ultima lectura desnormalizada en `CONTENEDOR`.** Los campos `estado`, `nivelLlenadoPct` y
+`temperaturaC` duplican la ultima fila de `LECTURA`. Es deliberado, y por la misma razon que el
+estado: el mapa de CU-07 y el listado de contenedores tienen que responder sin hacer JOIN contra
+una tabla que crece ~48.000 filas por dia.
 
 **Estado derivado y persistido a la vez.** `CONTENEDOR.estado` podría calcularse siempre desde la
 última lectura, pero se persiste igual. Dos razones: el mapa de CU-07 necesita responder rápido sin
@@ -119,6 +131,10 @@ distinto tipo (saturado y con batería baja a la vez) y necesitamos su ciclo de 
 **`SENSOR` es entidad aparte aunque la relación sea 1:1.** El sensor tiene ciclo de vida propio:
 se rompe, se reemplaza, se recalibra. Además guarda su `apiKeyHash`, que es una credencial y no
 debe convivir con datos de ubicación pública ([ADR-005](../adr/ADR-005-seguridad-identidad.md)).
+
+**`RUTA.choferId` es un string, no una clave foránea.** Los choferes son usuarios del módulo de
+identidad del Squad 2, no entidades nuestras: se guarda el `sub` de su JWT. Mantener una copia de
+sus datos acá solo garantizaría que se desincronice.
 
 **Preparado para los alcances completos.** `ZONA` puede recibir una columna `geometry` (PostGIS)
 sin migrar datos si algún día se implementa CU-02 completo, y `PARADA.confirmadaEn` ya contempla

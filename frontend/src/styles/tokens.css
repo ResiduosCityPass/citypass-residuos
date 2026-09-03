@@ -1,0 +1,78 @@
+/**
+ * Design system de CityPass+ v1.0 bajado a custom properties.
+ *
+ * Es la unica fuente de color, tipografia y espaciado del modulo. Ningun
+ * componente escribe un hexadecimal a mano: si un color no esta aca, se agrega
+ * aca. Es lo que mantiene las cuatro pantallas mirandose entre si.
+ */
+
+:root {
+  /* --- Paleta institucional -------------------------------------------- */
+  --navy: #142430;        /* Azul Noche: sidebar, titulos, texto fuerte */
+  --blue: #2563A6;        /* Azul Urbano: accion primaria */
+  --sky: #8FB8D8;         /* Celeste: acentos suaves, estado activo del sidebar */
+  --green: #4F8A72;       /* Verde Urbano: exito, contenedor NORMAL */
+  --sand: #EBE6DE;        /* Arena: bordes y separadores calidos */
+  --warm-white: #F8F9F7;  /* Blanco Calido: fondo de la aplicacion */
+  --graphite: #30343B;    /* Grafito: texto de lectura */
+  --gray: #68717D;        /* Gris Medio: texto secundario, FUERA_DE_SERVICIO */
+  --amber: #D99838;       /* Ambar: advertencia, contenedor ADVERTENCIA */
+  --red: #C83E4D;         /* Rojo Emergencia: peligro, contenedor CRITICO */
+
+  /* Derivados: fondos tenues para avisos y chips. Se calculan con color-mix
+     sobre el blanco calido para que no compitan con el fondo de la pagina. */
+  --green-soft: color-mix(in srgb, var(--green) 12%, white);
+  --amber-soft: color-mix(in srgb, var(--amber) 15%, white);
+  --red-soft: color-mix(in srgb, var(--red) 12%, white);
+  --blue-soft: color-mix(in srgb, var(--blue) 10%, white);
+
+  /* --- Roles semanticos ------------------------------------------------ */
+  --bg: var(--warm-white);
+  --surface: #ffffff;
+  --surface-sunken: color-mix(in srgb, var(--sand) 40%, white);
+  --text: var(--graphite);
+  --text-strong: var(--navy);
+  --text-muted: var(--gray);
+  --border: var(--sand);
+  --border-strong: color-mix(in srgb, var(--gray) 35%, white);
+  --accent: var(--blue);
+  --error: var(--red);
+
+  /* --- Tipografia ------------------------------------------------------ */
+  /* Space Grotesk en titulos, Inter en UI, JetBrains Mono en codigos y datos
+     tecnicos (CT-0001, UUIDs, API keys). Los fallbacks importan: si Google
+     Fonts no carga, la pantalla se degrada a system-ui sin romperse. */
+  --font-heading: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+  --font-ui: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* Los tamanos van bajo --font-size-* y no bajo --text-*, que ya es el color
+     del texto. Compartir prefijo entre un color y una escala se presta a
+     escribir `color: var(--text-lg)` sin que nada avise. */
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.8125rem;
+  --font-size-base: 0.9375rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.375rem;
+  --font-size-2xl: 1.75rem;
+
+  /* --- Espaciado, radios y sombras ------------------------------------- */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+
+  --shadow-sm: 0 1px 2px rgb(20 36 48 / 0.06);
+  --shadow: 0 2px 8px rgb(20 36 48 / 0.08);
+  --shadow-lg: 0 12px 32px rgb(20 36 48 / 0.18);
+
+  --sidebar-width: 232px;
+  --topbar-height: 60px;
+}

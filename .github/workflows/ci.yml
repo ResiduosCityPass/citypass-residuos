@@ -8,12 +8,40 @@ on:
 
 jobs:
   backend:
-    name: Backend — lint, build y tests
+    name: Backend — lint, build, unitarios e integrales
     runs-on: ubuntu-latest
 
     defaults:
       run:
         working-directory: ./backend
+
+    # Los tests de integracion corren contra un Postgres real, no contra un
+    # doble: son los que cubren las consultas del ORM, la formula de Haversine
+    # de CU-11 y los guards globales, que un test unitario no puede tocar.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: citypass
+          POSTGRES_PASSWORD: citypass
+          POSTGRES_DB: residuos
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U citypass"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DB_HOST: localhost
+      DB_PORT: '5432'
+      DB_USER: citypass
+      DB_PASSWORD: citypass
+      DB_NAME: residuos
+      DB_SYNCHRONIZE: 'false'
+      JWT_SECRET: secreto-de-ci
+      EVENT_BUS_DRIVER: inmemory
 
     steps:
       - uses: actions/checkout@v4
@@ -33,18 +61,18 @@ jobs:
       - name: Build
         run: npm run build
 
+      # Que las migraciones corran es parte de lo que se verifica: el esquema de
+      # produccion sale de aca, no de synchronize.
+      - name: Migraciones
+        run: npm run migration:run
+
       # El umbral de 60% esta configurado en package.json (coverageThreshold).
       # Si la cobertura baja, este paso falla y el PR no se puede mergear.
-      # Dimension 6 de la rubrica.
-      - name: Tests con cobertura
+      - name: Tests unitarios con cobertura
         run: npm run test:cov
-        env:
-          DB_HOST: localhost
-          DB_PORT: '5432'
-          DB_USER: citypass
-          DB_PASSWORD: citypass
-          DB_NAME: residuos
-          JWT_SECRET: ci-secret
+
+      - name: Tests de integracion
+        run: npm run test:e2e
 
       - name: Publicar reporte de cobertura
         if: always()
@@ -52,4 +80,41 @@ jobs:
         with:
           name: coverage-backend
           path: backend/coverage/
+          retention-days: 14
+
+  frontend:
+    name: Frontend — lint, build y tests
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Tests con cobertura
+        run: npm run cobertura
+
+      - name: Publicar reporte de cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-frontend
+          path: frontend/coverage/
           retention-days: 14

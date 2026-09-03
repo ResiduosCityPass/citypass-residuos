@@ -23,10 +23,14 @@ Ver la matriz completa en [ADR-005](../adr/ADR-005-seguridad-identidad.md).
 | `POST` | `/zonas` | Admin |
 | `GET` | `/zonas` | Admin, Operador |
 | `PATCH` | `/zonas/:id` | Admin |
+| `PATCH` | `/zonas/:id/bloqueo?bloqueada=true` | Admin, Operador |
+| `DELETE` | `/zonas/:id` | Admin |
 
 Cuerpo: `{ nombre, umbralCriticoPct, umbralTemperaturaC }`.
 
-## CU-03 · Flota
+`DELETE` responde `409 ZONA_CON_CONTENEDORES` si la zona todavía tiene contenedores asignados.
+
+## CU-03 · Flota — **implementado**
 
 | Método | Ruta | Rol |
 |---|---|---|
@@ -42,7 +46,6 @@ Cuerpo: `{ nombre, umbralCriticoPct, umbralTemperaturaC }`.
 
 ```json
 {
-  "sensorId": "SN-0421",
   "nivelLlenadoPct": 87.4,
   "temperaturaC": 22.1,
   "bateriaPct": 64,
@@ -50,9 +53,28 @@ Cuerpo: `{ nombre, umbralCriticoPct, umbralTemperaturaC }`.
 }
 ```
 
-Es el endpoint más caliente del módulo. Al recibir la lectura, en la misma transacción:
-la valida, la persiste, actualiza el estado del contenedor y dispara la evaluación de reglas
-(CU-05 y CU-06). La publicación de eventos ocurre **después** del commit, vía outbox.
+> **El cuerpo no lleva `sensorId`.** La identidad del sensor sale de la API key del
+> header, no del payload. Si viniera en el cuerpo, un sensor podria reportar lecturas
+> en nombre de otro con solo cambiar un campo.
+
+Es el endpoint más caliente del módulo. Al recibir la lectura: la valida contra la anterior,
+la persiste, actualiza el sensor y el contenedor, y dispara la evaluación de reglas de CU-05 y CU-06.
+
+Devuelve la transición para que el llamador sepa qué pasó:
+
+```json
+{
+  "lecturaId": "...",
+  "contenedorId": "...",
+  "estadoAnterior": "NORMAL",
+  "estadoNuevo": "CRITICO",
+  "alertasGeneradas": ["SATURACION"]
+}
+```
+
+> Todo el flujo corre en una transacción: la lectura, el sensor, el contenedor, las alertas y el
+> evento en la tabla outbox se guardan juntos o no se guarda ninguno. La publicación al bus la hace
+> después el despachador, fuera de la transacción, con reintentos.
 
 **Respuestas:** `202 Accepted` · `400` lectura fuera de rango · `401` API key inválida ·
 `404` sensor inexistente · `409` lectura duplicada o con timestamp anterior a la última registrada.
@@ -77,7 +99,7 @@ Payload liviano pensado para renderizar marcadores: `id`, `lat`, `lng`, `estado`
 > Para el Hito 1 el mapa refresca por *polling* cada 30s. La actualización push por WebSocket
 > queda como mejora del Sprint 5, si hay tiempo.
 
-## CU-08 / CU-09 · Rutas
+## CU-08 / CU-09 · Rutas — **implementados**
 
 | Método | Ruta | Rol |
 |---|---|---|
@@ -89,7 +111,7 @@ Payload liviano pensado para renderizar marcadores: `id`, `lat`, `lng`, `estado`
 La separación entre generar y asignar es deliberada: **mantiene a una persona en el medio**, que es
 exactamente lo que pide CU-09 por si la heurística propone algo absurdo.
 
-## CU-10 · Confirmar vaciado
+## CU-10 · Confirmar vaciado — **implementado**
 
 | Método | Ruta | Rol |
 |---|---|---|
@@ -101,17 +123,24 @@ alertas de saturación abiertas y publica `residuos.contenedor.vaciado`.
 
 **Respuestas:** `200` · `403` fuera del radio permitido · `409` parada ya confirmada.
 
-## CU-11 · Consulta ciudadana — **público**
+## CU-11 · Consulta ciudadana — **público, implementado**
 
 | Método | Ruta | Auth |
 |---|---|---|
 | `GET` | `/publico/contenedores/cercanos` | Ninguna |
 
-Query: `?lat=&lng=&radioMetros=1000&tipoResiduo=RECICLABLE`.
-Resuelto con fórmula de Haversine. No expone estado de llenado ni alertas: es información
-operativa interna.
+Query: `?lat=&lng=&radioMetros=1000&tipoResiduo=RECICLABLE`. `lat` y `lng` obligatorias;
+`radioMetros` por defecto 1000, máximo 10000.
 
-## CU-12 · Predicción de saturación
+Devuelve `{id, codigo, lat, lng, tipoResiduo, distanciaMetros}` ordenado por distancia ascendente.
+Haversine en SQL plano, sin PostGIS (ADR-002).
+
+No expone estado de llenado, temperatura ni alertas: es información operativa interna. Los
+contenedores `FUERA_DE_SERVICIO` quedan excluidos del resultado, aunque el estado no se exponga.
+
+Detalle completo en la [guía de frontend](guia-frontend.md).
+
+## CU-12 · Predicción de saturación — **implementado**
 
 | Método | Ruta | Rol |
 |---|---|---|
@@ -119,15 +148,25 @@ operativa interna.
 
 ```json
 {
-  "contenedorId": "CT-0421",
-  "nivelActualPct": 62.3,
-  "tasaLlenadoPctPorHora": 3.1,
-  "horasHastaUmbral": 2.5,
-  "saturacionEstimadaEn": "2026-09-15T17:00:00.000Z",
-  "confianza": 0.87,
-  "muestrasUsadas": 96
+  "contenedorId": "809d697e-05b4-4a4b-a0c2-95289e128cf2",
+  "codigo": "CT-0007",
+  "nivelActualPct": 58.45,
+  "umbralCriticoPct": 70,
+  "tasaLlenadoPctPorHora": 8.02,
+  "horasHastaUmbral": 1.44,
+  "saturacionEstimadaEn": "2026-09-02T23:51:21.213Z",
+  "confianza": 0.997,
+  "muestrasUsadas": 25
 }
 ```
+
+`contenedorId` es el UUID, por consistencia con el resto de la API; el código legible va en
+`codigo`. `horasHastaUmbral` es `0` si el umbral ya se cruzó, nunca negativo.
+
+**Errores:** `409 SIN_LECTURAS_SUFICIENTES` (menos de 3 lecturas en el ciclo actual) ·
+`409 TENDENCIA_NO_CRECIENTE` (el contenedor no se está llenando) · `404 CONTENEDOR_NO_ENCONTRADO`.
+
+El detalle del modelo está en la [guía de frontend](guia-frontend.md).
 
 ## Manejo de errores
 
