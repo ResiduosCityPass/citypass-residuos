@@ -57,6 +57,7 @@ La API queda en `http://localhost:3000` y la documentación Swagger en `http://l
 ## Documentación clave
 
 - [Backlog priorizado](docs/sprints/backlog-priorizado.md) — qué construimos y en qué orden, con el recorte de alcance justificado.
+- [Diagramas](docs/arquitectura/diagramas.md) — casos de uso, C4, secuencia y máquinas de estado.
 - [Modelo de datos](docs/arquitectura/modelo-de-datos.md)
 - [Contratos de eventos](docs/arquitectura/contratos-de-eventos.md) — qué publicamos y a qué nos suscribimos.
 - [API preliminar](docs/arquitectura/api-preliminar.md)
