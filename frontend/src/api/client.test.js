@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { api, apiPublic, ApiError, saveToken, clearToken } from './client.js';
+import { api, apiPublic, ApiError, saveToken, clearToken, readToken, seedDevToken } from './client.js';
 
 describe('cliente de la API', () => {
   beforeEach(() => {
@@ -118,5 +118,71 @@ describe('cliente de la API', () => {
     await apiPublic.get('/publico/contenedores/cercanos');
 
     expect(fetchMock.mock.calls[0][1]).not.toHaveProperty('anonymous');
+  });
+
+  /* --- Token de desarrollo (VITE_DEV_TOKEN) ----------------------------- */
+
+  describe('seedDevToken', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it('siembra el token cuando no hay ninguno guardado', () => {
+      vi.stubEnv('VITE_DEV_TOKEN', 'jwt-admin');
+
+      expect(seedDevToken('/mapa')).toBe(true);
+      expect(readToken()).toBe('jwt-admin');
+    });
+
+    /** La pantalla del chofer exige rol CHOFER: el token de admin ahi da 403. */
+    it('usa el token de chofer en /chofer', () => {
+      vi.stubEnv('VITE_DEV_TOKEN', 'jwt-admin');
+      vi.stubEnv('VITE_DEV_TOKEN_CHOFER', 'jwt-chofer');
+
+      expect(seedDevToken('/chofer')).toBe(true);
+      expect(readToken()).toBe('jwt-chofer');
+    });
+
+    /**
+     * El caso que rompia la app: quedaba pegado el token de chofer y todas las
+     * demas pantallas devolvian 401 hasta borrarlo a mano. En desarrollo el
+     * token es andamiaje, no una eleccion del usuario, asi que se pisa.
+     */
+    it('pisa un token que no corresponde a la pantalla', () => {
+      vi.stubEnv('VITE_DEV_TOKEN', 'jwt-admin');
+      vi.stubEnv('VITE_DEV_TOKEN_CHOFER', 'jwt-chofer');
+      saveToken('jwt-chofer');
+
+      expect(seedDevToken('/mapa')).toBe(true);
+      expect(readToken()).toBe('jwt-admin');
+    });
+
+    /** Si ya es el que corresponde, no reescribe ni avisa que cambio nada. */
+    it('no hace nada si el token ya es el correcto', () => {
+      vi.stubEnv('VITE_DEV_TOKEN', 'jwt-admin');
+      saveToken('jwt-admin');
+
+      expect(seedDevToken('/mapa')).toBe(false);
+      expect(readToken()).toBe('jwt-admin');
+    });
+
+    it('no hace nada si la variable no esta definida', () => {
+      vi.stubEnv('VITE_DEV_TOKEN', '');
+
+      expect(seedDevToken('/mapa')).toBe(false);
+      expect(readToken()).toBe('');
+    });
+
+    /**
+     * La condicion que importa: Vite pone DEV en false al compilar, asi que el
+     * bloque no llega al bundle de produccion. Aca se simula esa compilacion.
+     */
+    it('no siembra nada fuera de desarrollo', () => {
+      vi.stubEnv('DEV', false);
+      vi.stubEnv('VITE_DEV_TOKEN', 'jwt-admin');
+
+      expect(seedDevToken('/mapa')).toBe(false);
+      expect(readToken()).toBe('');
+    });
   });
 });

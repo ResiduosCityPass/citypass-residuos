@@ -22,11 +22,20 @@ import { api, apiPublic } from './client.js';
  * @property {'COMUN'|'RECICLABLE'|'ORGANICO'} tipoResiduo
  * @property {number} nivelLlenadoPct    - Ultima lectura, 2 decimales
  * @property {string|null} ultimaLecturaEn - null si nunca reporto
+ * @property {string} zonaNombre         - Para el tooltip del marcador
+ * @property {number} umbralCriticoPct   - Umbral de su zona, para la marca de la barra
+ * @property {boolean} incendioActivo    - Independiente del `estado`: uno NORMAL puede tenerlo
  */
 
 /* --- CU-07 · Mapa ------------------------------------------------------- */
 
-/** Payload flaco a proposito: solo lo necesario para pintar el marcador. */
+/**
+ * Payload flaco a proposito: solo lo necesario para pintar el marcador.
+ *
+ * Trae `incendioActivo`, asi que el mapa se resuelve con UNA llamada. Antes
+ * habia que cruzar `/alertas?tipo=INCENDIO&estado=ABIERTA` en cada refresco
+ * para saber que contenedor mostrar con halo.
+ */
 export const fetchMapContainers = (filters) => api.get('/mapa/contenedores', filters);
 
 /* --- CU-01 · Contenedores ----------------------------------------------- */
@@ -63,7 +72,13 @@ export const deleteZone = (id) => api.delete(`/zonas/${id}`);
 
 /* --- CU-05 / CU-06 · Alertas -------------------------------------------- */
 
-/** Ordenadas de mas reciente a mas antigua. Filtros: contenedorId, tipo, severidad, estado. */
+/**
+ * Ordenadas de mas reciente a mas antigua. Filtros: contenedorId, tipo,
+ * severidad, estado.
+ *
+ * Cada alerta trae `contenedorCodigo`: la tabla no tiene que cruzar fila por
+ * fila contra el listado de contenedores para mostrar "CT-0007".
+ */
 export const fetchAlerts = (filters) => api.get('/alertas', filters);
 
 /** Pasa la alerta a EN_ATENCION. Sin cuerpo. Falla con ALERTA_NO_ABIERTA si ya no esta ABIERTA. */
@@ -75,11 +90,13 @@ export const resolveAlert = (id) => api.patch(`/alertas/${id}/resolver`);
 /* --- CU-12 · Prediccion de saturacion ----------------------------------- */
 
 /**
- * Regresion lineal sobre el historico de lecturas. Devuelve `nivelActualPct`,
- * `tasaLlenadoPctPorHora`, `horasHastaUmbral`, `saturacionEstimadaEn`,
- * `confianza` y `muestrasUsadas`.
+ * Regresion lineal sobre el historico de lecturas. Devuelve `codigo`,
+ * `nivelActualPct`, `umbralCriticoPct`, `tasaLlenadoPctPorHora`,
+ * `horasHastaUmbral`, `saturacionEstimadaEn`, `confianza` y `muestrasUsadas`.
  *
- * Un contenedor sin lecturas no tiene de donde predecir.
+ * Dos 409 que NO son fallos, sino estados legitimos del contenedor:
+ * SIN_LECTURAS_SUFICIENTES (menos de 3 lecturas en el ciclo actual) y
+ * TENDENCIA_NO_CRECIENTE (se esta vaciando, no hay saturacion que predecir).
  */
 export const fetchPrediction = (id) => api.get(`/contenedores/${id}/prediccion`);
 
@@ -101,17 +118,18 @@ export const fetchRoute = (id) => api.get(`/rutas/${id}`);
  */
 export const generateRoute = (data) => api.post('/rutas/generar', data);
 
-/** CU-09. Confirma la propuesta, asigna chofer y pasa la ruta a ASIGNADA. */
-export const assignRoute = (id, data) => api.patch(`/rutas/${id}/asignar`, data);
-
 /**
- * Lista de choferes para el <select> de CU-09.
+ * CU-09. Confirma la propuesta, asigna chofer y pasa la ruta a ASIGNADA.
  *
- * NO EXISTE en el backend. Los choferes son usuarios con rol CHOFER del
- * directorio del Squad 2 (ADR-005) y nadie expuso todavia un endpoint para
- * listarlos. Queda mockeado y anotado como pedido de contrato.
+ * `choferId` es un string libre: el `sub` del JWT de un usuario con rol CHOFER
+ * del directorio del Squad 2 (ADR-005). El backend NO lo valida contra ningun
+ * padron, asi que no existe CHOFER_NO_ENCONTRADO y un id mal tipeado asigna la
+ * ruta igual. Tampoco hay `GET /choferes` para llenar un <select>: por eso la
+ * pantalla lo pide escrito a mano. Pedido de contrato pendiente.
+ *
+ * Errores: 409 RUTA_NO_PROPUESTA, 404 RUTA_NO_ENCONTRADA.
  */
-export const fetchDrivers = () => api.get('/choferes');
+export const assignRoute = (id, data) => api.patch(`/rutas/${id}/asignar`, data);
 
 /* --- CU-10 · Mi ruta y confirmar vaciado -------------------------------- */
 
@@ -121,19 +139,22 @@ export const fetchDrivers = () => api.get('/choferes');
  * leer la ruta de otro cambiando un valor. La firma no toma argumentos a
  * proposito — si alguien le agrega `?choferId=`, abrio un agujero.
  *
- * PROPUESTA de contrato: api-preliminar.md documenta la ruta pero no la forma.
- * Se asume el mismo objeto expandido de GET /rutas/:id, o `null` con 200
- * cuando el chofer no tiene ruta activa. No tener ruta es el estado normal de
- * alguien que termino el turno, no un error, asi que no es un 404.
+ * Devuelve el objeto expandido de GET /rutas/:id, o CUERPO VACIO con 200
+ * cuando no hay ruta activa, que `client.js` convierte en `null`. No tener
+ * ruta es el estado normal de alguien que termino el turno, no un error, asi
+ * que no es un 404.
  */
 export const fetchMyRoute = () => api.get('/rutas/mias');
 
 /**
- * CU-10. El cuerpo es exactamente `{ lat, lng }`: el radio permitido es
+ * CU-10. El cuerpo es exactamente `{ lat, lng }`: el radio permitido (100 m) es
  * configuracion del servidor, no algo que el cliente pueda mandar.
  *
- * Errores: 403 PARADA_FUERA_DE_RADIO (code PROPUESTO, ver domain/errors.js) y
- * 409 PARADA_YA_CONFIRMADA.
+ * Devuelve la transicion completa. Ojo con `alertasCerradas`: es un NUMERO, no
+ * una lista de ids.
+ *
+ * Errores: 403 PARADA_FUERA_DE_RADIO, 403 PARADA_DE_OTRA_RUTA (un chofer solo
+ * confirma paradas de su propia ruta) y 409 PARADA_YA_CONFIRMADA.
  */
 export const confirmStop = (id, position) => api.patch(`/paradas/${id}/confirmar`, position);
 
@@ -144,9 +165,11 @@ export const confirmStop = (id, position) => api.patch(`/paradas/${id}/confirmar
  *
  * Filtros: { lat, lng, radioMetros, tipoResiduo }.
  *
- * PROPUESTA de contrato: la respuesta no esta especificada. Se asume el payload
- * de CU-07 menos `estado` y `nivelLlenadoPct` (informacion operativa interna),
- * mas `codigo` y `distanciaMetros`.
+ * Devuelve exactamente seis campos, ordenados por distancia ascendente: id,
+ * codigo, lat, lng, tipoResiduo y distanciaMetros. Ni `estado` ni
+ * `nivelLlenadoPct`: es informacion operativa interna del municipio y no tiene
+ * por que estar en una vista anonima. Los FUERA_DE_SERVICIO no aparecen, y sin
+ * resultados devuelve `[]`, no un error.
  */
 export const fetchNearbyContainers = (filters) =>
   apiPublic.get('/publico/contenedores/cercanos', filters);

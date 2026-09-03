@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseBoolPipe,
   ParseUUIDPipe,
   Patch,
   Post,
@@ -53,6 +54,21 @@ export class ContenedoresController {
   @ApiOperation({ summary: 'Editar ubicacion, capacidad, tipo de residuo o zona' })
   actualizar(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ActualizarContenedorDto) {
     return this.contenedores.actualizar(id, dto);
+  }
+
+  @Patch(':id/servicio')
+  @Roles(Rol.ADMINISTRADOR, Rol.OPERADOR)
+  @ApiOperation({ summary: 'CU-01 · Sacar de servicio el contenedor o reintegrarlo' })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Al reintegrarlo se lo reevalua contra el umbral de su zona: si quedo lleno, vuelve CRITICO',
+  })
+  cambiarServicio(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('fuera', ParseBoolPipe) fuera: boolean,
+  ) {
+    return this.contenedores.cambiarServicio(id, fuera);
   }
 
   @Delete(':id')

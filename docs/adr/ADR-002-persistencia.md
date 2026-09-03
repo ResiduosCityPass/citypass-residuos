@@ -39,8 +39,10 @@ instalar PostGIS. Para el volumen del proyecto es más que suficiente y evita un
 
 ## Consecuencias
 
-- `synchronize: true` se usa **solo** en el perfil de desarrollo. A partir del Sprint 2 se generan
-  migraciones explícitas, porque el despliegue cloud (dim. 7) no puede depender de autosincronización.
+- `synchronize` queda **apagado por defecto**. El esquema lo definen migraciones versionadas en
+  `backend/src/migrations/`, porque el despliegue cloud (dim. 7) no puede depender de
+  autosincronización, y porque con synchronize dos máquinas terminan con esquemas distintos según
+  la última rama que corrió cada una. *(Implementado en el Sprint 2: `EsquemaInicial`.)*
 - Se define índice compuesto sobre `lectura (contenedor_id, timestamp DESC)`: es el acceso que usan
   tanto el motor de reglas de CU-05 como la predicción de CU-12.
 - El acceso a datos se encapsula tras interfaces de repositorio definidas en la capa de dominio, de

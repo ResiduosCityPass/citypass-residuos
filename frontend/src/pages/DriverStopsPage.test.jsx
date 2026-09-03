@@ -2,16 +2,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import DriverStopsPage from './DriverStopsPage.jsx';
-import { fetchMyRoute, confirmStop, fetchDrivers } from '../api/waste.js';
+import { fetchMyRoute, confirmStop } from '../api/waste.js';
 import { ApiError } from '../api/client.js';
 
 vi.mock('../api/waste.js', () => ({
-  // Sin mocks no aparece el selector de chofer ni el simulador de GPS: se
-  // prueba la pantalla como la ve un chofer contra el backend real.
-  USING_MOCKS: false,
   fetchMyRoute: vi.fn(),
   confirmStop: vi.fn(),
-  fetchDrivers: vi.fn(),
 }));
 
 vi.mock('../components/routes/RouteMap.jsx', () => ({
@@ -45,7 +41,9 @@ const route = (paradas = [stop()]) => ({
   estado: 'EN_CURSO',
   distanciaEstimadaKm: 7.4,
   camion: { id: 'cm-01', patente: 'AB123CD' },
-  chofer: { id: 'ldap:mgomez', nombre: 'Maria Gomez' },
+  // Solo `choferId`: la ruta no trae un objeto `chofer` porque el backend no
+  // tiene el nombre. Los choferes son usuarios del directorio del Squad 2.
+  choferId: 'ldap:mgomez',
   paradas,
 });
 
@@ -57,7 +55,6 @@ beforeEach(() => {
     value: { getCurrentPosition, watchPosition: vi.fn(), clearWatch: vi.fn() },
   });
   fetchMyRoute.mockResolvedValue(route());
-  fetchDrivers.mockResolvedValue([]);
   grant(CONTAINER.lat, CONTAINER.lng);
 });
 
@@ -85,7 +82,10 @@ describe('CU-10 · confirmar vaciado', () => {
 
   it('confirma mandando exactamente la posicion del GPS', async () => {
     const user = userEvent.setup();
-    confirmStop.mockResolvedValue({ paradaId: 'pd-02', estado: 'CONFIRMADA' });
+    confirmStop.mockResolvedValue({
+      paradaId: 'pd-02', estado: 'CONFIRMADA', estadoContenedor: 'NORMAL',
+      nivelLlenadoPct: 0, alertasCerradas: 0, rutaEstado: 'EN_CURSO',
+    });
     render(<DriverStopsPage />);
 
     await user.click(await screen.findByRole('button', { name: 'Confirmar vaciado' }));
@@ -97,6 +97,62 @@ describe('CU-10 · confirmar vaciado', () => {
       }),
     );
     expect(await screen.findByText('Vaciado confirmado')).toBeInTheDocument();
+  });
+
+  /**
+   * `alertasCerradas` es un NUMERO, no una lista de ids: el id de una alerta ya
+   * cerrada no le sirve a alguien parado en la vereda. Se cuenta, no se enumera.
+   */
+  it('cuenta las alertas que cerro la confirmacion', async () => {
+    const user = userEvent.setup();
+    confirmStop.mockResolvedValue({
+      paradaId: 'pd-02', estado: 'CONFIRMADA', estadoContenedor: 'NORMAL',
+      nivelLlenadoPct: 0, alertasCerradas: 2, rutaEstado: 'EN_CURSO',
+    });
+    render(<DriverStopsPage />);
+
+    await user.click(await screen.findByRole('button', { name: 'Confirmar vaciado' }));
+
+    expect(await screen.findByText(/Se cerraron 2 alertas/)).toBeInTheDocument();
+  });
+
+  /** La ultima parada cierra la ruta y libera el camion: vale la pena decirlo. */
+  it('avisa cuando la ultima parada completa la ruta', async () => {
+    const user = userEvent.setup();
+    confirmStop.mockResolvedValue({
+      paradaId: 'pd-02', estado: 'CONFIRMADA', estadoContenedor: 'NORMAL',
+      nivelLlenadoPct: 0, alertasCerradas: 1, rutaEstado: 'COMPLETADA',
+    });
+    render(<DriverStopsPage />);
+
+    await user.click(await screen.findByRole('button', { name: 'Confirmar vaciado' }));
+
+    expect(await screen.findByText('Última parada: ruta completa')).toBeInTheDocument();
+    expect(screen.getByText(/El camión ya quedó disponible/)).toBeInTheDocument();
+  });
+
+  /**
+   * Un chofer solo confirma paradas de SU ruta. Si llega este 403 la pantalla
+   * esta mostrando una ruta que ya no le corresponde, asi que se recarga: no
+   * tiene sentido dejarlo insistiendo con un boton que no puede funcionar.
+   */
+  it('una parada de otra ruta se explica y dispara una recarga', async () => {
+    const user = userEvent.setup();
+    confirmStop.mockRejectedValue(
+      new ApiError({
+        code: 'PARADA_DE_OTRA_RUTA',
+        status: 403,
+        message: 'La parada pd-02 no pertenece a tu ruta activa',
+      }),
+    );
+    render(<DriverStopsPage />);
+
+    await user.click(await screen.findByRole('button', { name: 'Confirmar vaciado' }));
+
+    expect(await screen.findByText('Esta parada no es de tu ruta')).toBeInTheDocument();
+    // No es un problema de rol: el chofer TIENE el rol.
+    expect(screen.queryByText(/No tenes permisos/i)).not.toBeInTheDocument();
+    await waitFor(() => expect(fetchMyRoute).toHaveBeenCalledTimes(2));
   });
 
   /**
@@ -190,20 +246,25 @@ describe('CU-10 · confirmar vaciado', () => {
     expect(screen.getByText('Sin ruta activa')).toBeInTheDocument();
   });
 
-  /** El contrato no define si /rutas/mias devuelve objeto o array. Los dos entran. */
-  it('acepta que el backend devuelva un array de una ruta', async () => {
-    fetchMyRoute.mockResolvedValue([route()]);
-    render(<DriverStopsPage />);
-
-    expect(await screen.findByText('AB123CD')).toBeInTheDocument();
-  });
-
-  it('sin mocks no aparece el selector de chofer de demostracion', async () => {
+  /**
+   * La identidad sale del `sub` del token. No hay —ni puede haber— forma de
+   * pedir la ruta de otro chofer: si viajara por parametro, cambiar un valor
+   * alcanzaria para leer el trabajo ajeno.
+   */
+  it('pide la ruta sin ningun parametro de chofer', async () => {
     render(<DriverStopsPage />);
 
     await screen.findByText('CT-0010');
+    expect(fetchMyRoute).toHaveBeenCalledWith();
     expect(screen.queryByLabelText('Chofer')).not.toBeInTheDocument();
-    expect(fetchDrivers).not.toHaveBeenCalled();
+  });
+
+  /** Con VITE_SIMULAR_GPS apagada —el default— el bypass no existe. */
+  it('sin la variable de entorno no aparece el simulador de GPS', async () => {
+    render(<DriverStopsPage />);
+
+    await screen.findByText('CT-0010');
+    expect(screen.queryByLabelText(/Simular que estoy en el contenedor/)).not.toBeInTheDocument();
   });
 
   it('muestra el nivel de llenado de cada parada', async () => {

@@ -15,6 +15,7 @@ vi.mock('../api/waste.js', () => ({
 const alert = (extras = {}) => ({
   id: 'al-1',
   contenedorId: 'ct-1',
+  contenedorCodigo: 'CT-0001',
   tipo: 'SATURACION',
   severidad: 'MEDIA',
   estado: 'ABIERTA',
@@ -56,15 +57,17 @@ describe('CU-05 / CU-06 tablero de alertas', () => {
   });
 
   /**
-   * GET /alertas trae contenedorId pero no el codigo. Se cruza contra los
-   * contenedores ya cargados: pedir el detalle de cada alerta seria una llamada
-   * por fila para mostrar seis caracteres.
+   * GET /alertas trae `contenedorCodigo` en la respuesta. Antes habia que
+   * cruzar cada fila contra el listado de contenedores para mostrar seis
+   * caracteres; ahora la fila se pinta con lo que ya vino.
    */
-  it('muestra el codigo del contenedor cruzandolo, no un UUID', async () => {
+  it('muestra el codigo del contenedor que viene en la alerta, no un UUID', async () => {
     fetchAlerts.mockResolvedValue([alert()]);
+    // Sin contenedores cargados: el codigo tiene que salir igual, porque ya no
+    // depende del cruce. Lo unico que llena `fetchContainers` es el filtro.
+    fetchContainers.mockResolvedValue([]);
     render(<AlertsPage />);
 
-    // Acotado a la alerta: CT-0001 tambien es una opcion del filtro por contenedor.
     const row = (await screen.findByText(/Nivel 76%/)).closest('li');
     expect(within(row).getByText('CT-0001')).toBeInTheDocument();
   });

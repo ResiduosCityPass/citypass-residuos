@@ -147,7 +147,7 @@ export default function NearbyContainersPage() {
     <div className="public-shell">
       <header className="public-header">
         <div className="public-brand">
-          <span className="sidebar-logo" aria-hidden="true">◉</span>
+          <img src="/citypass-logo.png" alt="" className="sidebar-logo" />
           <span>CityPass<strong>+</strong></span>
           <span className="muted">· Residuos</span>
         </div>

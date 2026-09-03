@@ -6,6 +6,7 @@ import { Contenedor } from '../../contenedores/domain/contenedor.entity';
 import { ContenedorRepository } from '../../contenedores/domain/contenedor.repository';
 import { Sensor } from '../../contenedores/domain/sensor.entity';
 import { SensorRepository } from '../../contenedores/domain/sensor.repository';
+import { ContextoTransaccional } from '../../../shared/persistence/contexto-transaccional';
 import { ZonasService } from '../../zonas/application/zonas.service';
 import { Zona } from '../../zonas/domain/zona.entity';
 import { Lectura } from '../domain/lectura.entity';
@@ -66,6 +67,7 @@ describe('LecturasService (CU-04)', () => {
       buscarPorId: jest.fn(),
       buscarPorCodigo: jest.fn(),
       listar: jest.fn(),
+      listarConZona: jest.fn().mockResolvedValue([]),
       contar: jest.fn(),
     };
     sensores = {
@@ -83,12 +85,21 @@ describe('LecturasService (CU-04)', () => {
       registrarBateriaBaja: jest.fn().mockResolvedValue({ id: 'a-3' }),
     };
 
+    // Doble del contexto transaccional: corre el bloque tal cual. La
+    // transaccion de verdad se verifica en los tests de integracion, que son
+    // los unicos que pueden comprobar que el rollback funciona.
+    const transaccion = {
+      ejecutar: <T>(bloque: () => Promise<T>) => bloque(),
+      managerActual: () => null,
+    } as unknown as ContextoTransaccional;
+
     service = new LecturasService(
       lecturas,
       contenedores,
       sensores,
       zonas as unknown as ZonasService,
       alertas as unknown as AlertasService,
+      transaccion,
       new ConfigService({}),
     );
   });
@@ -118,6 +129,36 @@ describe('LecturasService (CU-04)', () => {
       contenedores.buscarPorId.mockResolvedValue(null);
 
       await expect(service.registrar(sensorDe(), lecturaNormal)).rejects.toThrow(NotFoundException);
+    });
+
+    it('consulta la zona una sola vez por lectura', async () => {
+      construir(contenedorDe());
+
+      await service.registrar(sensorDe(), lecturaNormal);
+
+      // Evaluar el estado y evaluar las reglas necesitan los mismos umbrales.
+      // Pedirlos dos veces duplicaba la consulta en el endpoint mas caliente del
+      // modulo, y permitia que una edicion de la zona en el medio dejara el estado
+      // y las alertas evaluados contra umbrales distintos.
+      expect(zonas.obtener).toHaveBeenCalledTimes(1);
+    });
+
+    it('evalua estado y alertas contra la misma zona', async () => {
+      construir(contenedorDe());
+
+      await service.registrar(sensorDe(), {
+        ...lecturaNormal,
+        nivelLlenadoPct: 87,
+        temperaturaC: 78,
+      });
+
+      expect(zonas.obtener).toHaveBeenCalledWith('z-1');
+      expect(alertas.registrarIncendio).toHaveBeenCalledWith(expect.anything(), ZONA_CENTRO);
+      expect(alertas.registrarSaturacion).toHaveBeenCalledWith(
+        expect.anything(),
+        ZONA_CENTRO,
+        expect.anything(),
+      );
     });
   });
 

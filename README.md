@@ -49,14 +49,16 @@ dinámica de rutas de recolección.
 
 ```bash
 docker compose -f infra/docker-compose.yml up -d
-cd backend && npm install && npm run start:dev
+cd backend && npm install && npm run migration:run && npm run start:dev
 ```
 
 La API queda en `http://localhost:3000` y la documentación Swagger en `http://localhost:3000/docs`.
 
 ## Documentación clave
 
+- [Guion de la demo del Hito 1](docs/sprints/guion-demo-hito-1.md) — que mostrar, en que orden y con que comandos.
 - [Backlog priorizado](docs/sprints/backlog-priorizado.md) — qué construimos y en qué orden, con el recorte de alcance justificado.
+- [Diagramas](docs/arquitectura/diagramas.md) — casos de uso, C4, secuencia y máquinas de estado.
 - [Modelo de datos](docs/arquitectura/modelo-de-datos.md)
 - [Contratos de eventos](docs/arquitectura/contratos-de-eventos.md) — qué publicamos y a qué nos suscribimos.
 - [API preliminar](docs/arquitectura/api-preliminar.md)

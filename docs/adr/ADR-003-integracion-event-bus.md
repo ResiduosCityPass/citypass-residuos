@@ -44,11 +44,30 @@ interface EventPublisher {
 
 Con tres implementaciones seleccionables por variable de entorno `EVENT_BUS_DRIVER`:
 
-| Driver | Uso | Disponible desde |
+| Driver | Uso | Estado |
 |---|---|---|
-| `inmemory` | Tests unitarios y perfil de desarrollo sin infraestructura | Sprint 1 |
-| `rabbitmq` | Broker local en Docker, para validar el flujo asincrónico end-to-end | Sprint 2 |
-| `platform` | Bus real definido por el Squad 1 | Sprint 3 |
+| `inmemory` | Tests y desarrollo sin infraestructura | Implementado |
+| `rabbitmq` | Broker local en Docker | Pendiente |
+| `platform` | Bus real definido por el Squad 1 | Pendiente, Sprint 3 |
+
+### Outbox transaccional *(agregado en el Sprint 2)*
+
+El dominio no publica contra el broker: escribe el evento en una tabla `evento_pendiente`
+**dentro de la misma transacción** que el cambio de negocio que lo origina. Un despachador aparte
+la vacía después contra el transporte real.
+
+Por eso hay dos tokens y no uno:
+
+| Token | Quién lo usa | Qué es |
+|---|---|---|
+| `EVENT_PUBLISHER` | El dominio | Escribe en la tabla outbox |
+| `TRANSPORTE_EVENTOS` | Solo el despachador | El broker de verdad |
+
+El dominio no sabe —ni tiene por qué saber— si el evento sale ya mismo o dentro de cinco segundos
+tras dos reintentos.
+
+El despachador reintenta con backoff exponencial y, agotados los intentos, marca el evento como
+`FALLIDO` sin borrarlo: es la *dead letter* que menciona el contrato de eventos.
 
 Los eventos se emiten **siempre**, desde el Sprint 1. Lo único que cambia entre hitos es dónde
 aterrizan. Así la dimensión 5 de la rúbrica queda demostrable incluso en el Hito 1, donde la
@@ -63,5 +82,9 @@ integración real todavía no se exige.
   Asumimos entrega *at-least-once* y no confiamos en el orden de llegada.
 - Al comenzar el Sprint 3 hay que negociar el formato de sobre con el Squad 1. Si difiere del
   nuestro, la traducción vive en la implementación `platform`, no en el dominio.
+- La ingesta de lecturas corre dentro de una transacción explícita. Los repositorios resuelven su
+  `EntityManager` desde un contexto basado en `AsyncLocalStorage`, así que participan de la
+  transacción en curso sin que el manager viaje como parámetro por la capa de aplicación y sin
+  ensuciar los puertos del dominio con un tipo de TypeORM.
 - **Acción abierta:** contactar al Squad 1 antes del cierre del Sprint 0 para acordar el borrador de
   contrato. Responsable: Nicolás (PM).

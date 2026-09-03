@@ -4,7 +4,7 @@ SPA del módulo de Residuos. Seis secciones: el mapa en tiempo real (CU-07), el 
 contenedores (CU-01) con la predicción de saturación (CU-12), el de zonas y umbrales (CU-02), el
 tablero de alertas (CU-05/CU-06), la flota (CU-03) y las rutas (CU-08/CU-09).
 
-**Qué cubre cada pantalla, dónde vive y qué falta: [CASOS-DE-USO.md](CASOS-DE-USO.md).**
+**Qué cubre cada pantalla, dónde vive y qué falta: [ESTADO.md](../ESTADO.md), en la raíz.**
 
 ## Stack
 
@@ -139,7 +139,7 @@ la pantalla móvil del chofer (CU-10).
 
 El detalle —qué pantalla cubre cada caso de uso, en qué archivos vive, qué endpoint consume, qué
 reglas de dominio resuelve y qué límites del backend quedaron a la vista— está en
-**[CASOS-DE-USO.md](CASOS-DE-USO.md)**.
+**[ESTADO.md](../ESTADO.md)**, en la raíz del repositorio.
 
 ## Notas de implementación
 

@@ -1,4 +1,5 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { aplicarCambios } from '../../../shared/application/aplicar-cambios';
 import { Zona } from '../domain/zona.entity';
 import { ZONA_REPOSITORY, ZonaRepository } from '../domain/zona.repository';
 import { ActualizarZonaDto } from './dto/actualizar-zona.dto';
@@ -61,7 +62,7 @@ export class ZonasService {
       }
     }
 
-    Object.assign(zona, dto);
+    aplicarCambios(zona, dto);
 
     return this.zonas.guardar(zona);
   }

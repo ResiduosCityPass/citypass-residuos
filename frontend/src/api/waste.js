@@ -50,7 +50,6 @@ export const fetchRoutes = (...args) => source.fetchRoutes(...args);
 export const fetchRoute = (...args) => source.fetchRoute(...args);
 export const generateRoute = (...args) => source.generateRoute(...args);
 export const assignRoute = (...args) => source.assignRoute(...args);
-export const fetchDrivers = (...args) => source.fetchDrivers(...args);
 
 /* CU-05 / CU-06 · Alertas */
 export const fetchAlerts = (...args) => source.fetchAlerts(...args);

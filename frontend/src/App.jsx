@@ -12,6 +12,7 @@ import RouteDetailPage from './pages/RouteDetailPage.jsx';
 import NearbyContainersPage from './pages/NearbyContainersPage.jsx';
 import DriverStopsPage from './pages/DriverStopsPage.jsx';
 import { fetchAlerts } from './api/waste.js';
+import { seedDevToken } from './api/client.js';
 import './App.css';
 
 /**
@@ -72,6 +73,19 @@ function Application() {
       .then((alerts) => setOpenAlerts(alerts.filter((a) => a.estado !== 'RESUELTA').length))
       .catch(() => setOpenAlerts(0));
   }, []);
+
+  // El token de desarrollo acompania a la navegacion: /chofer necesita uno con
+  // rol CHOFER y el resto del modulo uno de ADMINISTRADOR. Sin esto habia que
+  // ir pegandolos a mano en la barra para moverse entre pantallas, y olvidarse
+  // de volver a cambiarlo dejaba media app en 401.
+  //
+  // Va DURANTE el render y no en un efecto a proposito: los efectos de los
+  // hijos corren antes que los del padre, asi que con useEffect la pantalla del
+  // chofer alcanzaba a pedir su ruta con el token de la pantalla anterior y se
+  // comia un 403 que despues quedaba pegado en la vista. Es una escritura en
+  // localStorage, idempotente, y solo existe en desarrollo: Vite borra el
+  // cuerpo de seedDevToken al compilar.
+  seedDevToken(pathname);
 
   useEffect(() => {
     // La vista ciudadana no tiene token y la del chofer no tiene sidebar:

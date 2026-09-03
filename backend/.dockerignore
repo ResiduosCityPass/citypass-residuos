@@ -1,0 +1,13 @@
+node_modules
+dist
+coverage
+test
+.env
+.env.*
+!.env.example
+*.log
+.git
+.github
+README.md
+eslint.config.mjs
+.prettierrc
