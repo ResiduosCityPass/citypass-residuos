@@ -38,7 +38,15 @@
   color: #fff;
 }
 
-.sidebar-logo { color: var(--sky); font-size: 1.2em; }
+/* El pin de CityPass+. Alto fijado en em para que acompanie al texto de la
+   marca si algun dia cambia el cuerpo tipografico. `width:auto` respeta la
+   proporcion del PNG, que es mas alto que ancho. */
+.sidebar-logo {
+  height: 1.6em;
+  width: auto;
+  display: block;
+  flex-shrink: 0;
+}
 .sidebar-brand strong { color: var(--green); }
 
 .sidebar-heading {
