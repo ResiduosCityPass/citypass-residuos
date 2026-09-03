@@ -50,7 +50,8 @@ puede atravesar un flujo de login interactivo.
 | Lecturas — alta | — | — | — | — | Sí |
 | Alertas | Sí | Sí | — | — | — |
 | Rutas — generar y asignar | Sí | Sí | — | — | — |
-| Rutas — ver la propia | Sí | Sí | Sí | — | — |
+| Rutas — ver el detalle por id | Sí | Sí | — | — | — |
+| Rutas — ver la propia (`/rutas/mias`) | — | — | Sí | — | — |
 | Confirmar vaciado | — | — | Sí | — | — |
 
 ## Consecuencias

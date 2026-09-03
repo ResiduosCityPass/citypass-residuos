@@ -58,9 +58,22 @@ export class RutasController {
     return this.rutas.rutaActivaDe(request.usuario!.sub);
   }
 
+  /**
+   * Sin rol CHOFER a proposito.
+   *
+   * Este endpoint devuelve cualquier ruta por id y no verifica de quien es, asi
+   * que darle acceso al chofer permitia que uno leyera la ruta de otro con solo
+   * conocer el id: un IDOR. El chofer ya tiene `GET /rutas/mias`, que resuelve
+   * su identidad desde el token y no acepta un id por parametro.
+   *
+   * Se saca el rol en vez de agregarle un chequeo de dueno porque ninguna
+   * pantalla del chofer pega aca -la de CU-10 usa solo /rutas/mias-, y cerrar
+   * una puerta que nadie usa es mas seguro que custodiarla.
+   */
   @Get(':id')
-  @Roles(Rol.ADMINISTRADOR, Rol.OPERADOR, Rol.CHOFER)
+  @Roles(Rol.ADMINISTRADOR, Rol.OPERADOR)
   @ApiOperation({ summary: 'Detalle de la ruta con camion y paradas' })
+  @ApiResponse({ status: 403, description: 'El chofer consulta su ruta por GET /rutas/mias' })
   obtener(@Param('id', ParseUUIDPipe) id: string) {
     return this.rutas.obtener(id);
   }

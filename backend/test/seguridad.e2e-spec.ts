@@ -1,5 +1,5 @@
 import * as request from 'supertest';
-import { Rol } from '../src/shared/domain/enums';
+import { Rol, TipoResiduo } from '../src/shared/domain/enums';
 import { AppDePrueba, crearAppDePrueba } from './helpers/app-de-prueba';
 
 /**
@@ -29,6 +29,10 @@ describe('Seguridad (e2e)', () => {
 
   afterAll(async () => {
     await ctx.cerrar();
+  });
+
+  beforeEach(async () => {
+    await ctx.limpiar();
   });
 
   it.each(PROTEGIDOS)('%s rechaza sin token', async (ruta) => {
@@ -67,6 +71,105 @@ describe('Seguridad (e2e)', () => {
       .set('Authorization', `Bearer ${operador}`)
       .send({ nombre: 'X', umbralCriticoPct: 70, umbralTemperaturaC: 60 })
       .expect(403);
+  });
+
+  describe('un chofer no puede leer la ruta de otro', () => {
+    /** Deja una ruta asignada a un chofer y devuelve su id. */
+    const rutaDeOtroChofer = async () => {
+      const admin = ctx.token(Rol.ADMINISTRADOR);
+      const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
+
+      const zona = await http
+        .post('/api/v1/zonas')
+        .set(auth(admin))
+        .send({ nombre: `Zona ${Date.now()}`, umbralCriticoPct: 70, umbralTemperaturaC: 60 })
+        .expect(201);
+
+      const contenedor = await http
+        .post('/api/v1/contenedores')
+        .set(auth(admin))
+        .send({
+          zonaId: zona.body.id,
+          tipoResiduo: TipoResiduo.RECICLABLE,
+          capacidadLitros: 1100,
+          lat: -34.6057,
+          lng: -58.3816,
+        })
+        .expect(201);
+
+      const sensor = await http
+        .post(`/api/v1/contenedores/${contenedor.body.id}/sensor`)
+        .set(auth(admin))
+        .send({})
+        .expect(201);
+
+      await http
+        .post('/api/v1/lecturas')
+        .set('X-Sensor-Key', sensor.body.apiKey)
+        .send({ nivelLlenadoPct: 88, temperaturaC: 21, bateriaPct: 90 })
+        .expect(202);
+
+      const camion = await http
+        .post('/api/v1/camiones')
+        .set(auth(admin))
+        .send({
+          patente: `ZZ${Date.now().toString().slice(-5)}`,
+          capacidadLitros: 12_000,
+          tipoResiduoHabilitado: TipoResiduo.RECICLABLE,
+        })
+        .expect(201);
+
+      const ruta = await http
+        .post('/api/v1/rutas/generar')
+        .set(auth(admin))
+        .send({ camionId: camion.body.id })
+        .expect(201);
+
+      await http
+        .patch(`/api/v1/rutas/${ruta.body.id}/asignar`)
+        .set(auth(admin))
+        .send({ choferId: 'U000001' })
+        .expect(200);
+
+      return ruta.body.id;
+    };
+
+    it('GET /rutas/:id no acepta rol CHOFER', async () => {
+      // El endpoint devuelve cualquier ruta por id y no verifica de quien es.
+      // Con el rol habilitado, un chofer que conociera el id leia la ruta de
+      // otro: camion, paradas y ubicaciones. El chofer tiene /rutas/mias, que
+      // resuelve la identidad desde el token y no acepta id por parametro.
+      const rutaAjena = await rutaDeOtroChofer();
+      const otroChofer = ctx.token(Rol.CHOFER, 'U000999');
+
+      await http
+        .get(`/api/v1/rutas/${rutaAjena}`)
+        .set('Authorization', `Bearer ${otroChofer}`)
+        .expect(403);
+    });
+
+    it('el operador si puede ver el detalle de cualquier ruta', async () => {
+      // La contracara: cerrar la puerta del chofer no puede romper la pantalla
+      // de detalle del operador, que es la que usa este endpoint.
+      const rutaAjena = await rutaDeOtroChofer();
+
+      await http
+        .get(`/api/v1/rutas/${rutaAjena}`)
+        .set('Authorization', `Bearer ${ctx.token(Rol.OPERADOR)}`)
+        .expect(200);
+    });
+
+    it('el chofer sigue viendo la suya por /rutas/mias', async () => {
+      await rutaDeOtroChofer();
+      const suDueno = ctx.token(Rol.CHOFER, 'U000001');
+
+      const respuesta = await http
+        .get('/api/v1/rutas/mias')
+        .set('Authorization', `Bearer ${suDueno}`)
+        .expect(200);
+
+      expect(respuesta.body.choferId).toBe('U000001');
+    });
   });
 
   it('la ingesta de lecturas no acepta un JWT de usuario', async () => {
