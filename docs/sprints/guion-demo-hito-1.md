@@ -66,6 +66,14 @@ cd simulator && npm start
 (CU-12) necesita al menos 3 lecturas del ciclo actual para tener algo que ajustar, y el mapa se ve
 mucho mejor con contenedores en distintos niveles que con todos en cero.
 
+> **El simulador recuerda los niveles entre corridas**, en `estado.json`. Eso es lo que permite
+> encadenar dos escenarios sin que el contenedor que acabás de saturar vuelva a verde solo al
+> arrancar el siguiente. Para empezar de cero a propósito:
+>
+> ```bash
+> cd simulator && node simulador.js --reiniciar
+> ```
+
 ### Preparar los tokens del frontend
 
 ```bash
@@ -75,6 +83,21 @@ cd backend && npm run token:dev -- CHOFER
 
 Van en `frontend/.env.local` como `VITE_DEV_TOKEN` y `VITE_DEV_TOKEN_CHOFER`. Duran 8 horas: si
 la demo es a la tarde y los generaste a la mañana, **regeneralos**.
+
+### Limpiar lo que dejaron los ensayos
+
+**El halo naranja no se apaga solo.** Sale de tener una alerta de `INCENDIO` abierta, no de la
+temperatura del momento, así que cada ensayo deja contenedores con halo que van a seguir ahí en la
+demo real. Lo mismo con las alertas de saturación.
+
+Antes de empezar, entrá a `/alertas` y **resolvé todo lo que quedó de los ensayos**. Si quedó muy
+sucio, resembrá desde cero:
+
+```bash
+cd simulator && node simulador.js --reiniciar
+```
+
+Media hora ensayando y un mapa con seis halos hace que el incendio de verdad no se note.
 
 ### Tener a mano, en pestañas ya abiertas
 
@@ -98,8 +121,12 @@ Abrís en `/mapa`. **No expliques la pantalla: mostrá lo que pasa solo.**
 > nivel de llenado. No estoy actualizando nada: los sensores reportan cada pocos segundos y la
 > pantalla se refresca sola."
 
-Quedate callado unos segundos y que se vea un marcador cambiar de color. **Ese silencio vale más
-que la explicación.**
+Quedate callado y que se vea un marcador cambiar de color. **Ese silencio vale más que la
+explicación.**
+
+> **Puede tardar hasta 30 segundos**, que es el intervalo del polling. Contalo antes de callarte
+> —"la pantalla se refresca sola cada 30 segundos"— para que la espera se lea como la regla
+> funcionando y no como que se colgó.
 
 Si preguntan cómo se actualiza: polling cada 30 segundos, decisión documentada, WebSocket evaluado
 y pospuesto.
@@ -120,6 +147,11 @@ Esto es lo que hace que el próximo paso no parezca magia.
 
 ### 3 · La detección automática (2 min) — CU-05, CU-06 · **el momento fuerte**
 
+> **Los dos escenarios tienen que caer sobre contenedores DISTINTOS.** Si no, el que acabás de
+> saturar es el mismo que después se prende fuego, y el remate —un contenedor **verde** con alerta
+> de incendio— es imposible: no puede estar verde si lo saturaste hace treinta segundos. Por eso el
+> segundo comando lleva `--contenedor`.
+
 En otra terminal, y **narrándolo mientras pasa**:
 
 ```bash
@@ -128,21 +160,27 @@ cd simulator && npm run saturacion
 
 > "Voy a simular que un contenedor se llena. Nadie va a apretar nada más."
 
-Volvés al mapa. El marcador se pone rojo solo. Vas a `/alertas` y la alerta ya está ahí.
+Volvés al mapa. El marcador de **CT-0001** se pone rojo solo. Vas a `/alertas` y la alerta ya está
+ahí. Cortá el simulador con Ctrl+C.
 
-Ahora el que más impresiona:
+Ahora el que más impresiona, **sobre otro contenedor**:
 
 ```bash
-cd simulator && npm run incendio
+cd simulator && node simulador.js --escenario incendio --contenedor CT-0007
 ```
 
-> "Este contenedor está al 8%, o sea verde. Pero el sensor reporta 78 grados."
+> "Este otro contenedor está por debajo del umbral, o sea verde. Pero el sensor reporta 78 grados."
 
-Aparece la alerta crítica de incendio **sobre un contenedor verde**.
+**Leé el porcentaje de la pantalla, no lo digas de memoria.** Depende de cuánto haya corrido el
+simulador antes, y decir un número que no coincide con el que se ve arriba es peor que no decirlo.
 
-> "El incendio no depende del llenado. Un contenedor casi vacío puede estar prendido fuego, y ese
-> es justo el caso que no se puede pasar por alto. Por eso son dos reglas distintas y el incendio
-> se pinta aparte del color de estado."
+Aparece la alerta crítica de incendio **sobre un contenedor verde**, con su halo naranja latiendo,
+mientras CT-0001 sigue rojo al lado. Las dos reglas conviviendo en la misma pantalla es la mejor
+prueba de que son independientes.
+
+> "El incendio no depende del llenado. Un contenedor que no está ni cerca de llenarse puede estar
+> prendido fuego, y ese es justo el caso que no se puede pasar por alto. Por eso son dos reglas
+> distintas y el incendio se pinta aparte del color de estado."
 
 **Este es el punto más alto de la demo.** Es una regla de negocio real, no un CRUD, y se ve.
 
@@ -216,9 +254,19 @@ Y ahora **la parada que no se pudo vaciar**:
 > "El caso real que faltaba: el chofer llega y hay un auto tapando el contenedor. Marca la parada
 > como omitida, con el motivo."
 
+Apretás **"No pude vaciar"**, elegís un motivo del desplegable y confirmás.
+
 > "Fíjense en la diferencia: el contenedor **sigue lleno y sigue en rojo**, y su alerta sigue
 > abierta, porque el problema sigue ahí. Pero la ruta se cierra igual y el camión queda libre. Sin
 > esto, una calle cortada dejaba el camión trabado para siempre."
+
+> **Omití la ÚLTIMA parada abierta, no una del medio.** La ruta se cierra y el camión se libera
+> solo cuando no queda ninguna parada pendiente. Si omitís una del medio la ruta sigue `EN_CURSO`
+> —que es lo correcto— pero entonces no podés decir la frase del camión libre. Con una ruta de dos
+> paradas: confirmás la primera, omitís la segunda.
+
+El motivo también lo ve el operador en `/rutas/:id`, que es de donde sale la decisión de si vuelve
+a rutear ese contenedor hoy. Vale mostrarlo si sobra tiempo."
 
 ### 8 · La vista ciudadana (30 seg) — CU-11
 
@@ -235,8 +283,13 @@ municipio.
 
 Sin volver al código:
 
-- **El CI en verde**: lint, build, 339 tests unitarios y 58 de integración contra PostgreSQL real.
-  Cobertura 91%, contra un mínimo exigido de 60%.
+- **El CI en verde**: lint, build, y los tests de los dos lados. Backend: **344 unitarios y 58 de
+  integración** contra PostgreSQL real, **91% de cobertura**. Frontend: **190 tests, 85,78% de
+  líneas**. El mínimo exigido es 60% y se fuerza en el CI: si baja, el build falla.
+
+> Los números cambian con cada PR. **Recontalos el día anterior** con `npm test` y `npm run
+> test:e2e` en `backend/`, y `npm test` en `frontend/`. Decir un número viejo en voz alta es peor
+> que no decir ninguno.
 - **Los diagramas**: casos de uso, C4 nivel 1 y 2, arquitectura de eventos, dos de secuencia y
   cuatro máquinas de estado.
 - **Las decisiones**: 7 ADRs, incluido el que documenta qué se recortó de cada caso de uso y por
@@ -255,11 +308,15 @@ Todas estas se ven como "no anda" cuando en realidad el sistema está haciendo l
 |---|---|---|
 | **El `choferId` mal tipeado** | La pantalla del chofer queda **vacía y sin error**. Parece que la ruta no se generó | Al asignar, usar exactamente el `sub` del token del chofer (`dev-chofer`). Anotalo antes |
 | **Correr `saturacion` dos veces** | La segunda vez no aparece ninguna alerta nueva | Es correcto: la alerta se emite solo en la transición. Usar otro contenedor, o explicarlo como una virtud |
+| **Saturación e incendio sobre el mismo contenedor** | El remate se cae: no podés mostrar un contenedor verde prendido fuego si lo acabás de saturar | Los escenarios pegan sobre el primer contenedor salvo que les digas otro. Usar `--contenedor CT-0007` en el de incendio |
+| **El halo naranja de un ensayo queda pegado** | Aparecen contenedores con halo que no están incendiados, y el incendio "de verdad" pierde efecto porque ya había tres | El halo sale de tener una alerta de INCENDIO **ABIERTA**, no de la temperatura actual: que el sensor se enfríe no la cierra. **Resolver a mano en `/alertas` todas las alertas de los ensayos**, o resembrar |
 | **Bajar el umbral de una zona en vivo** | El mapa no se repinta al instante | Cada contenedor se reevalúa con su próxima lectura. Esperar unos segundos, o no tocarlo en vivo |
 | **Predicción sin datos** | Dice `SIN_LECTURAS_SUFICIENTES` | Necesita 3 lecturas del ciclo actual. Dejar el simulador corriendo antes, y no vaciar ese contenedor justo antes de mostrarlo |
 | **Confirmar desde lejos** | `403`, "estás a N metros" | Es una regla, no un error. Si lo mostrás, mostralo a propósito |
 | **Tokens vencidos** | Todo devuelve `401` | Duran 8 horas. Regenerarlos el mismo día |
-| **Base vieja sin migrar** | El backend no arranca | `npm run migration:run` antes de todo |
+| **Cambiar de rama invalida los tokens** | `401` aunque al token le queden horas | No es vencimiento: el contrato de identidad del Squad 2 cambió la validación, el backend en watch recompila, y un token firmado con el código anterior deja de servir. Regenerar los dos |
+| **Pegar tokens con el front prendido** | Sigue el `401` aunque `.env.local` esté bien | **Vite lee `.env.local` solo al arrancar.** Reiniciar `npm run dev` |
+| **Base vieja sin migrar** | El backend no arranca, o falta una columna nueva | `npm run migration:run` antes de todo, y de nuevo cada vez que traigas `develop` |
 
 ---
 
