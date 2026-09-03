@@ -17,13 +17,78 @@ RabbitMQ está declarado pero no se usa hasta el Sprint 2: hasta entonces el bac
 
 ## Pendientes de este rol
 
-| # | Tarea | Sprint |
-|---|---|---|
-| 1 | Proteger `main` en GitHub: PR obligatorio, CI en verde, sin auto-merge propio | 0 |
-| 2 | `Dockerfile` multi-stage para el backend | 1 |
-| 3 | `Dockerfile` para el frontend (depende del stack que defina Máximo en el ADR-006) | 2 |
-| 4 | Job de deploy en el pipeline | 3 |
-| 5 | Elegir destino cloud y escribirlo como IaC — dimensión 7 de la rúbrica pide *infraestructura como código*, no despliegue manual | 3-4 |
+| # | Tarea | Sprint | Estado |
+|---|---|---|---|
+| 1 | Proteger `main` y `develop`: PR obligatorio, CI en verde, sin bypass | 0 | Pendiente |
+| 2 | `Dockerfile` multi-stage para el backend | 1 | **Hecho** — ver abajo |
+| 3 | `Dockerfile` para el frontend (React + Vite: build y servir estáticos) | 2 | Pendiente |
+| 4 | Job de deploy en el pipeline | 3 | Pendiente |
+| 5 | Elegir destino cloud y escribirlo como IaC — la dimensión 7 pide *infraestructura como código*, no despliegue manual | 3-4 | Pendiente |
+
+---
+
+## Imagen del backend
+
+Está en [`backend/Dockerfile`](../backend/Dockerfile). La escribió Francisco para desbloquear el
+despliegue; **de acá en adelante es tuya**.
+
+```bash
+docker build -t citypass-residuos-api ./backend
+```
+
+Verificado: arranca, se conecta a Postgres, responde la API, el `HEALTHCHECK` pasa a `healthy`,
+**corre como usuario `node` y no como root**, y las migraciones se pueden ejecutar desde la imagen.
+Pesa 404 MB, que es lo normal para NestJS con TypeORM.
+
+### Para sumarla al compose
+
+```yaml
+  api:
+    build: ../backend
+    container_name: citypass-residuos-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_PORT: '5432'
+      DB_USER: citypass
+      DB_PASSWORD: citypass
+      DB_NAME: residuos
+      # Corre las migraciones al arrancar. En un entorno desplegado suele
+      # preferirse un job aparte, para que un rollback de la app no dependa
+      # de haber revertido el esquema.
+      DB_MIGRATIONS_RUN: 'true'
+      JWT_SECRET: cambiar-en-produccion
+      EVENT_BUS_DRIVER: inmemory
+    ports:
+      - '3000:3000'
+```
+
+### Migraciones en un entorno desplegado
+
+Dos caminos, y conviene elegir a conciencia:
+
+- `DB_MIGRATIONS_RUN=true` — la aplicación las corre al arrancar. Simple, pero si hay varias
+  réplicas todas intentan migrar a la vez.
+- Un paso previo al deploy, que es lo que yo haría:
+
+  ```bash
+  docker run --rm --env-file .env citypass-residuos-api npm run migration:run:prod
+  ```
+
+  Usa el CLI compilado, no `ts-node`, así que funciona en la imagen de producción.
+
+### Tres cosas del Dockerfile que no son decorativas
+
+- **Multi-stage.** La etapa de build necesita las devDependencies y el compilador de TypeScript;
+  la imagen final no. Copiar el `node_modules` completo sumaría unos 400 MB de herramientas que
+  nunca corren en producción.
+- **`dumb-init` como PID 1.** Sin él, Node no recibe `SIGTERM` y el contenedor se mata a la fuerza
+  a los 10 segundos. Eso cortaría al despachador del outbox en medio de un lote.
+- **Usuario `node`.** Correr como root es innecesario y es de lo primero que mira cualquier
+  revisión de seguridad.
 
 Toda decisión de infraestructura que tenga más de una opción razonable necesita su ADR
 en `docs/adr/`. Es requisito explícito de la cátedra.
