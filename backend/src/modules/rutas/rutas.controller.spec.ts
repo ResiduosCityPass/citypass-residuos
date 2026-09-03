@@ -1,4 +1,5 @@
 import { Request } from 'express';
+import { payloadDePrueba } from '../../shared/auth/payload-de-prueba';
 import { EstadoRuta, Rol } from '../../shared/domain/enums';
 import { RutasService } from './application/rutas.service';
 import { RutasController } from './rutas.controller';
@@ -8,7 +9,7 @@ describe('RutasController (CU-08, CU-09)', () => {
   let controller: RutasController;
 
   const requestDe = (sub: string) =>
-    ({ usuario: { sub, username: sub, rol: Rol.CHOFER } }) as Request;
+    ({ usuario: { ...payloadDePrueba(Rol.CHOFER, sub), rol: Rol.CHOFER } }) as unknown as Request;
 
   beforeEach(() => {
     service = {

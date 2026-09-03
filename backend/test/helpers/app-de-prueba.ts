@@ -4,6 +4,7 @@ import { Test } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../../src/app.module';
 import { HttpExceptionFilter } from '../../src/shared/filters/http-exception.filter';
+import { payloadDePrueba } from '../../src/shared/auth/payload-de-prueba';
 import { Rol } from '../../src/shared/domain/enums';
 
 export interface AppDePrueba {
@@ -42,7 +43,7 @@ export async function crearAppDePrueba(): Promise<AppDePrueba> {
     app,
     dataSource,
     token: (rol: Rol = Rol.ADMINISTRADOR, sub = `test-${rol}`) =>
-      jwt.sign({ sub, username: `${rol}@test.local`, rol }),
+      jwt.sign(payloadDePrueba(rol, sub)),
     limpiar: async () => {
       // El orden importa menos con CASCADE, pero se listan igual de la hoja a
       // la raiz para que el dia que se saque el CASCADE esto siga andando.

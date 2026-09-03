@@ -11,6 +11,9 @@ import { IsEnum, IsInt, IsOptional, IsString, Max, Min, validateSync } from 'cla
  */
 export const EMISOR_TOKEN_DEFAULT = 'citypass-squad2';
 
+/** Esta API como destinatario del token. Viaja en `aud`, siempre como lista. */
+export const AUDIENCIA_TOKEN_DEFAULT = 'citypass-residuos-api';
+
 enum Entorno {
   Development = 'development',
   Test = 'test',
@@ -53,6 +56,14 @@ class VariablesEntorno {
   @IsString()
   @IsOptional()
   JWT_EXPIRES_IN: string = '8h';
+
+  @IsString()
+  @IsOptional()
+  JWT_AUDIENCE: string = AUDIENCIA_TOKEN_DEFAULT;
+
+  @IsString()
+  @IsOptional()
+  JWT_ALGORITHM: string = 'HS256';
 
   @IsString()
   @IsOptional()

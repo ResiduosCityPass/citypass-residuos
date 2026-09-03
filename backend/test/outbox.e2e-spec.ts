@@ -4,6 +4,7 @@ import * as request from 'supertest';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
 import { HttpExceptionFilter } from '../src/shared/filters/http-exception.filter';
+import { payloadDePrueba } from '../src/shared/auth/payload-de-prueba';
 import { Rol, TipoResiduo } from '../src/shared/domain/enums';
 import { DespachadorOutbox } from '../src/shared/events/outbox/despachador-outbox';
 import {
@@ -196,9 +197,7 @@ describe('Outbox transaccional · rollback (e2e)', () => {
     };
 
     const { JwtService } = await import('@nestjs/jwt');
-    admin = app
-      .get(JwtService)
-      .sign({ sub: 'test', username: 'test@test.local', rol: Rol.ADMINISTRADOR });
+    admin = app.get(JwtService).sign(payloadDePrueba(Rol.ADMINISTRADOR, 'test-ADMINISTRADOR'));
   });
 
   afterAll(async () => {
