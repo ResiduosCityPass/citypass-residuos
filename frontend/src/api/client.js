@@ -15,6 +15,36 @@ export const saveToken = (token) => localStorage.setItem(TOKEN_KEY, token.trim()
 export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
 
 /**
+ * Deja listo el token de VITE_DEV_TOKEN para no tener que pegarlo a mano.
+ *
+ * Existe porque el login federado del Squad 2 recien llega en el Sprint 3
+ * (ADR-005). Hasta entonces el token se fabrica con `npm run token:dev` y dura
+ * 8 horas, y pegarlo a mano en cada vencimiento es incomodo en la demo.
+ *
+ * Dos condiciones, y hacen falta las dos:
+ *
+ *  1. `import.meta.env.DEV`, que Vite pone en false al compilar. El bloque
+ *     entero desaparece del bundle de produccion: no es una comprobacion que
+ *     se pueda saltear, es codigo que no llega a existir.
+ *  2. Que la variable este definida. No tiene valor por defecto y `.env.local`
+ *     no se versiona, asi que un clon del repo no hereda el token de nadie.
+ *
+ * No pisa un token ya guardado: si pegaste uno de CHOFER a mano, sigue siendo
+ * el tuyo hasta que lo borres desde la barra.
+ *
+ * @returns {boolean} true si sembro el token en este llamado.
+ */
+export function seedDevToken() {
+  if (!import.meta.env.DEV) return false;
+
+  const preset = import.meta.env.VITE_DEV_TOKEN;
+  if (!preset || readToken()) return false;
+
+  saveToken(preset);
+  return true;
+}
+
+/**
  * Error de API con el `code` estable del backend.
  *
  * `message` es el heredado de Error: texto ya redactado en castellano por el

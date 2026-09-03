@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { api, apiPublic, ApiError, saveToken, clearToken } from './client.js';
+import { api, apiPublic, ApiError, saveToken, clearToken, readToken, seedDevToken } from './client.js';
 
 describe('cliente de la API', () => {
   beforeEach(() => {
@@ -118,5 +118,51 @@ describe('cliente de la API', () => {
     await apiPublic.get('/publico/contenedores/cercanos');
 
     expect(fetchMock.mock.calls[0][1]).not.toHaveProperty('anonymous');
+  });
+
+  /* --- Token de desarrollo (VITE_DEV_TOKEN) ----------------------------- */
+
+  describe('seedDevToken', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it('siembra el token cuando no hay ninguno guardado', () => {
+      vi.stubEnv('VITE_DEV_TOKEN', 'jwt-de-desarrollo');
+
+      expect(seedDevToken()).toBe(true);
+      expect(readToken()).toBe('jwt-de-desarrollo');
+    });
+
+    /**
+     * Si pegaste a mano un token de CHOFER para probar /chofer, la variable no
+     * te lo puede reemplazar por el de ADMINISTRADOR en la proxima recarga.
+     */
+    it('no pisa un token que ya estaba guardado', () => {
+      vi.stubEnv('VITE_DEV_TOKEN', 'jwt-de-desarrollo');
+      saveToken('el-que-pegue-a-mano');
+
+      expect(seedDevToken()).toBe(false);
+      expect(readToken()).toBe('el-que-pegue-a-mano');
+    });
+
+    it('no hace nada si la variable no esta definida', () => {
+      vi.stubEnv('VITE_DEV_TOKEN', '');
+
+      expect(seedDevToken()).toBe(false);
+      expect(readToken()).toBe('');
+    });
+
+    /**
+     * La condicion que importa: Vite pone DEV en false al compilar, asi que el
+     * bloque no llega al bundle de produccion. Aca se simula esa compilacion.
+     */
+    it('no siembra nada fuera de desarrollo', () => {
+      vi.stubEnv('DEV', false);
+      vi.stubEnv('VITE_DEV_TOKEN', 'jwt-de-desarrollo');
+
+      expect(seedDevToken()).toBe(false);
+      expect(readToken()).toBe('');
+    });
   });
 });
