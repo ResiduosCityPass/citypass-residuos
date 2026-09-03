@@ -37,14 +37,32 @@ export default function PredictionCard({ containerId, thresholdPct }) {
   if (loading) return <p className="muted">Calculando prediccion…</p>;
 
   if (error) {
-    // Sin historico no hay regresion posible. No es un fallo: es un contenedor
-    // que todavia no dio datos, y decirlo asi evita que parezca un bug.
+    // Los dos 409 de este endpoint NO son fallos: son estados legitimos del
+    // contenedor, y significan cosas opuestas. A uno le faltan datos; el otro
+    // tiene datos de sobra y dicen que se esta vaciando. Meterlos bajo un
+    // mismo titulo haria pasar por problema algo que es una buena noticia.
+    if (error.code === 'SIN_LECTURAS_SUFICIENTES') {
+      return (
+        <Notice type="info" title="Todavía no se puede predecir">
+          Hacen falta al menos 3 lecturas del sensor en el ciclo de llenado actual para estimar la
+          tasa. En cuanto el contenedor empiece a reportar, la predicción aparece sola.
+        </Notice>
+      );
+    }
+
+    if (error.code === 'TENDENCIA_NO_CRECIENTE') {
+      return (
+        <Notice type="success" title="No se está llenando">
+          Las últimas lecturas bajan o se mantienen, así que no hay ninguna saturación que
+          predecir. Cuando vuelva a llenarse, la estimación reaparece sola.
+        </Notice>
+      );
+    }
+
+    // Cualquier codigo que no conozcamos muestra el `message` del backend, que
+    // ya viene redactado en castellano.
     return (
-      <Notice type="info" title="Todavía no se puede predecir">
-        {error.code === 'SIN_LECTURAS_SUFICIENTES'
-          ? 'Hacen falta lecturas del sensor para estimar la tasa de llenado. En cuanto el contenedor empiece a reportar, la predicción aparece sola.'
-          : error.message}
-      </Notice>
+      <Notice type="info" title="Todavía no se puede predecir">{error.message}</Notice>
     );
   }
 

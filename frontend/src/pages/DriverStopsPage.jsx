@@ -4,7 +4,7 @@ import Button from '../components/ui/Button.jsx';
 import Chip from '../components/ui/Chip.jsx';
 import FillBar from '../components/ui/FillBar.jsx';
 import Notice from '../components/ui/Notice.jsx';
-import { fetchMyRoute, confirmStop, fetchDrivers, USING_MOCKS } from '../api/waste.js';
+import { fetchMyRoute, confirmStop } from '../api/waste.js';
 import { generalMessage } from '../domain/errors.js';
 import {
   STOP_STATE_LABEL,
@@ -34,6 +34,18 @@ const RADIUS_M = 100;
 /** Un jitter de ~22 m, para que la posicion simulada no sea un sospechoso "0 m". */
 const JITTER = 0.0002;
 
+/**
+ * Permite confirmar usando la posicion del contenedor en vez de la del GPS.
+ *
+ * Es un bypass del unico control que tiene este caso de uso, asi que vive en su
+ * propia variable de entorno, apagada por defecto y fuera de cualquier build
+ * que no sea una demo. Antes colgaba de USING_MOCKS, y al conectar el backend
+ * real desaparecia: los contenedores del seed estan en el Obelisco y cualquiera
+ * que pruebe desde su casa esta a kilometros, con lo cual CU-10 no se podia
+ * mostrar funcionando ni una vez.
+ */
+const SIMULAR_GPS = import.meta.env.VITE_SIMULAR_GPS === 'true';
+
 export default function DriverStopsPage() {
   const geo = useGeolocation();
 
@@ -41,36 +53,29 @@ export default function DriverStopsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const [drivers, setDrivers] = useState([]);
-  const [driverId, setDriverId] = useState('');
-
   const [confirmingId, setConfirmingId] = useState(null);
   const [feedback, setFeedback] = useState(null); // { stopId, type, title, body }
   const [simulateGps, setSimulateGps] = useState(false);
 
+  // Sin argumentos: el chofer sale del `sub` del token. No hay forma de pedir
+  // la ruta de otro, que es exactamente el punto.
+  //
+  // El backend devuelve cuerpo vacio con 200 cuando no hay ruta activa, y
+  // client.js lo convierte en `null`. Terminar el turno no es un error.
   const load = useCallback(() => {
     setLoading(true);
     setError(null);
-    return fetchMyRoute(driverId)
-      .then((data) => {
-        // El contrato no dice si /rutas/mias devuelve objeto o array. Se
-        // normaliza aca para que la pantalla no dependa de cual eligieron.
-        setRoute(Array.isArray(data) ? (data[0] ?? null) : data);
-      })
+    return fetchMyRoute()
+      .then(setRoute)
       .catch(setError)
       .finally(() => setLoading(false));
-  }, [driverId]);
+  }, []);
 
   useEffect(() => {
     // La carga inicial es la sincronizacion con el backend, no un derivado.
     // oxlint-disable-next-line react/set-state-in-effect
     load();
   }, [load]);
-
-  useEffect(() => {
-    if (!USING_MOCKS) return;
-    fetchDrivers().then(setDrivers).catch(() => setDrivers([]));
-  }, []);
 
   const paradas = route?.paradas ?? [];
   const { confirmed, total } = stopsProgress(paradas);
@@ -79,14 +84,14 @@ export default function DriverStopsPage() {
    * La posicion que se manda. Se pide FRESCA en cada confirmacion en vez de
    * reusar la ultima: el chofer se movio entre una parada y la siguiente.
    *
-   * El simulador esta gateado por USING_MOCKS y no puede estar de otra forma:
-   * en produccion seria un bypass del unico control que tiene este caso de
-   * uso. Existe porque los contenedores del seed estan en CABA y cualquiera
-   * que pruebe la demo esta a kilometros, asi que sin esto el camino feliz no
-   * se puede mostrar.
+   * El simulador esta gateado por VITE_SIMULAR_GPS, apagada por defecto: en
+   * produccion seria un bypass del unico control que tiene este caso de uso.
+   * Existe porque los contenedores del seed estan en CABA y cualquiera que
+   * pruebe la demo esta a kilometros, asi que sin esto el camino feliz no se
+   * puede mostrar nunca.
    */
   const positionFor = (stop) => {
-    if (USING_MOCKS && simulateGps && stop.contenedor) {
+    if (SIMULAR_GPS && simulateGps && stop.contenedor) {
       return Promise.resolve({
         lat: stop.contenedor.lat + JITTER,
         lng: stop.contenedor.lng + JITTER,
@@ -109,8 +114,26 @@ export default function DriverStopsPage() {
     }
 
     try {
-      await confirmStop(stop.id, { lat: position.lat, lng: position.lng });
-      setFeedback({ stopId: stop.id, type: 'success', title: 'Vaciado confirmado' });
+      // La respuesta trae la transicion entera. `alertasCerradas` es un NUMERO,
+      // no una lista de ids: el id de una alerta ya cerrada no le sirve a nadie
+      // parado en la vereda, y devolverlo obligaba a cargar entidades enteras
+      // para descartarlas.
+      const result = await confirmStop(stop.id, { lat: position.lat, lng: position.lng });
+      const closed = result?.alertasCerradas ?? 0;
+      const done = result?.rutaEstado === 'COMPLETADA';
+
+      setFeedback({
+        stopId: stop.id,
+        type: 'success',
+        title: done ? 'Última parada: ruta completa' : 'Vaciado confirmado',
+        body: [
+          'El contenedor volvió a 0%.',
+          closed === 1 ? 'Se cerró 1 alerta.' : closed > 1 ? `Se cerraron ${closed} alertas.` : null,
+          done ? 'El camión ya quedó disponible.' : null,
+        ]
+          .filter(Boolean)
+          .join(' '),
+      });
       await load();
     } catch (err) {
       if (err.code === 'PARADA_FUERA_DE_RADIO') {
@@ -125,6 +148,19 @@ export default function DriverStopsPage() {
             ? `Estás a ${formatDistance(away)} del contenedor. Acercate a menos de ${RADIUS_M} m.`
             : generalMessage(err),
         });
+      } else if (err.code === 'PARADA_DE_OTRA_RUTA') {
+        // Un chofer solo confirma paradas de SU ruta. Si llega este error la
+        // pantalla esta mostrando una ruta que ya no le corresponde —se la
+        // reasignaron mientras la tenia abierta—, asi que se recarga: dejarlo
+        // mirando paradas ajenas lo hace insistir con un boton que no puede
+        // funcionar.
+        setFeedback({
+          stopId: stop.id,
+          type: 'error',
+          title: 'Esta parada no es de tu ruta',
+          body: 'Puede que te hayan reasignado. Estamos recargando tu ruta actual.',
+        });
+        await load();
       } else if (err.code === 'PARADA_YA_CONFIRMADA') {
         // Casi siempre es un doble tap o el otro dispositivo. No es una falla.
         setFeedback({ stopId: stop.id, type: 'info', title: 'Esta parada ya figura confirmada' });
@@ -165,20 +201,15 @@ export default function DriverStopsPage() {
       </header>
 
       <main className="driver-main">
-        {USING_MOCKS && (
+        {/* El selector de chofer ya no existe: la ruta sale del token y no hay
+            forma de pedir la de otro. Lo unico que queda es el simulador de
+            GPS, y solo si la variable de entorno lo habilita. */}
+        {SIMULAR_GPS && (
           <div className="panel-card demo-panel">
-            <Notice type="info" title="Modo demostración">
-              Sin login federado no hay chofer autenticado: acá se elige a mano. Contra el backend
-              real la ruta sale del token y este selector no aparece.
+            <Notice type="warning" title="Simulación de GPS activa">
+              Las confirmaciones pueden usar la posición del contenedor en vez de la tuya. Es solo
+              para la demo: apagá VITE_SIMULAR_GPS antes de entregar.
             </Notice>
-
-            <label htmlFor="chofer">Chofer</label>
-            <select id="chofer" value={driverId} onChange={(e) => setDriverId(e.target.value)}>
-              <option value="">El del token</option>
-              {drivers.map((d) => (
-                <option key={d.id} value={d.id}>{d.nombre}</option>
-              ))}
-            </select>
 
             <label className="demo-gps">
               <input

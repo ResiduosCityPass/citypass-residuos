@@ -239,19 +239,15 @@ export const TRUCKS = [
   },
 ];
 
-/**
- * CU-09 · Choferes.
+/*
+ * CU-09 · No hay fixture de choferes, y no puede haberlo.
  *
- * ESTO NO EXISTE EN EL BACKEND. `RUTA.choferId` es un string que apunta a un
- * usuario con rol CHOFER del directorio del Squad 2 (ADR-005), y no hay ningun
- * endpoint que los liste. Es un pedido de contrato pendiente: sin el, el
- * <select> de "asignar chofer" no se puede llenar contra la API real.
+ * `RUTA.choferId` es un string libre: el `sub` del JWT de un usuario con rol
+ * CHOFER del directorio del Squad 2 (ADR-005). No existe `GET /choferes` y el
+ * backend no valida el id contra ningun padron. Mantener una lista falsa aca
+ * hacia creer que el <select> se iba a poder llenar algun dia solo con conectar
+ * la API; en la pantalla de asignacion el identificador se escribe a mano.
  */
-export const DRIVERS = [
-  { id: 'ldap:jperez', nombre: 'Juan Perez', legajo: '10432' },
-  { id: 'ldap:mgomez', nombre: 'Maria Gomez', legajo: '10877' },
-  { id: 'ldap:rlopez', nombre: 'Ricardo Lopez', legajo: '11204' },
-];
 
 /* ------------------------------------------------------------------------
  * CU-08 / CU-09 · Rutas y paradas

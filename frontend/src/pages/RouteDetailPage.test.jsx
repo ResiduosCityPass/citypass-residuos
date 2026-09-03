@@ -3,13 +3,12 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import RouteDetailPage from './RouteDetailPage.jsx';
-import { fetchRoute, fetchDrivers, assignRoute } from '../api/waste.js';
+import { fetchRoute, assignRoute } from '../api/waste.js';
 import { ApiError } from '../api/client.js';
 
 vi.mock('../api/waste.js', () => ({
   USING_MOCKS: false,
   fetchRoute: vi.fn(),
-  fetchDrivers: vi.fn(),
   assignRoute: vi.fn(),
 }));
 
@@ -33,15 +32,14 @@ const route = (extras = {}) => ({
   generadaEn: new Date().toISOString(),
   asignadaEn: null,
   camion: { id: 'cm-1', patente: 'AB123CD', capacidadLitros: 4000, tipoResiduoHabilitado: 'COMUN' },
-  chofer: null,
+  // La ruta NO trae un objeto `chofer`: los choferes son usuarios del Squad 2 y
+  // este modulo no guarda copia de sus datos. Solo viaja `choferId`.
   paradas: [
     { id: 'pd-1', orden: 1, estado: 'PENDIENTE', confirmadaEn: null, contenedor: container('ct-1', 'CT-0001') },
     { id: 'pd-2', orden: 2, estado: 'PENDIENTE', confirmadaEn: null, contenedor: container('ct-2', 'CT-0002') },
   ],
   ...extras,
 });
-
-const DRIVERS = [{ id: 'ldap:jperez', nombre: 'Juan Perez', legajo: '10432' }];
 
 const mount = () =>
   render(
@@ -55,7 +53,6 @@ const mount = () =>
 describe('CU-08 / CU-09 · revisar y asignar una ruta', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    fetchDrivers.mockResolvedValue(DRIVERS);
   });
 
   it('una propuesta avisa que todavia no la ve ningun chofer', async () => {
@@ -63,7 +60,9 @@ describe('CU-08 / CU-09 · revisar y asignar una ruta', () => {
     mount();
 
     expect(await screen.findByText('Esta ruta es una propuesta')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Confirmar y asignar' })).toBeEnabled();
+    // Sin identificador escrito no se puede confirmar: no hay lista de choferes
+    // de la que preseleccionar uno, y asignar a nadie no significa nada.
+    expect(screen.getByRole('button', { name: 'Confirmar y asignar' })).toBeDisabled();
   });
 
   /**
@@ -93,22 +92,24 @@ describe('CU-08 / CU-09 · revisar y asignar una ruta', () => {
    */
   it('una ruta ya asignada no se puede volver a asignar', async () => {
     fetchRoute.mockResolvedValue(
-      route({ estado: 'ASIGNADA', choferId: 'ldap:jperez', chofer: DRIVERS[0], asignadaEn: new Date().toISOString() }),
+      route({ estado: 'ASIGNADA', choferId: 'ldap:jperez', asignadaEn: new Date().toISOString() }),
     );
     mount();
 
-    expect(await screen.findByText('Juan Perez')).toBeInTheDocument();
+    // Se muestra el identificador y nada mas: no tenemos el nombre del chofer.
+    expect(await screen.findByText('ldap:jperez')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Confirmar y asignar' })).not.toBeInTheDocument();
     expect(screen.queryByText('Esta ruta es una propuesta')).not.toBeInTheDocument();
   });
 
-  it('asignar manda el chofer elegido', async () => {
+  it('asignar manda el identificador escrito a mano', async () => {
     const user = userEvent.setup();
     fetchRoute.mockResolvedValue(route());
     assignRoute.mockResolvedValue(route({ estado: 'ASIGNADA' }));
     mount();
 
-    await user.click(await screen.findByRole('button', { name: 'Confirmar y asignar' }));
+    await user.type(await screen.findByLabelText(/Asignar a/), 'ldap:jperez');
+    await user.click(screen.getByRole('button', { name: 'Confirmar y asignar' }));
 
     await waitFor(() => expect(assignRoute).toHaveBeenCalledWith('rt-9', { choferId: 'ldap:jperez' }));
   });
@@ -121,15 +122,21 @@ describe('CU-08 / CU-09 · revisar y asignar una ruta', () => {
     );
     mount();
 
-    await user.click(await screen.findByRole('button', { name: 'Confirmar y asignar' }));
+    await user.type(await screen.findByLabelText(/Asignar a/), 'ldap:jperez');
+    await user.click(screen.getByRole('button', { name: 'Confirmar y asignar' }));
 
     expect(await screen.findByText('[RUTA_NO_PROPUESTA]')).toBeInTheDocument();
   });
 
-  it('avisa que la lista de choferes no viene del backend', async () => {
+  /**
+   * No hay GET /choferes y el backend no valida el id contra ningun padron: un
+   * identificador mal tipeado asigna la ruta igual y el chofer no la ve nunca.
+   * La pantalla tiene que decirlo, no disimularlo con un <select> inventado.
+   */
+  it('avisa que el identificador del chofer se escribe a mano', async () => {
     fetchRoute.mockResolvedValue(route());
     mount();
 
-    expect(await screen.findByText('Los choferes son de demostración')).toBeInTheDocument();
+    expect(await screen.findByText('El identificador se escribe a mano')).toBeInTheDocument();
   });
 });

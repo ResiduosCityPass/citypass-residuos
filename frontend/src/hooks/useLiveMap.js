@@ -1,21 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { fetchMapContainers, fetchAlerts } from '../api/waste.js';
+import { fetchMapContainers } from '../api/waste.js';
 
 /** No hay WebSocket (esta evaluado para Sprint 5). El mapa se refresca por polling. */
 export const POLLING_INTERVAL_MS = 30_000;
 
 /**
- * Mantiene el mapa vivo: cada `intervalMs` vuelve a pedir los contenedores y
- * las alertas de incendio abiertas.
+ * Mantiene el mapa vivo: cada `intervalMs` vuelve a pedir los contenedores.
  *
- * Las dos llamadas van juntas porque `GET /mapa/contenedores` no informa nada de
- * alertas, y un contenedor puede estar VERDE con un incendio abierto (el incendio
- * se evalua contra la temperatura, no contra el llenado). Sin este cruce, ese caso
- * —que es justo el que no se puede pasar por alto— no se ve en el mapa.
+ * Es UNA sola llamada. Antes eran dos: habia que cruzar el mapa contra
+ * `/alertas?tipo=INCENDIO&estado=ABIERTA` porque el payload del mapa no decia
+ * nada de incendios, y un contenedor puede estar VERDE y estar prendido fuego
+ * al mismo tiempo (el incendio se evalua contra la temperatura, no contra el
+ * llenado). Ahora `GET /mapa/contenedores` trae `incendioActivo` por
+ * contenedor y el cruce desaparecio: la mitad de las llamadas del polling.
  */
 export function useLiveMap(filters = {}, intervalMs = POLLING_INTERVAL_MS) {
   const [containers, setContainers] = useState([]);
-  const [firesByContainer, setFires] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [updatedAt, setUpdatedAt] = useState(null);
@@ -25,14 +25,10 @@ export function useLiveMap(filters = {}, intervalMs = POLLING_INTERVAL_MS) {
 
   const refresh = useCallback(async () => {
     try {
-      const [fromMap, fireAlerts] = await Promise.all([
-        fetchMapContainers({ zonaId, tipoResiduo, estado }),
-        fetchAlerts({ tipo: 'INCENDIO', estado: 'ABIERTA' }),
-      ]);
+      const fromMap = await fetchMapContainers({ zonaId, tipoResiduo, estado });
       if (!alive.current) return;
 
       setContainers(fromMap);
-      setFires(Object.fromEntries(fireAlerts.map((a) => [a.contenedorId, a])));
       setUpdatedAt(new Date());
       setError(null);
     } catch (e) {
@@ -54,5 +50,5 @@ export function useLiveMap(filters = {}, intervalMs = POLLING_INTERVAL_MS) {
     };
   }, [refresh, intervalMs]);
 
-  return { containers, firesByContainer, loading, error, updatedAt, refresh };
+  return { containers, loading, error, updatedAt, refresh };
 }

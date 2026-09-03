@@ -1,5 +1,5 @@
 import { ApiError } from '../api/client.js';
-import { ZONES, CONTAINERS, SENSORS, ALERTS, TRUCKS, DRIVERS, ROUTES, STOPS } from './data.js';
+import { ZONES, CONTAINERS, SENSORS, ALERTS, TRUCKS, ROUTES, STOPS } from './data.js';
 import { DEPOT, distanceKm, distanceMeters } from '../domain/geo.js';
 
 /**
@@ -27,7 +27,6 @@ const store = {
   sensors: SENSORS.map((s) => ({ ...s })),
   alerts: ALERTS.map((a) => ({ ...a })),
   trucks: TRUCKS.map((t) => ({ ...t })),
-  drivers: DRIVERS.map((d) => ({ ...d })),
   routes: ROUTES.map((r) => ({ ...r })),
   stops: STOPS.map((s) => ({ ...s })),
 };
@@ -76,12 +75,27 @@ const matches = (container, { zonaId, tipoResiduo, estado }) =>
 
 /* --- CU-07 · Mapa ------------------------------------------------------- */
 
+/**
+ * `zonaNombre`, `umbralCriticoPct` e `incendioActivo` los agrego el backend
+ * para que el mapa se resuelva con UNA sola llamada: antes habia que cruzar
+ * `/alertas?tipo=INCENDIO&estado=ABIERTA` en cada refresco y pedir la zona
+ * aparte para saber donde va la marca del umbral.
+ *
+ * `incendioActivo` es independiente del `estado`: el estado refleja el llenado
+ * y el incendio se evalua contra la temperatura, asi que un contenedor NORMAL
+ * al 8% puede tenerlo en true.
+ */
 export const fetchMapContainers = (filters = {}) =>
   respond(
     active()
       .filter((c) => matches(c, filters))
-      .map(({ id, codigo, lat, lng, estado, tipoResiduo, nivelLlenadoPct, ultimaLecturaEn }) => ({
+      .map(({ id, codigo, lat, lng, estado, tipoResiduo, nivelLlenadoPct, ultimaLecturaEn, zonaId }) => ({
         id, codigo, lat, lng, estado, tipoResiduo, nivelLlenadoPct, ultimaLecturaEn,
+        zonaNombre: zoneOf(zonaId)?.nombre ?? null,
+        umbralCriticoPct: zoneOf(zonaId)?.umbralCriticoPct ?? null,
+        incendioActivo: store.alerts.some(
+          (a) => a.contenedorId === id && a.tipo === 'INCENDIO' && a.estado !== 'RESUELTA',
+        ),
       })),
   );
 
@@ -276,7 +290,13 @@ export function fetchAlerts(filters = {}) {
         (!severidad || a.severidad === severidad) &&
         (!estado || a.estado === estado),
     )
-    .sort((a, b) => new Date(b.detectadaEn) - new Date(a.detectadaEn));
+    .sort((a, b) => new Date(b.detectadaEn) - new Date(a.detectadaEn))
+    // `contenedorCodigo` viene en la respuesta: la tabla ya no tiene que cruzar
+    // cada fila contra el listado de contenedores para mostrar "CT-0007".
+    .map((a) => ({
+      ...a,
+      contenedorCodigo: store.containers.find((c) => c.id === a.contenedorId)?.codigo ?? null,
+    }));
   return respond(result);
 }
 
@@ -322,6 +342,14 @@ export function fetchPrediction(id) {
     return fail('SIN_LECTURAS_SUFICIENTES', 409, `El contenedor ${container.codigo} todavia no reporto ninguna lectura`);
   }
 
+  // Un contenedor que reporto y esta en cero es uno que acaban de vaciar: la
+  // serie va para abajo y darle una fecha de saturacion seria inventar un
+  // futuro. Es el caso que dispara TENDENCIA_NO_CRECIENTE, y se puede provocar
+  // a voluntad confirmando una parada en la pantalla del chofer.
+  if (container.nivelLlenadoPct === 0) {
+    return fail('TENDENCIA_NO_CRECIENTE', 409, `El contenedor ${container.codigo} no se esta llenando: no hay saturacion que predecir`);
+  }
+
   const zone = zoneOf(container.zonaId);
   const level = container.nivelLlenadoPct;
   const threshold = zone.umbralCriticoPct;
@@ -340,7 +368,10 @@ export function fetchPrediction(id) {
 
   return respond({
     contenedorId: container.id,
+    codigo: container.codigo,
     nivelActualPct: level,
+    // El umbral viaja en la respuesta para no tener que pedir la zona aparte.
+    umbralCriticoPct: threshold,
     tasaLlenadoPctPorHora: ratePerHour,
     horasHastaUmbral: hoursUntil,
     saturacionEstimadaEn: new Date(Date.now() + hoursUntil * 3600_000).toISOString(),
@@ -389,6 +420,13 @@ export function updateTruck(id, changes) {
   const truck = store.trucks.find((t) => t.id === id);
   if (!truck) return fail('CAMION_NO_ENCONTRADO', 404, `No existe el camion ${id}`);
 
+  // EN_RUTA no es un estado que se pueda pedir: lo fija la asignacion de ruta
+  // (CU-09) y lo libera la ultima parada confirmada (CU-10). Aceptarlo a mano
+  // dejaba camiones trabados sin ninguna ruta que cerrar para liberarlos.
+  if (changes.estado === 'EN_RUTA') {
+    return fail('HTTP_400', 400, ['estado must be one of the following values: DISPONIBLE, MANTENIMIENTO']);
+  }
+
   // Un camion EN_RUTA no se puede mandar a mantenimiento por el medio: primero
   // hay que cerrar o cancelar su ruta.
   if (truck.estado === 'EN_RUTA' && changes.estado && changes.estado !== 'EN_RUTA') {
@@ -405,20 +443,22 @@ export function updateTruck(id, changes) {
  * CU-08 / CU-09 · Rutas
  * ====================================================================== */
 
-export const fetchDrivers = () => respond(store.drivers);
-
 /** Litros que ocupa hoy un contenedor, segun su nivel de llenado. */
 const litersIn = (container) => (container.capacidadLitros * container.nivelLlenadoPct) / 100;
 
 const routeStops = (routeId) =>
   store.stops.filter((s) => s.rutaId === routeId).sort((a, b) => a.orden - b.orden);
 
-/** Una ruta con camion, chofer y paradas (con su contenedor) anidados. */
+/**
+ * Una ruta con camion y paradas (con su contenedor) anidados.
+ *
+ * NO hay objeto `chofer`, solo `choferId`: los choferes son usuarios del
+ * directorio del Squad 2 y este modulo no guarda una copia de sus datos.
+ */
 function expandRoute(route) {
   return {
     ...route,
     camion: store.trucks.find((t) => t.id === route.camionId) ?? null,
-    chofer: store.drivers.find((d) => d.id === route.choferId) ?? null,
     paradas: routeStops(route.id).map((stop) => ({
       ...stop,
       contenedor: store.containers.find((c) => c.id === stop.contenedorId) ?? null,
@@ -546,10 +586,10 @@ export function assignRoute(id, data = {}) {
     return fail('RUTA_NO_PROPUESTA', 409, `La ruta ya esta en estado ${route.estado}`);
   }
   if (!data.choferId) return fail('HTTP_400', 400, ['choferId should not be empty']);
-  if (!store.drivers.some((d) => d.id === data.choferId)) {
-    return fail('CHOFER_NO_ENCONTRADO', 404, `No existe el chofer ${data.choferId}`);
-  }
 
+  // `choferId` es un string libre: el `sub` del JWT del chofer. El backend NO
+  // lo valida contra ningun padron —no tiene contra cual—, asi que aca tampoco.
+  // Por eso CHOFER_NO_ENCONTRADO no existe del lado del servidor.
   route.choferId = data.choferId;
   route.estado = 'ASIGNADA';
   route.asignadaEn = now();
@@ -571,17 +611,14 @@ export function assignRoute(id, data = {}) {
 export const CONFIRM_RADIUS_M = 100;
 
 /**
- * La ruta activa del chofer. En el backend la identidad sale del JWT; aca se
- * acepta un id opcional solo para que el <select> de demo pueda cambiar de
- * chofer. La implementacion HTTP tiene aridad cero y lo ignora.
+ * La ruta activa del chofer. Sin argumentos: en el backend la identidad sale
+ * del `sub` del JWT y no hay forma de pedir la ruta de otro.
  *
  * Devuelve `null` con exito cuando no hay ruta activa: un chofer que ya
- * termino el turno no es un error.
+ * termino el turno no es un error, asi que no es un 404.
  */
-export function fetchMyRoute(driverId) {
-  const route = store.routes.find(
-    (r) => ['ASIGNADA', 'EN_CURSO'].includes(r.estado) && (!driverId || r.choferId === driverId),
-  );
+export function fetchMyRoute() {
+  const route = store.routes.find((r) => ['ASIGNADA', 'EN_CURSO'].includes(r.estado));
   return respond(route ? expandRoute(route) : null);
 }
 
@@ -661,7 +698,10 @@ export function confirmStop(id, position = {}) {
     contenedorId: container.id,
     estadoContenedor: container.estado,
     nivelLlenadoPct: container.nivelLlenadoPct,
-    alertasCerradas: closed.map((a) => a.id),
+    // Un NUMERO, no una lista de ids: el id de una alerta ya cerrada no le
+    // sirve a la pantalla, y devolverlo obligaba a cargar entidades enteras
+    // solo para descartarlas.
+    alertasCerradas: closed.length,
     rutaEstado: route.estado,
     distanciaMetros: meters,
   });

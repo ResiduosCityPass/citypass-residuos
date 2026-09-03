@@ -1,21 +1,21 @@
 import { Fragment } from 'react';
-import { MapContainer, TileLayer, CircleMarker, Tooltip } from 'react-leaflet';
+import { MapContainer, CircleMarker, Tooltip } from 'react-leaflet';
+import BaseTiles from './map/BaseTiles.jsx';
 import 'leaflet/dist/leaflet.css';
 import { colorForState, STATE_LABEL, neverReported } from '../domain/states.js';
 
 /** Obelisco: el seed del simulador crea los contenedores alrededor de este punto. */
 const CABA_CENTER = [-34.6037, -58.3816];
 
-export default function ContainersMap({ containers, fires, selectedId, onSelect }) {
+export default function ContainersMap({ containers, selectedId, onSelect }) {
   return (
     <MapContainer center={CABA_CENTER} zoom={15} className="map" scrollWheelZoom>
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
+      <BaseTiles />
 
       {containers.map((container) => {
-        const hasFire = Boolean(fires[container.id]);
+        // `incendioActivo` lo trae el propio payload del mapa: no depende del
+        // estado ni de una segunda llamada a /alertas.
+        const hasFire = Boolean(container.incendioActivo);
         const selected = container.id === selectedId;
 
         return (
@@ -45,8 +45,15 @@ export default function ContainersMap({ containers, fires, selectedId, onSelect 
             >
               <Tooltip direction="top" offset={[0, -10]}>
                 <strong>{container.codigo}</strong>
+                {container.zonaNombre && <span className="tooltip-zone"> · {container.zonaNombre}</span>}
                 <br />
                 {STATE_LABEL[container.estado]} · {container.nivelLlenadoPct}%
+                {/* "94% sobre un umbral de 70" se entiende mucho mejor que un 94%
+                    solo. El umbral viene en el payload del mapa, asi que no hay
+                    que pedir la zona aparte para mostrarlo. */}
+                {container.umbralCriticoPct != null && (
+                  <span className="tooltip-muted"> (umbral {container.umbralCriticoPct}%)</span>
+                )}
                 {hasFire && (
                   <>
                     <br />

@@ -6,8 +6,8 @@ import Field from '../components/ui/Field.jsx';
 import Notice from '../components/ui/Notice.jsx';
 import FillBar from '../components/ui/FillBar.jsx';
 import RouteMap from '../components/routes/RouteMap.jsx';
-import { fetchRoute, fetchDrivers, assignRoute } from '../api/waste.js';
-import { generalMessage } from '../domain/errors.js';
+import { fetchRoute, assignRoute } from '../api/waste.js';
+import { fieldErrors, generalMessage } from '../domain/errors.js';
 import {
   ROUTE_STATE_LABEL,
   ROUTE_STATE_CHIP,
@@ -30,19 +30,19 @@ import {
 export default function RouteDetailPage() {
   const { id } = useParams();
   const [route, setRoute] = useState(null);
-  const [drivers, setDrivers] = useState([]);
   const [driverId, setDriverId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [assignError, setAssignError] = useState(null);
   const [assigning, setAssigning] = useState(false);
 
+  // Solo la ruta. Antes tambien pedia el listado de choferes en el mismo
+  // Promise.all, y como ese endpoint no existe en el backend, el 404 hacia
+  // fallar los dos y la pantalla no cargaba ni la ruta.
   const load = useCallback(() => {
-    Promise.all([fetchRoute(id), fetchDrivers()])
-      .then(([itsRoute, itsDrivers]) => {
+    fetchRoute(id)
+      .then((itsRoute) => {
         setRoute(itsRoute);
-        setDrivers(itsDrivers);
-        setDriverId((current) => current || itsDrivers[0]?.id || '');
         setError(null);
       })
       .catch(setError)
@@ -75,7 +75,7 @@ export default function RouteDetailPage() {
     );
   }
 
-  const { camion, chofer, paradas } = route;
+  const { camion, paradas } = route;
 
   // Cuanto se lleva el camion, segun el nivel actual de cada contenedor.
   const liters = paradas.reduce(
@@ -165,10 +165,13 @@ export default function RouteDetailPage() {
           )}
 
           <h3 className="spaced">Chofer</h3>
-          {chofer ? (
+          {/* La ruta trae `choferId` y nada mas. No hay objeto `chofer` porque
+              los choferes son usuarios del directorio del Squad 2 y este modulo
+              no guarda una copia de sus datos: mostrar el identificador es todo
+              lo que se puede decir con la verdad. */}
+          {route.choferId ? (
             <dl className="data-list">
-              <dt>Nombre</dt><dd>{chofer.nombre}</dd>
-              <dt>Legajo</dt><dd className="mono">{chofer.legajo}</dd>
+              <dt>Identificador</dt><dd className="mono">{route.choferId}</dd>
               <dt>Asignada</dt><dd>{route.asignadaEn ? timeAgo(route.asignadaEn) : '—'}</dd>
             </dl>
           ) : canAssign(route) ? (
@@ -180,26 +183,30 @@ export default function RouteDetailPage() {
               )}
 
               <Field label="Asignar a" htmlFor="choferId" required
+                     error={fieldErrors(assignError).choferId}
                      hint="Al confirmar, la ruta pasa a ASIGNADA y el camión queda tomado.">
-                <select id="choferId" value={driverId} onChange={(e) => setDriverId(e.target.value)}>
-                  {drivers.map((driver) => (
-                    <option key={driver.id} value={driver.id}>
-                      {driver.nombre} — legajo {driver.legajo}
-                    </option>
-                  ))}
-                </select>
+                <input
+                  id="choferId"
+                  className="mono"
+                  value={driverId}
+                  onChange={(e) => setDriverId(e.target.value)}
+                  placeholder="identificador del chofer"
+                />
               </Field>
 
               <Button variant="success" onClick={confirm} disabled={assigning || !driverId}>
                 {assigning ? 'Asignando…' : 'Confirmar y asignar'}
               </Button>
 
-              {/* El listado de choferes no existe en el backend: `choferId` es un
-                  usuario del directorio del Squad 2 y nadie expuso un endpoint
-                  para enumerarlos. Se dice en pantalla en vez de disimularlo. */}
-              <Notice type="info" title="Los choferes son de demostración">
-                El backend no expone todavía un endpoint para listar usuarios con rol CHOFER: salen
-                del directorio del Squad 2. Es un pedido de contrato pendiente.
+              {/* Se escribe a mano porque no hay de donde sacar una lista.
+                  `choferId` es el `sub` del JWT del chofer y el backend no lo
+                  valida contra ningun padron: un identificador mal tipeado
+                  asigna la ruta igual, y el chofer no la ve nunca. */}
+              <Notice type="warning" title="El identificador se escribe a mano">
+                No hay endpoint para listar los usuarios con rol CHOFER: son del directorio del
+                Squad 2, no de este módulo. El backend acepta el identificador sin validarlo, así
+                que revisá que esté bien antes de confirmar. Pedido de contrato pendiente con
+                Nicolás y Adriel.
               </Notice>
             </>
           ) : (

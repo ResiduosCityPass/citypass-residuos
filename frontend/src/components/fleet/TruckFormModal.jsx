@@ -4,7 +4,7 @@ import Field from '../ui/Field.jsx';
 import Button from '../ui/Button.jsx';
 import Notice from '../ui/Notice.jsx';
 import { fieldErrors, generalMessage } from '../../domain/errors.js';
-import { WASTE_TYPE_LABEL, TRUCK_STATE_LABEL } from '../../domain/states.js';
+import { WASTE_TYPE_LABEL, TRUCK_STATE_LABEL, TRUCK_STATE_SELECTABLE } from '../../domain/states.js';
 
 const EMPTY = { patente: '', capacidadLitros: 12000, tipoResiduoHabilitado: 'COMUN', estado: 'DISPONIBLE' };
 
@@ -41,9 +41,12 @@ export default function TruckFormModal({ truck, onSave, onClose }) {
     setSaving(true);
     setError(null);
     try {
-      // En el alta el estado no se elige: todo camion nuevo nace DISPONIBLE.
+      // El `estado` viaja solo cuando se puede elegir. En el alta no se elige:
+      // todo camion nace DISPONIBLE. Y en un camion EN_RUTA tampoco, porque el
+      // backend solo acepta DISPONIBLE o MANTENIMIENTO y reenviarle su propio
+      // EN_RUTA le daria un 400 al guardar un cambio de patente o capacidad.
       const { estado: _ignored, ...rest } = values;
-      await onSave(editing ? values : rest);
+      await onSave(editing && !onRoute ? values : rest);
     } catch (e) {
       setError(e);
       setSaving(false);
@@ -90,14 +93,17 @@ export default function TruckFormModal({ truck, onSave, onClose }) {
           </select>
         </Field>
 
+        {/* EN_RUTA no se ofrece: lo pone la asignacion de ruta (CU-09) y lo saca
+            la ultima confirmacion de parada (CU-10). Mandarlo a mano da 400. El
+            camion que YA esta en ruta muestra su estado, pero deshabilitado. */}
         {editing && (
           <Field label="Estado" htmlFor="estado" error={byField.estado}
                  hint={onRoute
-                   ? 'Está en ruta: primero hay que cerrar o cancelar su ruta.'
+                   ? 'Está en ruta: lo libera la última parada que confirme el chofer.'
                    : 'Un camión en mantenimiento no aparece al generar rutas.'}>
             <select id="estado" value={values.estado} onChange={change('estado')} disabled={onRoute}>
-              {Object.entries(TRUCK_STATE_LABEL).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
+              {(onRoute ? ['EN_RUTA'] : TRUCK_STATE_SELECTABLE).map((value) => (
+                <option key={value} value={value}>{TRUCK_STATE_LABEL[value]}</option>
               ))}
             </select>
           </Field>
