@@ -1,5 +1,6 @@
 import { JwtService } from '@nestjs/jwt';
 import { config as cargarEnv } from 'dotenv';
+import { EMISOR_TOKEN_DEFAULT } from '../config/env.validation';
 import { Rol } from '../shared/domain/enums';
 
 /**
@@ -29,7 +30,9 @@ const token = jwt.sign(
     username: `${rolPedido.toLowerCase()}@dev.local`,
     rol: rolPedido,
   },
-  { expiresIn: '8h', issuer: process.env.JWT_ISSUER },
+  // Mismo valor por defecto que usa la aplicacion: este script firma por su
+  // cuenta, y sin el falla con "issuer must be a string" si no hay `.env`.
+  { expiresIn: '8h', issuer: process.env.JWT_ISSUER ?? EMISOR_TOKEN_DEFAULT },
 );
 
 console.log(token);
