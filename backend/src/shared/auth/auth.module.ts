@@ -25,7 +25,11 @@ import { RolesGuard } from './roles.guard';
         signOptions: {
           expiresIn: config.get<string>('JWT_EXPIRES_IN', '8h'),
           issuer: config.get<string>('JWT_ISSUER'),
-          audience: config.get<string>('JWT_AUDIENCE'),
+          // Array, no string suelto: el contrato del Squad 2 exige `aud` como lista
+          // siempre (docs/arquitectura/contrato-identidad-token.md §3), y el guard
+          // rechaza a proposito cualquier `aud` que no sea array (§4, "trampas").
+          // Firmar un string acá haría que el propio backend rechace sus tokens.
+          audience: [config.get<string>('JWT_AUDIENCE', 'citypass-residuos-api')],
           algorithm: config.get<string>('JWT_ALGORITHM', 'HS256'),
         } as JwtModuleOptions['signOptions'],
       }),
