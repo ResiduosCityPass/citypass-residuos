@@ -153,6 +153,18 @@ export const TRUCK_STATE_CHIP = {
 /** Solo un camion DISPONIBLE puede recibir una ruta nueva. */
 export const isTruckAvailable = (truck) => truck.estado === 'DISPONIBLE';
 
+/**
+ * Los unicos estados que un humano puede elegir en el formulario.
+ *
+ * EN_RUTA queda afuera y el backend devuelve 400 si se lo manda: lo fija la
+ * asignacion de ruta (CU-09) y lo libera la ultima confirmacion de parada
+ * (CU-10). Poder ponerlo a mano abria una trampa sin salida —un camion EN_RUTA
+ * sin ruta asociada no se puede destrabar, porque justamente esta en ruta y no
+ * hay ninguna ruta que cerrar—. Se muestra en la tabla, no se ofrece en el
+ * <select>.
+ */
+export const TRUCK_STATE_SELECTABLE = ['DISPONIBLE', 'MANTENIMIENTO'];
+
 /* ------------------------------------------------------------------------
  * Rutas y paradas (CU-08 / CU-09 / CU-10)
  * ---------------------------------------------------------------------- */

@@ -49,7 +49,7 @@ dinámica de rutas de recolección.
 
 ```bash
 docker compose -f infra/docker-compose.yml up -d
-cd backend && npm install && npm run start:dev
+cd backend && npm install && npm run migration:run && npm run start:dev
 ```
 
 La API queda en `http://localhost:3000` y la documentación Swagger en `http://localhost:3000/docs`.

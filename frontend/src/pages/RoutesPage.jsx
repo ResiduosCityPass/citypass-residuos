@@ -54,18 +54,23 @@ export default function RoutesPage() {
     {
       key: 'chofer',
       title: 'Chofer',
+      // Solo el identificador: los choferes son usuarios del directorio del
+      // Squad 2 y este modulo no tiene sus nombres.
       render: (r) =>
-        r.chofer
-          ? r.chofer.nombre
+        r.choferId
+          ? <span className="mono">{r.choferId}</span>
           : <span className="muted">sin asignar</span>,
     },
     {
-      key: 'paradas',
-      title: 'Paradas',
-      render: (r) => {
-        const done = r.paradas.filter((p) => p.estado === 'CONFIRMADA').length;
-        return <span className="mono">{done}/{r.paradas.length}</span>;
-      },
+      key: 'carga',
+      title: 'Carga estimada',
+      // `GET /rutas` no trae las paradas —solo el detalle las expande—, asi que
+      // el avance "2 de 3" no se puede mostrar aca sin una llamada por fila.
+      // `litrosEstimados` si viene y dice lo mismo que importa de un vistazo:
+      // cuanto levanta el viaje. El avance esta en la pantalla de la ruta.
+      render: (r) => (
+        <span className="mono">{(r.litrosEstimados ?? 0).toLocaleString('es-AR')} L</span>
+      ),
     },
     {
       key: 'distancia',

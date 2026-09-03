@@ -1,4 +1,5 @@
-import { MapContainer, TileLayer, CircleMarker, Polyline, Tooltip } from 'react-leaflet';
+import { MapContainer, CircleMarker, Polyline, Tooltip } from 'react-leaflet';
+import BaseTiles from '../map/BaseTiles.jsx';
 import 'leaflet/dist/leaflet.css';
 import { colorForState } from '../../domain/states.js';
 
@@ -25,10 +26,7 @@ export default function RouteMap({ stops, me = null }) {
 
   return (
     <MapContainer center={DEPOT} zoom={13} className="map map-route" scrollWheelZoom>
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
+      <BaseTiles />
 
       <Polyline positions={path} pathOptions={{ color: '#2563A6', weight: 3, dashArray: '6 6' }} />
 

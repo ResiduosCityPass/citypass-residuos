@@ -7,7 +7,6 @@ import {
   fetchZones,
   fetchMapContainers,
   fetchContainers,
-  fetchDrivers,
   fetchMyRoute,
 } from './api/waste.js';
 
@@ -28,7 +27,6 @@ vi.mock('./api/waste.js', () => ({
   deleteZone: vi.fn(),
   acknowledgeAlert: vi.fn(),
   resolveAlert: vi.fn(),
-  fetchDrivers: vi.fn(),
   fetchMyRoute: vi.fn(),
   confirmStop: vi.fn(),
   fetchNearbyContainers: vi.fn(),
@@ -66,7 +64,6 @@ describe('shell de la aplicacion', () => {
     fetchContainers.mockResolvedValue([]);
     fetchZones.mockResolvedValue([]);
     fetchAlerts.mockResolvedValue([]);
-    fetchDrivers.mockResolvedValue([]);
     fetchMyRoute.mockResolvedValue(null);
   });
 

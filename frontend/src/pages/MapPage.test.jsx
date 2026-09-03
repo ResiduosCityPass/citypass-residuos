@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import MapPage from './MapPage.jsx';
-import { fetchMapContainers, fetchAlerts, fetchZones } from '../api/waste.js';
+import { fetchMapContainers, fetchZones } from '../api/waste.js';
 import { saveToken, clearToken } from '../api/client.js';
 
 vi.mock('../api/waste.js', () => ({
   USING_MOCKS: false,
   fetchMapContainers: vi.fn(),
-  fetchAlerts: vi.fn(),
   fetchZones: vi.fn(),
   fetchContainer: vi.fn(),
 }));
@@ -27,6 +27,9 @@ const container = (extras = {}) => ({
   tipoResiduo: 'COMUN',
   nivelLlenadoPct: 5,
   ultimaLecturaEn: '2026-08-20T22:50:02.199Z',
+  zonaNombre: 'Centro',
+  umbralCriticoPct: 70,
+  incendioActivo: false,
   ...extras,
 });
 
@@ -54,7 +57,6 @@ describe('pantalla del mapa', () => {
       container({ id: 'c-2', estado: 'CRITICO' }),
       container({ id: 'c-3', estado: 'CRITICO' }),
     ]);
-    fetchAlerts.mockResolvedValue([]);
 
     render(<MapPage tokenVersion={0} />);
 
@@ -64,8 +66,8 @@ describe('pantalla del mapa', () => {
   });
 
   it('cuenta los incendios abiertos aparte del estado del contenedor', async () => {
-    fetchMapContainers.mockResolvedValue([container()]);
-    fetchAlerts.mockResolvedValue([{ id: 'a-1', contenedorId: 'c-1', tipo: 'INCENDIO' }]);
+    // `incendioActivo` viene en el propio payload del mapa: una sola llamada.
+    fetchMapContainers.mockResolvedValue([container({ incendioActivo: true })]);
 
     render(<MapPage tokenVersion={0} />);
 
@@ -75,9 +77,56 @@ describe('pantalla del mapa', () => {
     expect(cardNumber('Incendios abiertos')).toBe('1');
   });
 
+  it('al filtrar por una tarjeta el mapa se achica pero los conteos no', async () => {
+    fetchMapContainers.mockResolvedValue([
+      container(),
+      container({ id: 'c-2', estado: 'CRITICO' }),
+      container({ id: 'c-3', estado: 'CRITICO' }),
+    ]);
+
+    render(<MapPage tokenVersion={0} />);
+    expect(await screen.findByText('3 marcadores')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /solo los de estado Critico/i }));
+
+    // El mapa dibuja solo los dos criticos...
+    expect(await screen.findByText('2 marcadores')).toBeInTheDocument();
+    // ...pero las tarjetas siguen contando todo: si Normal quedara en 0, no
+    // habria forma de saber que hay adonde volver.
+    expect(cardNumber('Normal')).toBe('1');
+    expect(cardNumber('Critico')).toBe('2');
+  });
+
+  it('el filtro de estado no viaja al backend: se resuelve en el cliente', async () => {
+    fetchMapContainers.mockResolvedValue([container({ estado: 'CRITICO' })]);
+
+    render(<MapPage tokenVersion={0} />);
+    await screen.findByTestId('mapa');
+    fetchMapContainers.mockClear();
+
+    await userEvent.click(screen.getByRole('button', { name: /solo los de estado Critico/i }));
+
+    expect(fetchMapContainers).not.toHaveBeenCalled();
+  });
+
+  it('la tarjeta de incendios filtra el mapa, no solo informa', async () => {
+    fetchMapContainers.mockResolvedValue([
+      container({ incendioActivo: true }),
+      container({ id: 'c-2', estado: 'CRITICO' }),
+    ]);
+
+    render(<MapPage tokenVersion={0} />);
+    expect(await screen.findByText('2 marcadores')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /solo los que tienen incendio/i }));
+
+    // Queda el NORMAL que se esta incendiando, que es el caso de CU-06.
+    expect(await screen.findByText('1 marcadores')).toBeInTheDocument();
+    expect(cardNumber('Critico')).toBe('1');
+  });
+
   it('ante un 401 explica como generar el token en lugar de mostrar el error crudo', async () => {
     fetchMapContainers.mockRejectedValue({ code: 'HTTP_401', message: 'Falta el header' });
-    fetchAlerts.mockResolvedValue([]);
 
     render(<MapPage tokenVersion={0} />);
 
@@ -87,7 +136,6 @@ describe('pantalla del mapa', () => {
   it('carga las zonas para el filtro cuando hay token', async () => {
     saveToken('un-jwt');
     fetchMapContainers.mockResolvedValue([]);
-    fetchAlerts.mockResolvedValue([]);
 
     render(<MapPage tokenVersion={0} />);
 
@@ -97,7 +145,6 @@ describe('pantalla del mapa', () => {
 
   it('no pide las zonas si todavia no cargaste el token', async () => {
     fetchMapContainers.mockResolvedValue([]);
-    fetchAlerts.mockResolvedValue([]);
 
     render(<MapPage tokenVersion={0} />);
 

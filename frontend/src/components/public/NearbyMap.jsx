@@ -1,4 +1,5 @@
-import { MapContainer, TileLayer, CircleMarker, Circle, Tooltip } from 'react-leaflet';
+import { MapContainer, CircleMarker, Circle, Tooltip } from 'react-leaflet';
+import BaseTiles from '../map/BaseTiles.jsx';
 import 'leaflet/dist/leaflet.css';
 import { colorForWasteType, WASTE_TYPE_LABEL } from '../../domain/states.js';
 import { formatDistance } from '../../domain/geo.js';
@@ -18,10 +19,7 @@ export default function NearbyMap({ origin, radiusM, containers, selectedId, onS
 
   return (
     <MapContainer center={center} zoom={15} className="map map-public" scrollWheelZoom>
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
+      <BaseTiles />
 
       <Circle
         center={center}

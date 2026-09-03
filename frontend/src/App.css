@@ -38,7 +38,15 @@
   color: #fff;
 }
 
-.sidebar-logo { color: var(--sky); font-size: 1.2em; }
+/* El pin de CityPass+. Alto fijado en em para que acompanie al texto de la
+   marca si algun dia cambia el cuerpo tipografico. `width:auto` respeta la
+   proporcion del PNG, que es mas alto que ancho. */
+.sidebar-logo {
+  height: 1.6em;
+  width: auto;
+  display: block;
+  flex-shrink: 0;
+}
 .sidebar-brand strong { color: var(--green); }
 
 .sidebar-heading {
@@ -209,16 +217,55 @@
   cursor: pointer;
 }
 
-.card-active { border-color: var(--blue); box-shadow: var(--shadow); }
+/* Las tarjetas son filtros, no rotulos. Sin hover no habia forma de saberlo
+   hasta hacer click, que es justo el momento en que ya no hace falta saberlo. */
+.card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow);
+  transform: translateY(-1px);
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.card:active { transform: translateY(0); }
+
+@media (prefers-reduced-motion: reduce) {
+  .card, .card:hover, .card:active { transform: none; }
+}
+
+/* Filtro aplicado. Antes era un borde azul de 1px: sobre cinco tarjetas
+   iguales no se veia. Ahora la tarjeta se tine con el color de su propio
+   estado, que ademas es el que tienen los marcadores en el mapa. */
+.card-active {
+  border-color: var(--card-color, var(--blue));
+  background: color-mix(in srgb, var(--card-color, var(--blue)) 12%, var(--surface));
+  box-shadow: var(--shadow);
+}
+
+.card-active .card-label { color: var(--text-strong); font-weight: 600; }
+
+/* Y se dice con palabras, porque el color solo no alcanza: hay 8% de varones
+   con alguna forma de daltonismo y esta pantalla la mira un operador apurado. */
+.card-active .card-label::after {
+  content: " · filtrando";
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
 .card-number { font-family: var(--font-heading); font-size: var(--font-size-2xl); color: var(--text-strong); }
 .card-label { font-size: var(--font-size-xs); color: var(--text-muted); }
 
-.card-fire { cursor: default; border-left-color: var(--border-strong); }
-.card-fire.active {
-  border-left-color: var(--red);
+/* La de incendios no tiene color de estado propio: lo toma segun haya o no
+   incendios abiertos, asi el rojo aparece solo cuando significa algo. */
+.card-fire { --card-color: var(--border-strong); }
+.card-fire.burning {
+  --card-color: var(--red);
   background: var(--red-soft);
 }
-.card-fire.active .card-number { color: var(--red); }
+.card-fire.burning .card-number { color: var(--red); }
 
 /* --- Barra de filtros --------------------------------------------------- */
 .filter-bar {
@@ -243,6 +290,39 @@
   overflow: hidden;
 }
 
+/* Sin fondo cartografico: la red bloquea al proveedor de tiles. Los marcadores
+   siguen ubicados y el mapa sigue siendo util, asi que se dice que falta el
+   fondo en vez de dejar un rectangulo gris que se lee como pantalla rota.
+   La clase la pone BaseTiles.jsx despues de varios tiles fallidos. */
+.map--no-basemap {
+  background-color: var(--surface-sunken);
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+.map--no-basemap::after {
+  content: "Sin conexion al mapa base · los contenedores estan en su ubicacion real";
+  position: absolute;
+  left: 50%;
+  /* Arriba y no abajo: abajo esta la atribucion de Leaflet, y en el mapa chico
+     de la ruta los dos quedan encimados. Los controles de zoom van a la
+     izquierda, asi que centrado no los pisa. */
+  top: var(--space-2);
+  transform: translateX(-50%);
+  z-index: 500; /* sobre los tiles (400), debajo de popups y controles (700+) */
+  max-width: calc(100% - var(--space-5));
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  text-align: center;
+  pointer-events: none;
+}
+
 .fire-halo { animation: pulse 1.6s ease-in-out infinite; }
 
 @keyframes pulse {
@@ -252,6 +332,7 @@
 
 .tooltip-fire { color: var(--red); font-weight: 600; }
 .tooltip-muted { color: var(--text-muted); }
+.tooltip-zone { color: var(--text-muted); font-weight: 400; }
 
 /* --- Panel lateral del mapa y tarjetas de detalle ----------------------- */
 .panel, .panel-card {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Notice from '../components/ui/Notice.jsx';
 import Button from '../components/ui/Button.jsx';
 import AlertRow from '../components/alerts/AlertRow.jsx';
@@ -39,22 +39,13 @@ export default function AlertsPage({ onAlertsChanged }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // El listado de alertas trae contenedorId pero no el codigo. Se cruza contra
-  // los contenedores que ya estan cargados en vez de pedir el detalle de cada
-  // alerta: seria una llamada por fila para mostrar seis caracteres.
-  const codeByContainer = useMemo(
-    () => Object.fromEntries(containers.map((c) => [c.id, c.codigo])),
-    [containers],
-  );
-
   // `loading` arranca en true y solo se apaga: no se vuelve a prender en cada
   // recarga. Un esqueleto parpadeando sobre una lista que ya tiene datos se lee
   // como un error, y despues de accionar la lista ya esta en pantalla.
   const load = useCallback(() => {
-    Promise.all([fetchAlerts(filters), fetchContainers()])
-      .then(([list, itsContainers]) => {
+    fetchAlerts(filters)
+      .then((list) => {
         setAlerts(list);
-        setContainers(itsContainers);
         setError(null);
       })
       .catch(setError)
@@ -62,6 +53,14 @@ export default function AlertsPage({ onAlertsChanged }) {
   }, [filters]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Los contenedores ya no se cruzan contra las alertas —cada alerta trae su
+  // `contenedorCodigo`—, asi que lo unico que llenan es el <select> del filtro.
+  // Por eso se piden UNA vez al montar y no en cada `load()`: antes viajaban
+  // enteros en cada cambio de filtro y despues de atender o resolver.
+  useEffect(() => {
+    fetchContainers().then(setContainers).catch(() => setContainers([]));
+  }, []);
 
   const act = async (action, alertId) => {
     await (action === 'acknowledge' ? acknowledgeAlert(alertId) : resolveAlert(alertId));
@@ -119,7 +118,7 @@ export default function AlertsPage({ onAlertsChanged }) {
               <AlertRow
                 key={alert.id}
                 alert={alert}
-                containerCode={codeByContainer[alert.contenedorId]}
+                containerCode={alert.contenedorCodigo}
                 onAction={act}
               />
             ))}
@@ -138,7 +137,7 @@ export default function AlertsPage({ onAlertsChanged }) {
                 <AlertRow
                   key={alert.id}
                   alert={alert}
-                  containerCode={codeByContainer[alert.contenedorId]}
+                  containerCode={alert.contenedorCodigo}
                   onAction={act}
                 />
               ))}

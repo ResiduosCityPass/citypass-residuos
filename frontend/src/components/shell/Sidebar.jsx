@@ -46,7 +46,7 @@ export default function Sidebar({ openAlerts = 0 }) {
   return (
     <nav className="sidebar" aria-label="Modulos de CityPass+">
       <div className="sidebar-brand">
-        <span className="sidebar-logo" aria-hidden="true">◉</span>
+        <img src="/citypass-logo.png" alt="" className="sidebar-logo" />
         <span>CityPass<strong>+</strong></span>
       </div>
 

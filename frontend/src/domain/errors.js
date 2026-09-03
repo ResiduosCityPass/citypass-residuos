@@ -43,11 +43,14 @@ export function generalMessage(error) {
       // conseguirlo y mandar a alguien a buscarlo a la documentacion es cruel.
       return 'Token ausente o vencido. Genera uno con: cd backend && npm run token:dev -- ADMINISTRADOR, y pegalo en el boton Token de la barra superior.';
     case 'PARADA_FUERA_DE_RADIO':
-      // PROPUESTA de contrato: api-preliminar.md documenta el 403 de CU-10 pero
-      // no le puso `code`. Va antes del HTTP_403 generico porque no es un
-      // problema de permisos: el chofer tiene el rol, lo que no tiene es la
-      // cercania. Decirle "no tenes permisos" lo manda a buscar un problema de
-      // rol que no existe.
+    case 'PARADA_DE_OTRA_RUTA':
+      // Los dos 403 de CU-10 van antes del HTTP_403 generico porque ninguno es
+      // un problema de permisos: el chofer TIENE el rol. En uno le falta
+      // cercania y en el otro la parada es de la ruta de otro. Decirle "no
+      // tenes permisos" lo manda a buscar un problema de rol que no existe.
+      //
+      // PARADA_DE_OTRA_RUTA lo agrego el backend para que nadie pueda cerrar el
+      // trabajo de otro chofer conociendo un id de parada.
       return error.message;
     case 'HTTP_403':
       return `No tenes permisos para esta accion. ${error.message}`;
