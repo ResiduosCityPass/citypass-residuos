@@ -10,7 +10,10 @@ describe('ParadasController (CU-10)', () => {
   const request = { usuario: { sub: 'user:jperez', rol: Rol.CHOFER } } as Request;
 
   beforeEach(() => {
-    service = { confirmar: jest.fn() } as unknown as jest.Mocked<ParadasService>;
+    service = {
+      confirmar: jest.fn(),
+      omitir: jest.fn(),
+    } as unknown as jest.Mocked<ParadasService>;
     controller = new ParadasController(service);
   });
 
@@ -20,6 +23,14 @@ describe('ParadasController (CU-10)', () => {
     expect(service.confirmar).toHaveBeenCalledWith('pd-1', 'user:jperez', {
       lat: -34.6,
       lng: -58.38,
+    });
+  });
+
+  it('omite con la identidad del token y el motivo del cuerpo', async () => {
+    await controller.omitir('pd-1', request, { motivo: 'Calle cortada' });
+
+    expect(service.omitir).toHaveBeenCalledWith('pd-1', 'user:jperez', {
+      motivo: 'Calle cortada',
     });
   });
 

@@ -33,4 +33,15 @@ export class Parada {
 
   @Column({ type: 'timestamptz', nullable: true })
   confirmadaEn!: Date | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  omitidaEn!: Date | null;
+
+  /**
+   * Por que el chofer no pudo vaciar este contenedor. Es obligatorio al omitir:
+   * una parada OMITIDA sin motivo no le dice nada al operador que despues tiene
+   * que decidir si manda otro camion.
+   */
+  @Column({ type: 'varchar', length: 200, nullable: true })
+  motivo!: string | null;
 }

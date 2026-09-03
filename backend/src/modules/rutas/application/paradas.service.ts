@@ -23,9 +23,12 @@ import {
   ContenedorRepository,
 } from '../../contenedores/domain/contenedor.repository';
 import { FlotaService } from '../../flota/application/flota.service';
+import { Parada } from '../domain/parada.entity';
 import { PARADA_REPOSITORY, ParadaRepository } from '../domain/parada.repository';
+import { Ruta } from '../domain/ruta.entity';
 import { RUTA_REPOSITORY, RutaRepository } from '../domain/ruta.repository';
 import { ConfirmarParadaDto } from './dto/confirmar-parada.dto';
+import { OmitirParadaDto } from './dto/omitir-parada.dto';
 
 export const RADIO_CONFIRMACION_DEFAULT_METROS = 100;
 
@@ -40,6 +43,22 @@ export interface ResultadoConfirmacion {
   alertasCerradas: number;
   rutaEstado: EstadoRuta;
   distanciaMetros: number;
+}
+
+/**
+ * Resultado de omitir una parada. Es la misma forma que la confirmacion menos
+ * `alertasCerradas`, y esa ausencia es el punto: omitir no resuelve nada, el
+ * contenedor sigue lleno y su alerta sigue abierta.
+ */
+export interface ResultadoOmision {
+  paradaId: string;
+  estado: EstadoParada;
+  omitidaEn: Date;
+  motivo: string;
+  contenedorId: string;
+  estadoContenedor: EstadoContenedor;
+  nivelLlenadoPct: number;
+  rutaEstado: EstadoRuta;
 }
 
 /**
@@ -88,32 +107,7 @@ export class ParadasService {
     choferId: string,
     posicion: ConfirmarParadaDto,
   ): Promise<ResultadoConfirmacion> {
-    const parada = await this.paradas.buscarPorId(paradaId);
-
-    if (!parada) {
-      throw new NotFoundException({
-        message: `No existe la parada ${paradaId}`,
-        code: 'PARADA_NO_ENCONTRADA',
-      });
-    }
-
-    const ruta = await this.rutas.buscarPorId(parada.rutaId);
-
-    // Un chofer solo confirma paradas de su propia ruta. Sin esto, cualquiera
-    // con un id de parada podria cerrar el trabajo de otro.
-    if (!ruta || ruta.choferId !== choferId) {
-      throw new ForbiddenException({
-        message: 'Esta parada no pertenece a tu ruta activa',
-        code: 'PARADA_DE_OTRA_RUTA',
-      });
-    }
-
-    if (parada.estado === EstadoParada.CONFIRMADA) {
-      throw new ConflictException({
-        message: `La parada ${parada.orden} ya fue confirmada`,
-        code: 'PARADA_YA_CONFIRMADA',
-      });
-    }
+    const { parada, ruta } = await this.buscarParadaPendiente(paradaId, choferId);
 
     const contenedor = await this.contenedores.buscarPorId(parada.contenedorId);
 
@@ -183,6 +177,131 @@ export class ParadasService {
       rutaEstado: estadoRuta,
       distanciaMetros: metros,
     };
+  }
+
+  /**
+   * CU-10 · El chofer llego pero no pudo vaciar.
+   *
+   * Es el otro final de la parada, y hasta ahora no existia: sin el, una calle
+   * cortada o un auto mal estacionado dejaban la ruta trabada para siempre en
+   * EN_CURSO y el camion tomado, porque la ruta solo se cierra cuando no queda
+   * ninguna parada PENDIENTE.
+   *
+   * A diferencia de confirmar, no toca el contenedor ni sus alertas: sigue
+   * lleno y su alerta sigue abierta, que es exactamente lo que el operador
+   * tiene que ver. Tampoco pide estar a menos de 100 m: el caso tipico es no
+   * poder acercarse.
+   */
+  async omitir(
+    paradaId: string,
+    choferId: string,
+    dto: OmitirParadaDto,
+  ): Promise<ResultadoOmision> {
+    return this.transaccion.ejecutar(() => this.omitirEnTransaccion(paradaId, choferId, dto));
+  }
+
+  private async omitirEnTransaccion(
+    paradaId: string,
+    choferId: string,
+    dto: OmitirParadaDto,
+  ): Promise<ResultadoOmision> {
+    const { parada, ruta } = await this.buscarParadaPendiente(paradaId, choferId);
+
+    const contenedor = await this.contenedores.buscarPorId(parada.contenedorId);
+
+    if (!contenedor) {
+      throw new NotFoundException({
+        message: `No existe el contenedor de la parada ${parada.orden}`,
+        code: 'CONTENEDOR_NO_ENCONTRADO',
+      });
+    }
+
+    const omitidaEn = new Date();
+
+    parada.estado = EstadoParada.OMITIDA;
+    parada.omitidaEn = omitidaEn;
+    parada.motivo = dto.motivo;
+    await this.paradas.guardar(parada);
+
+    const estadoRuta = await this.avanzarRuta(parada.rutaId);
+
+    await this.eventos.publish(
+      buildEvent(
+        EventTypes.PARADA_OMITIDA,
+        {
+          paradaId: parada.id,
+          rutaId: parada.rutaId,
+          contenedorId: contenedor.codigo,
+          camionId: ruta.camion?.patente ?? ruta.camionId,
+          choferId,
+          motivo: dto.motivo,
+          nivelLlenadoPct: contenedor.nivelLlenadoPct,
+          omitidaEn: omitidaEn.toISOString(),
+        },
+        { occurredAt: omitidaEn },
+      ),
+    );
+
+    return {
+      paradaId: parada.id,
+      estado: parada.estado,
+      omitidaEn,
+      motivo: dto.motivo,
+      contenedorId: contenedor.id,
+      estadoContenedor: contenedor.estado,
+      nivelLlenadoPct: contenedor.nivelLlenadoPct,
+      rutaEstado: estadoRuta,
+    };
+  }
+
+  /**
+   * Los dos finales de una parada comparten los mismos tres chequeos: que
+   * exista, que sea de la ruta de quien la esta cerrando, y que siga abierta.
+   *
+   * Una parada cerrada no se reabre, ni confirmada ni omitida. Si el auto que
+   * tapaba el contenedor se movio, se genera una ruta nueva: reabrirla obligaria
+   * a revivir una ruta que ya paso a COMPLETADA y a devolver a EN_RUTA un camion
+   * que ya se libero.
+   */
+  private async buscarParadaPendiente(
+    paradaId: string,
+    choferId: string,
+  ): Promise<{ parada: Parada; ruta: Ruta }> {
+    const parada = await this.paradas.buscarPorId(paradaId);
+
+    if (!parada) {
+      throw new NotFoundException({
+        message: `No existe la parada ${paradaId}`,
+        code: 'PARADA_NO_ENCONTRADA',
+      });
+    }
+
+    const ruta = await this.rutas.buscarPorId(parada.rutaId);
+
+    // Un chofer solo cierra paradas de su propia ruta. Sin esto, cualquiera con
+    // un id de parada podria cerrar el trabajo de otro.
+    if (!ruta || ruta.choferId !== choferId) {
+      throw new ForbiddenException({
+        message: 'Esta parada no pertenece a tu ruta activa',
+        code: 'PARADA_DE_OTRA_RUTA',
+      });
+    }
+
+    if (parada.estado === EstadoParada.CONFIRMADA) {
+      throw new ConflictException({
+        message: `La parada ${parada.orden} ya fue confirmada`,
+        code: 'PARADA_YA_CONFIRMADA',
+      });
+    }
+
+    if (parada.estado === EstadoParada.OMITIDA) {
+      throw new ConflictException({
+        message: `La parada ${parada.orden} ya fue omitida: ${parada.motivo}`,
+        code: 'PARADA_YA_OMITIDA',
+      });
+    }
+
+    return { parada, ruta };
   }
 
   /**

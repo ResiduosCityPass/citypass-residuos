@@ -82,6 +82,8 @@ erDiagram
         int orden
         enum estado
         timestamp confirmadaEn
+        timestamp omitidaEn
+        string motivo
     }
 ```
 

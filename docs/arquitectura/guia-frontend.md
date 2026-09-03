@@ -269,10 +269,28 @@ Roles: `ADMINISTRADOR`, `OPERADOR`. Mismos query params que el mapa.
   "temperaturaC": 20.61,
   "ultimaLecturaEn": "2026-08-20T22:50:02.199Z",
   "activo": true,
+  "sensor": {
+    "id": "4c1f...",
+    "codigo": "SN-0001",
+    "contenedorId": "13479ceb-47ce-47c9-8006-b47604beddd1",
+    "estado": "ACTIVO",
+    "bateriaPct": 88,
+    "ultimoReporteEn": "2026-08-20T22:50:02.199Z",
+    "creadoEn": "...",
+    "actualizadoEn": "..."
+  },
   "creadoEn": "2026-08-20T22:49:05.393Z",
   "actualizadoEn": "2026-08-20T22:50:02.395Z"
 }
 ```
+
+> **`sensor` viene en el listado, y es `undefined` cuando no tiene.** Lo pediste porque sin esto
+> "sin sensor" y "sensor que nunca reportó" se ven idénticos: los dos muestran 0% y
+> `ultimaLecturaEn: null`. Con esto podés deshabilitar el botón de vincular en la fila que ya
+> tiene uno, en vez de dejar que el usuario se coma un `409 CONTENEDOR_YA_TIENE_SENSOR`.
+>
+> **`apiKeyHash` no viaja nunca**, ni acá ni en el detalle: la columna está declarada
+> `select: false` en el modelo. Si lo ves en algún lado, es un bug mío.
 
 ### `GET /contenedores/:id` — detalle
 
@@ -383,6 +401,37 @@ Rol: `ADMINISTRADOR`. Mandás **solo los campos que cambian**. Mismas reglas que
 ```
 
 Devuelve `200` con el contenedor actualizado.
+
+### `PATCH /contenedores/:id/servicio?fuera=true` — sacar de servicio o reintegrar
+
+Roles: `ADMINISTRADOR`, `OPERADOR`. **El valor va como query param**, igual que el bloqueo de
+zonas. Devuelve `200` con el contenedor actualizado.
+
+```
+PATCH /api/v1/contenedores/13479ceb.../servicio?fuera=true    → estado: FUERA_DE_SERVICIO
+PATCH /api/v1/contenedores/13479ceb.../servicio?fuera=false   → vuelve a servicio
+```
+
+**Por qué no viaja en el `PATCH` general.** `estado` no es un campo editable: NORMAL,
+ADVERTENCIA y CRITICO los decide el motor de reglas con cada lectura (CU-05), y dejarlos escribir
+a mano sería pelearle al motor que los calcula — la próxima lectura pisaría lo que el usuario
+puso. `FUERA_DE_SERVICIO` es lo único que decide una persona, y es un acto operativo, no la
+edición de un campo. Mismo criterio que el bloqueo de zonas y que el estado del camión.
+
+**Al reintegrarlo NO vuelve a `NORMAL` a ciegas.** Se lo reevalúa contra el umbral de su zona con
+el último nivel conocido: un contenedor que quedó al 92% vuelve `CRITICO`, no verde. Devolverlo a
+verde lo dejaría además fuera del ruteo, que solo toma críticos.
+
+**Las alertas abiertas no se tocan**, ni al salir ni al volver: el contenedor sigue lleno y esa
+alerta es justamente lo que alguien tiene que atender.
+
+**Es idempotente:** pedir dos veces lo mismo devuelve `200` sin cambiar nada.
+
+> **Un límite conocido:** si vuelve a servicio y queda `CRITICO`, *no* se genera una alerta nueva.
+> Las alertas se emiten solo en la transición a crítico, y acá el contenedor ya estaba crítico
+> antes de salir de servicio — con lo cual su alerta original sigue abierta y no hace falta otra.
+> El caso raro es que alguien la haya resuelto a mano mientras estaba fuera de servicio: ahí queda
+> rojo en el mapa sin alerta. Es la misma regla que ya documentamos más abajo, no un caso nuevo.
 
 ### `DELETE /contenedores/:id` — baja
 
@@ -584,7 +633,9 @@ porque `estado` refleja el llenado.
 
 ### `FUERA_DE_SERVICIO` es pegajoso
 
-Ninguna lectura saca a un contenedor de ese estado. Solo un administrador puede reactivarlo.
+Ninguna lectura saca a un contenedor de ese estado: se entra y se sale solo por
+`PATCH /contenedores/:id/servicio?fuera=`. Un vaciado confirmado tampoco lo devuelve a `NORMAL`
+—lo que tiene roto es el sensor o la tapa, no el nivel— aunque sí le pone el nivel en 0.
 
 ### Un contenedor sin sensor nunca cambia
 
@@ -824,6 +875,34 @@ Reglas de la heurística, todas verificadas:
 Errores: `409 CAMION_NO_DISPONIBLE` · `409 RUTA_SIN_CONTENEDORES` (también cuando hay críticos pero
 ninguno entra en la capacidad) · `404 CAMION_NO_ENCONTRADO`.
 
+### `GET /rutas` — listado
+
+Roles: `ADMINISTRADOR`, `OPERADOR`. Query params: `estado`, `camionId`.
+
+Trae el camión pero **no las paradas**. En cambio trae `avance`, que es lo que pediste para poder
+mostrar "2 de 3 vaciadas" sin una llamada por fila:
+
+```json
+{
+  "id": "...",
+  "camionId": "...",
+  "camion": { "patente": "AB123CD", "...": "..." },
+  "choferId": "user:jperez",
+  "estado": "EN_CURSO",
+  "distanciaEstimadaKm": 4.2,
+  "litrosEstimados": 2904,
+  "avance": { "total": 3, "confirmadas": 2, "omitidas": 0, "pendientes": 1 },
+  "generadaEn": "...", "asignadaEn": "...", "completadaEn": null
+}
+```
+
+**`avance` siempre viene, aunque la ruta no tenga paradas** — en ese caso los cuatro valores son
+`0`. Nunca es `undefined`, así que podés hacer `ruta.avance.confirmadas` sin preguntar.
+
+Del lado del servidor es **una sola consulta agrupada** para todo el listado, no una por fila.
+El detalle (`GET /rutas/:id`) **no trae `avance`**: ahí tenés las paradas enteras y contarlas es
+trivial.
+
 ### `PATCH /rutas/:id/asignar` — CU-09
 
 Roles: `ADMINISTRADOR`, `OPERADOR`. Cuerpo: `{ choferId }`.
@@ -894,6 +973,45 @@ Reglas:
 - **La primera confirmación pasa la ruta a `EN_CURSO`; la última la cierra y libera el camión.**
   Sin eso el camión quedaría `EN_RUTA` para siempre, y CU-03 no deja sacarlo de ese estado a mano.
 
+### `PATCH /paradas/:id/omitir` — CU-10
+
+Rol: `CHOFER`. Cuerpo: `{ motivo }`. **El motivo es obligatorio** (3 a 200 caracteres); sin él
+devuelve `400`.
+
+Es el otro final de una parada, y hasta ahora no existía: el chofer llegó y **no pudo vaciar**
+—auto mal estacionado, calle cortada—. Sin esto, esa parada quedaba `PENDIENTE` para siempre, y
+como la ruta solo se cierra cuando no queda ninguna pendiente, la ruta quedaba trabada en
+`EN_CURSO` y el camión tomado sin forma de recuperarlo.
+
+```json
+{
+  "paradaId": "...",
+  "estado": "OMITIDA",
+  "omitidaEn": "2026-09-03T18:22:10.500Z",
+  "motivo": "Auto mal estacionado tapando el contenedor",
+  "contenedorId": "...",
+  "estadoContenedor": "CRITICO",
+  "nivelLlenadoPct": 88,
+  "rutaEstado": "EN_CURSO"
+}
+```
+
+Las tres diferencias con `confirmar`, todas deliberadas:
+
+- **No toca el contenedor.** Sigue lleno y en `CRITICO`. Vaciarlo porque el chofer no pudo llegar
+  sería mostrar en verde justo el que nadie recolectó.
+- **No cierra las alertas.** Por eso la respuesta no trae `alertasCerradas`: esa ausencia es el
+  punto. La alerta sigue abierta porque el problema sigue ahí.
+- **No exige estar dentro de los 100 m.** El caso típico es no poder acercarse. Pedirle estar al
+  lado para declarar que no pudo llegar sería una contradicción.
+
+Lo que sí comparte: **avanza la ruta igual que una confirmación.** Si es la última parada abierta,
+la ruta pasa a `COMPLETADA` y el camión vuelve a `DISPONIBLE`.
+
+> **Una parada cerrada no se reabre.** Ni confirmada ni omitida: los dos casos devuelven `409`.
+> Si el auto se movió y ahora sí se puede vaciar, se genera una ruta nueva. Reabrirla obligaría a
+> revivir una ruta que ya pasó a `COMPLETADA` y a volver a tomar un camión que ya se liberó.
+
 ### Códigos nuevos
 
 | `code` | HTTP | Cuándo |
@@ -906,6 +1024,7 @@ Reglas:
 | `PARADA_YA_CONFIRMADA` | 409 | — |
 | `PARADA_FUERA_DE_RADIO` | 403 | El chofer está a más de 100 m |
 | `PARADA_DE_OTRA_RUTA` | 403 | **Nuevo.** La parada no pertenece a la ruta activa del chofer |
+| `PARADA_YA_OMITIDA` | 409 | **Nuevo.** La parada ya se había omitido; no se reabre |
 
 ---
 

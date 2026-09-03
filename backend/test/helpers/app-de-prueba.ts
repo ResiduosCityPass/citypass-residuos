@@ -10,7 +10,8 @@ export interface AppDePrueba {
   app: INestApplication;
   dataSource: DataSource;
   /** Token firmado localmente para el rol indicado. */
-  token(rol?: Rol): string;
+  /** `sub` propio para los casos donde importa que sean dos personas distintas. */
+  token(rol?: Rol, sub?: string): string;
   /** Vacia todas las tablas de dominio respetando las claves foraneas. */
   limpiar(): Promise<void>;
   cerrar(): Promise<void>;
@@ -40,8 +41,8 @@ export async function crearAppDePrueba(): Promise<AppDePrueba> {
   return {
     app,
     dataSource,
-    token: (rol: Rol = Rol.ADMINISTRADOR) =>
-      jwt.sign({ sub: `test-${rol}`, username: `${rol}@test.local`, rol }),
+    token: (rol: Rol = Rol.ADMINISTRADOR, sub = `test-${rol}`) =>
+      jwt.sign({ sub, username: `${rol}@test.local`, rol }),
     limpiar: async () => {
       // El orden importa menos con CASCADE, pero se listan igual de la hoja a
       // la raiz para que el dia que se saque el CASCADE esto siga andando.

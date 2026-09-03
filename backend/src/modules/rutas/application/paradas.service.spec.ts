@@ -1,4 +1,4 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventTypes } from '../../../shared/domain/domain-event';
 import {
@@ -46,6 +46,8 @@ describe('ParadasService (CU-10)', () => {
       orden: 1,
       estado: EstadoParada.PENDIENTE,
       confirmadaEn: null,
+      omitidaEn: null,
+      motivo: null,
     } as Parada;
 
     contenedor = {
@@ -78,6 +80,7 @@ describe('ParadasService (CU-10)', () => {
       listar: jest.fn(),
       buscarActivaDeChofer: jest.fn(),
       contenedoresEnRutasVivas: jest.fn(),
+      avanceDeParadas: jest.fn(),
     };
     contenedores = {
       crear: jest.fn(),
@@ -240,6 +243,102 @@ describe('ParadasService (CU-10)', () => {
       expect(ruta.completadaEn).toBeInstanceOf(Date);
       expect(flota.guardarEstado).toHaveBeenCalledWith(
         expect.objectContaining({ estado: EstadoCamion.DISPONIBLE }),
+      );
+    });
+  });
+
+  describe('omitir · el chofer llego pero no pudo vaciar', () => {
+    const MOTIVO = { motivo: 'Auto mal estacionado tapando el contenedor' };
+
+    it('deja la parada OMITIDA con su motivo y la fecha', async () => {
+      const resultado = await service.omitir('pd-1', CHOFER, MOTIVO);
+
+      expect(parada.estado).toBe(EstadoParada.OMITIDA);
+      expect(parada.motivo).toBe(MOTIVO.motivo);
+      expect(parada.omitidaEn).toBeInstanceOf(Date);
+      expect(resultado.estado).toBe(EstadoParada.OMITIDA);
+    });
+
+    it('NO toca el contenedor: sigue lleno y en CRITICO', async () => {
+      // Es toda la diferencia con confirmar. Vaciar el contenedor porque el
+      // chofer no pudo llegar seria mentirle al mapa.
+      const resultado = await service.omitir('pd-1', CHOFER, MOTIVO);
+
+      expect(contenedores.guardar).not.toHaveBeenCalled();
+      expect(contenedor.nivelLlenadoPct).toBe(94);
+      expect(resultado.estadoContenedor).toBe(EstadoContenedor.CRITICO);
+      expect(resultado.nivelLlenadoPct).toBe(94);
+    });
+
+    it('NO cierra las alertas del contenedor', async () => {
+      await service.omitir('pd-1', CHOFER, MOTIVO);
+
+      expect(alertas.resolverAbiertasPorTipo).not.toHaveBeenCalled();
+    });
+
+    it('no exige estar dentro del radio: el caso tipico es no poder acercarse', async () => {
+      // Una calle cortada deja al camion a cuadras del contenedor. Pedirle
+      // estar a 100 m para declarar que no pudo llegar seria una contradiccion.
+      await expect(service.omitir('pd-1', CHOFER, MOTIVO)).resolves.toBeDefined();
+    });
+
+    it('publica el evento con el motivo y el nivel en que quedo', async () => {
+      await service.omitir('pd-1', CHOFER, MOTIVO);
+
+      const [evento] = eventos.getPublished(EventTypes.PARADA_OMITIDA);
+
+      expect(evento).toBeDefined();
+      expect(evento.payload).toEqual(
+        expect.objectContaining({
+          contenedorId: 'CT-0421',
+          motivo: MOTIVO.motivo,
+          nivelLlenadoPct: 94,
+          choferId: CHOFER,
+        }),
+      );
+    });
+
+    it('una parada omitida cierra la ruta y libera el camion como una confirmada', async () => {
+      // Sin esto una calle cortada dejaba la ruta trabada en EN_CURSO para
+      // siempre, y al camion tomado sin forma de recuperarlo.
+      const resultado = await service.omitir('pd-1', CHOFER, MOTIVO);
+
+      expect(resultado.rutaEstado).toBe(EstadoRuta.COMPLETADA);
+      expect(flota.guardarEstado).toHaveBeenCalledWith(
+        expect.objectContaining({ estado: EstadoCamion.DISPONIBLE }),
+      );
+    });
+
+    it('rechaza omitir una parada de otro chofer', async () => {
+      await expect(service.omitir('pd-1', 'user:otro', MOTIVO)).rejects.toThrow(ForbiddenException);
+    });
+
+    it('rechaza omitir una parada que no existe', async () => {
+      paradas.buscarPorId.mockResolvedValue(null);
+
+      await expect(service.omitir('pd-1', CHOFER, MOTIVO)).rejects.toThrow(NotFoundException);
+    });
+
+    it('rechaza omitir una parada ya confirmada', async () => {
+      parada.estado = EstadoParada.CONFIRMADA;
+
+      await expect(service.omitir('pd-1', CHOFER, MOTIVO)).rejects.toThrow(ConflictException);
+    });
+
+    it('una parada omitida es final: no se vuelve a omitir', async () => {
+      parada.estado = EstadoParada.OMITIDA;
+
+      await expect(service.omitir('pd-1', CHOFER, MOTIVO)).rejects.toThrow(ConflictException);
+    });
+
+    it('una parada omitida tampoco se puede confirmar despues', async () => {
+      // Reabrirla obligaria a revivir una ruta ya COMPLETADA y a volver a tomar
+      // un camion que ya se libero. Si el contenedor se puede vaciar, se genera
+      // una ruta nueva.
+      parada.estado = EstadoParada.OMITIDA;
+
+      await expect(service.confirmar('pd-1', CHOFER, EN_EL_CONTENEDOR)).rejects.toThrow(
+        ConflictException,
       );
     });
   });

@@ -18,7 +18,12 @@ import { FlotaService } from '../../flota/application/flota.service';
 import { ZonasService } from '../../zonas/application/zonas.service';
 import { PARADA_REPOSITORY, ParadaRepository } from '../domain/parada.repository';
 import { Ruta } from '../domain/ruta.entity';
-import { FiltroRutas, RUTA_REPOSITORY, RutaRepository } from '../domain/ruta.repository';
+import {
+  AVANCE_VACIO,
+  FiltroRutas,
+  RUTA_REPOSITORY,
+  RutaRepository,
+} from '../domain/ruta.repository';
 import { CandidatoRuteo, litrosOcupados, planificarRuta } from '../domain/reglas/planificador';
 import { AsignarRutaDto } from './dto/asignar-ruta.dto';
 import { GenerarRutaDto } from './dto/generar-ruta.dto';
@@ -159,8 +164,19 @@ export class RutasService {
     });
   }
 
-  listar(filtro: FiltroRutas): Promise<Ruta[]> {
-    return this.rutas.listar(filtro);
+  /**
+   * El listado no trae las paradas, pero si su avance: la tabla necesita
+   * mostrar "2 de 3 vaciadas" y una llamada por fila para eso es un N+1.
+   */
+  async listar(filtro: FiltroRutas): Promise<Ruta[]> {
+    const rutas = await this.rutas.listar(filtro);
+    const avances = await this.rutas.avanceDeParadas(rutas.map((ruta) => ruta.id));
+
+    for (const ruta of rutas) {
+      ruta.avance = avances.get(ruta.id) ?? AVANCE_VACIO;
+    }
+
+    return rutas;
   }
 
   async obtener(id: string): Promise<Ruta> {

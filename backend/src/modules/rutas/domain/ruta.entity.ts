@@ -12,6 +12,7 @@ import { EstadoRuta } from '../../../shared/domain/enums';
 import { columnaNumerica } from '../../../shared/persistence/columna-numerica';
 import { Camion } from '../../flota/domain/camion.entity';
 import { Parada } from './parada.entity';
+import type { AvanceParadas } from './ruta.repository';
 
 /**
  * Recorrido de recoleccion (CU-08, CU-09).
@@ -53,6 +54,12 @@ export class Ruta {
 
   @OneToMany(() => Parada, (parada) => parada.ruta)
   paradas?: Parada[];
+
+  /**
+   * No se persiste: lo completa el listado. El detalle no lo trae porque ya
+   * devuelve las paradas enteras y contarlas es trivial del lado del cliente.
+   */
+  avance?: AvanceParadas;
 
   @CreateDateColumn({ type: 'timestamptz' })
   generadaEn!: Date;

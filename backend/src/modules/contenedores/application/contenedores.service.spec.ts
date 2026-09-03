@@ -1,5 +1,5 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
-import { TipoResiduo } from '../../../shared/domain/enums';
+import { EstadoContenedor, TipoResiduo } from '../../../shared/domain/enums';
 import { ZonasService } from '../../zonas/application/zonas.service';
 import { Zona } from '../../zonas/domain/zona.entity';
 import { hashearApiKey } from '../domain/api-key';
@@ -189,6 +189,68 @@ describe('ContenedoresService (CU-01)', () => {
       await expect(service.vincularSensor('c-1', { codigo: 'SN-0001' })).rejects.toThrow(
         ConflictException,
       );
+    });
+  });
+
+  describe('cambiarServicio', () => {
+    const guardado = () => contenedores.guardar.mock.calls.at(-1)?.[0] as Contenedor;
+
+    const enBase = (parcial: Partial<Contenedor>) =>
+      contenedores.buscarPorId.mockResolvedValue({
+        id: 'c-1',
+        zonaId: 'z-1',
+        estado: EstadoContenedor.CRITICO,
+        nivelLlenadoPct: 92,
+        temperaturaC: 21,
+        ...parcial,
+      } as Contenedor);
+
+    beforeEach(() => {
+      zonas.obtener.mockResolvedValue({
+        id: 'z-1',
+        umbralCriticoPct: 80,
+        umbralTemperaturaC: 60,
+      } as Zona);
+    });
+
+    it('lo saca de servicio cualquiera sea su estado previo', async () => {
+      enBase({ estado: EstadoContenedor.CRITICO });
+
+      await service.cambiarServicio('c-1', true);
+
+      expect(guardado().estado).toBe(EstadoContenedor.FUERA_DE_SERVICIO);
+    });
+
+    it('al reintegrarlo lo reevalua contra el umbral: si quedo lleno, vuelve CRITICO', async () => {
+      // Devolverlo a NORMAL a ciegas dejaria un contenedor al 92% pintado de
+      // verde en el mapa y fuera del ruteo, que solo toma criticos.
+      enBase({ estado: EstadoContenedor.FUERA_DE_SERVICIO, nivelLlenadoPct: 92 });
+
+      await service.cambiarServicio('c-1', false);
+
+      expect(guardado().estado).toBe(EstadoContenedor.CRITICO);
+    });
+
+    it('al reintegrarlo vuelve NORMAL si su ultimo nivel estaba lejos del umbral', async () => {
+      enBase({ estado: EstadoContenedor.FUERA_DE_SERVICIO, nivelLlenadoPct: 12 });
+
+      await service.cambiarServicio('c-1', false);
+
+      expect(guardado().estado).toBe(EstadoContenedor.NORMAL);
+    });
+
+    it('es idempotente: pedir dos veces lo mismo no vuelve a escribir', async () => {
+      enBase({ estado: EstadoContenedor.FUERA_DE_SERVICIO });
+
+      await service.cambiarServicio('c-1', true);
+
+      expect(contenedores.guardar).not.toHaveBeenCalled();
+    });
+
+    it('propaga el 404 si el contenedor no existe', async () => {
+      contenedores.buscarPorId.mockResolvedValue(null);
+
+      await expect(service.cambiarServicio('c-1', true)).rejects.toThrow(NotFoundException);
     });
   });
 });
