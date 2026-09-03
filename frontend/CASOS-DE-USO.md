@@ -2,11 +2,13 @@
 
 Qué pantalla cubre cada caso de uso, dónde vive en el código y qué falta.
 
-> **Ninguna pantalla está conectada al backend todavía.** Todas corren contra el servidor falso de
-> [`src/mocks/`](src/mocks). Se levanta con `npm run dev` y `VITE_USE_MOCKS=true`, sin API, sin
-> Docker y sin token. Conectar es apagar esa variable — ver [Cómo se conecta](#cómo-se-conecta).
+> **Las pantallas están conectadas al backend real** (`VITE_USE_MOCKS=false`). El servidor falso
+> de [`src/mocks/`](src/mocks) sigue existiendo, alineado al mismo contrato, para poder mostrar la
+> aplicación sin levantar Docker ni la API — ver [Cómo se conecta](#cómo-se-conecta).
 
-Actualizado al **2026-08-21**.
+Para el estado del módulo completo y lo que falta, ver [ESTADO.md](../ESTADO.md) en la raíz.
+
+Actualizado al **2026-09-03**.
 
 ---
 
@@ -408,9 +410,12 @@ Los mocks fallan con los mismos `code` estables que el backend
 `HTTP_400` con `message` como array), así que las pantallas de error ya están diseñadas contra el
 comportamiento real y no contra un backend imaginario.
 
-Cuando las once estén conectadas se borra `src/mocks/`, se borra la variable, y `waste.js` vuelve
-a ser un re-export de `waste.http.js`. Está documentado en
-[ADR-007](../docs/adr/ADR-007-design-system-y-mocks.md).
+El plan original era borrar `src/mocks/` al conectar las pantallas
+([ADR-007](../docs/adr/ADR-007-design-system-y-mocks.md)). Se decidió conservarlo y **alinearlo al
+contrato real** en su lugar: sirve para mostrar la aplicación sin backend, y el interruptor solo
+tiene sentido si las dos fuentes devuelven exactamente lo mismo. Un mock más generoso que la API
+esconde errores hasta el peor momento — pasó con `GET /rutas`, que en el mock traía las paradas y
+en el backend no, y la pantalla de rutas se caía al conectar.
 
 ---
 
@@ -424,9 +429,12 @@ Cuatro límites del backend que están **visibles en la UI a propósito**, en ve
 2. **El listado de contenedores no dice si ya tienen sensor.** `GET /contenedores` no devuelve
    `sensor` ni un `tieneSensor`. La UI deja intentar y muestra el
    `409 CONTENEDOR_YA_TIENE_SENSOR` si corresponde.
-3. **No hay endpoint para listar choferes.** `RUTA.choferId` apunta a un usuario con rol `CHOFER`
-   del directorio del Squad 2 ([ADR-005](../docs/adr/ADR-005-seguridad-identidad.md)), y CU-09
-   necesita poblar un `<select>` con ellos. Hoy salen de datos falsos y la pantalla lo dice.
+3. **No hay endpoint para listar choferes, y Francisco decidió que no lo va a implementar.** Los
+   choferes son usuarios del directorio del Squad 2
+   ([ADR-005](../docs/adr/ADR-005-seguridad-identidad.md)): mantener acá un padrón propio se
+   desincronizaría. `choferId` es un string libre que el backend **no valida**, así que tampoco
+   existe `CHOFER_NO_ENCONTRADO`. CU-09 pide el identificador **escrito a mano** y lo avisa en
+   pantalla. Necesita una decisión de equipo con Nicolás y Adriel.
 
 4. **No hay endpoint para omitir una parada.** `EstadoParada.OMITIDA` existe en el enum del backend
    y es un caso de negocio real (el chofer llegó y no pudo vaciar: auto mal estacionado, calle
