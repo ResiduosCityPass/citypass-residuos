@@ -44,7 +44,8 @@ puede atravesar un flujo de login interactivo.
 |---|---|---|---|---|---|
 | Contenedores — alta, baja, edición | Sí | — | — | — | — |
 | Contenedores — lectura | Sí | Sí | Sí | Sí (vista pública) | — |
-| Zonas y umbrales | Sí | — | — | — | — |
+| Zonas y umbrales — alta, baja, edición | Sí | — | — | — | — |
+| Zonas y umbrales — lectura | Sí | Sí | — | — | — |
 | Flota | Sí | Sí (lectura) | — | — | — |
 | Lecturas — alta | — | — | — | — | Sí |
 | Alertas | Sí | Sí | — | — | — |
@@ -105,3 +106,20 @@ que el Sprint 3 sea el cambio quirúrgico que este ADR prometía, y no una reesc
   username. Responsable: Adriel / Francisco.
 - **Acción abierta (Sprint 3):** agregar resolución de clave por JWKS (`jwks-rsa` o equivalente) y
   cambiar `JWT_ALGORITHM=RS256` + `JWT_ISSUER` al emisor real. Responsable: Adriel.
+
+## Auditoría 2026-09-03 — `@Roles()` vs. la matriz, sobre `develop`
+
+Se revisaron los endpoints ya mergeados (`alertas`, `contenedores`, `lecturas`, `mapa`, `zonas`)
+contra la matriz. Dos diferencias:
+
+- **Zonas — lectura:** el código ya le da acceso a Operador (`@Roles(ADMINISTRADOR, OPERADOR)`),
+  siguiendo a [api-preliminar.md](../arquitectura/api-preliminar.md), que documentaba esto desde
+  antes. La matriz de este ADR había quedado vieja — corregida arriba, no era un problema de
+  seguridad.
+- **Contenedores — lectura:** la matriz promete acceso a Chofer; el código de `contenedores.controller.ts`
+  solo permite Administrador y Operador. **Acción abierta:** decidir si el chofer necesita pegarle
+  directo a `/contenedores`, o le alcanza con lo que traiga `/rutas/mias` (todavía sin mergear a
+  `develop`). Responsable: Adriel, a definir cuando `rutas` llegue a `develop`.
+
+`flota`, `rutas` y `paradas` todavía no están en `develop` (están en `feat/CU-12-prediccion`) —
+repetir esta auditoría cuando se mergeen.
