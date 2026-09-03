@@ -887,7 +887,7 @@ mostrar "2 de 3 vaciadas" sin una llamada por fila:
   "id": "...",
   "camionId": "...",
   "camion": { "patente": "AB123CD", "...": "..." },
-  "choferId": "user:jperez",
+  "choferId": "U000042",
   "estado": "EN_CURSO",
   "distanciaEstimadaKm": 4.2,
   "litrosEstimados": 2904,

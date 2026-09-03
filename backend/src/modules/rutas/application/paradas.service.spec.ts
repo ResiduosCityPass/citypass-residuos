@@ -21,7 +21,7 @@ import { Ruta } from '../domain/ruta.entity';
 import { RutaRepository } from '../domain/ruta.repository';
 import { ParadasService } from './paradas.service';
 
-const CHOFER = 'user:jperez';
+const CHOFER = 'U000042';
 const EN_EL_CONTENEDOR = { lat: -34.6037, lng: -58.3816 };
 const A_CINCO_KM = { lat: -34.65, lng: -58.3816 };
 

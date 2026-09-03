@@ -40,18 +40,18 @@ describe('RutasController (CU-08, CU-09)', () => {
   });
 
   it('delega la asignacion', async () => {
-    await controller.asignar('rt-1', { choferId: 'user:jperez' });
+    await controller.asignar('rt-1', { choferId: 'U000042' });
 
-    expect(service.asignar).toHaveBeenCalledWith('rt-1', { choferId: 'user:jperez' });
+    expect(service.asignar).toHaveBeenCalledWith('rt-1', { choferId: 'U000042' });
   });
 
   describe('ruta propia del chofer', () => {
     it('toma la identidad del token, no de la query', async () => {
       // Si el id del chofer viajara por query string, cualquiera podria leer la
       // ruta de otro cambiando un valor.
-      await controller.rutaPropia(requestDe('user:jperez'));
+      await controller.rutaPropia(requestDe('U000042'));
 
-      expect(service.rutaActivaDe).toHaveBeenCalledWith('user:jperez');
+      expect(service.rutaActivaDe).toHaveBeenCalledWith('U000042');
     });
 
     it('cada chofer recibe la suya', async () => {

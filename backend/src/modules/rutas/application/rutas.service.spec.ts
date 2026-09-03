@@ -198,15 +198,15 @@ describe('RutasService (CU-08, CU-09)', () => {
       const ruta = rutaCreada();
       rutas.buscarPorId.mockResolvedValue(ruta);
 
-      await service.asignar('rt-1', { choferId: 'user:jperez' });
+      await service.asignar('rt-1', { choferId: 'U000042' });
 
       expect(ruta.estado).toBe(EstadoRuta.ASIGNADA);
-      expect(ruta.choferId).toBe('user:jperez');
+      expect(ruta.choferId).toBe('U000042');
       expect(ruta.asignadaEn).toBeInstanceOf(Date);
     });
 
     it('recien ahi toma el camion', async () => {
-      await service.asignar('rt-1', { choferId: 'user:jperez' });
+      await service.asignar('rt-1', { choferId: 'U000042' });
 
       expect(flota.guardarEstado).toHaveBeenCalledWith(
         expect.objectContaining({ estado: EstadoCamion.EN_RUTA }),
@@ -214,7 +214,7 @@ describe('RutasService (CU-08, CU-09)', () => {
     });
 
     it('publica residuos.ruta.asignada', async () => {
-      await service.asignar('rt-1', { choferId: 'user:jperez' });
+      await service.asignar('rt-1', { choferId: 'U000042' });
 
       expect(eventos.getPublished(EventTypes.RUTA_ASIGNADA)).toHaveLength(1);
     });
@@ -276,13 +276,13 @@ describe('RutasService (CU-08, CU-09)', () => {
 
   describe('rutaActivaDe', () => {
     it('devuelve null si el chofer no tiene ruta activa', async () => {
-      await expect(service.rutaActivaDe('user:jperez')).resolves.toBeNull();
+      await expect(service.rutaActivaDe('U000042')).resolves.toBeNull();
     });
 
     it('pide la ruta del chofer indicado', async () => {
-      await service.rutaActivaDe('user:jperez');
+      await service.rutaActivaDe('U000042');
 
-      expect(rutas.buscarActivaDeChofer).toHaveBeenCalledWith('user:jperez');
+      expect(rutas.buscarActivaDeChofer).toHaveBeenCalledWith('U000042');
     });
   });
 });
