@@ -25,7 +25,7 @@ RabbitMQ está declarado pero no se usa hasta el Sprint 2: hasta entonces el bac
 | 2 | `Dockerfile` multi-stage para el backend | 1 | **Hecho** — ver abajo |
 | 3 | `Dockerfile` para el frontend (React + Vite: build y servir estáticos) | 2 | **Hecho** — ver abajo |
 | 4 | Job de deploy en el pipeline | 3 | Pendiente |
-| 5 | Elegir destino cloud y escribirlo como IaC — la dimensión 7 pide *infraestructura como código*, no despliegue manual | 3-4 | Pendiente |
+| 5 | Elegir destino cloud y escribirlo como IaC — la dimensión 7 pide *infraestructura como código*, no despliegue manual | 3-4 | Destino elegido: Render ([ADR-008](../docs/adr/ADR-008-destino-cloud.md)). IaC pendiente |
 
 ---
 
@@ -83,3 +83,11 @@ puerto 3000.
 
 Toda decisión de infraestructura que tenga más de una opción razonable necesita su ADR
 en `docs/adr/`. Es requisito explícito de la cátedra.
+
+## Destino cloud
+
+El destino elegido para el despliegue académico es **Render**. La decisión está documentada en
+[`ADR-008`](../docs/adr/ADR-008-destino-cloud.md).
+
+La infraestructura debe quedar versionada como `render.yaml`: frontend estático, backend Docker,
+PostgreSQL administrado y secretos configurados fuera del repo.

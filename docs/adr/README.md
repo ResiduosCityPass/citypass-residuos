@@ -15,3 +15,4 @@ Un ADR nunca se edita una vez aceptado: si la decisión cambia, se escribe uno n
 | [005](ADR-005-seguridad-identidad.md) | Seguridad e identidad federada | Aceptado |
 | [006](ADR-006-stack-frontend.md) | Stack tecnológico del frontend | Aceptado |
 | [007](ADR-007-design-system-y-mocks.md) | Design system, navegación y capa de datos falsos en el frontend | Aceptado |
+| [008](ADR-008-destino-cloud.md) | Destino cloud para despliegue | Aceptado |
