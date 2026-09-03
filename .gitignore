@@ -39,3 +39,6 @@ desktop.ini
 infra/data/
 *.sqlite
 *.sqlite3
+
+# Notas personales
+ADRIEL-notas.md

@@ -68,8 +68,8 @@ export enum EstadoParada {
 }
 
 /**
- * Roles de la plataforma. El claim de rol del JWT emitido por el Squad 2
- * se mapea contra estos valores. Ver ADR-005.
+ * Roles de la plataforma. Los grupos (`groups`) del JWT emitido por el Squad 2
+ * se mapean contra estos valores -- ver auth/grupo-rol.map.ts y ADR-005.
  */
 export enum Rol {
   ADMINISTRADOR = 'ADMINISTRADOR',
