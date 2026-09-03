@@ -4,13 +4,15 @@ import Button from '../components/ui/Button.jsx';
 import Chip from '../components/ui/Chip.jsx';
 import FillBar from '../components/ui/FillBar.jsx';
 import Notice from '../components/ui/Notice.jsx';
-import { fetchMyRoute, confirmStop } from '../api/waste.js';
-import { generalMessage } from '../domain/errors.js';
+import Field from '../components/ui/Field.jsx';
+import { fetchMyRoute, confirmStop, skipStop } from '../api/waste.js';
+import { fieldErrors, generalMessage } from '../domain/errors.js';
 import {
   STOP_STATE_LABEL,
   ROUTE_STATE_LABEL,
   ROUTE_STATE_CHIP,
   canConfirmStop,
+  canSkipStop,
   stopsProgress,
   timeAgo,
 } from '../domain/states.js';
@@ -46,6 +48,29 @@ const JITTER = 0.0002;
  */
 const SIMULAR_GPS = import.meta.env.VITE_SIMULAR_GPS === 'true';
 
+/**
+ * Los motivos por los que una parada no se pudo vaciar.
+ *
+ * Van como preset y no como campo libre porque el chofer los tipea parado en
+ * la calle, con una mano: tres opciones se eligen de un toque y ademas salen
+ * siempre escritas igual, que es lo que hace que el operador pueda leer
+ * despues cuantas paradas se perdieron por calle cortada. "Otro" existe para
+ * el caso que no previmos, no para reemplazar a los dos primeros.
+ *
+ * El texto que viaja es el de la opcion, no la clave: el backend guarda un
+ * varchar libre de 3 a 200 y es lo que despues lee una persona.
+ */
+const MOTIVOS = [
+  'Auto mal estacionado',
+  'Calle cortada',
+];
+
+const MOTIVO_OTRO = 'OTRO';
+
+/** Lo que valida el backend con @Length(3, 200). Se replica para no gastar un 400. */
+const MOTIVO_MIN = 3;
+const MOTIVO_MAX = 200;
+
 export default function DriverStopsPage() {
   const geo = useGeolocation();
 
@@ -56,6 +81,15 @@ export default function DriverStopsPage() {
   const [confirmingId, setConfirmingId] = useState(null);
   const [feedback, setFeedback] = useState(null); // { stopId, type, title, body }
   const [simulateGps, setSimulateGps] = useState(false);
+
+  // El formulario de omision se abre por parada, no como modal: el chofer ya
+  // esta mirando la parada que no pudo vaciar y sacarlo de la lista para
+  // preguntarle por que le hace perder cual era.
+  const [skippingId, setSkippingId] = useState(null);
+  const [motivoOption, setMotivoOption] = useState(MOTIVOS[0]);
+  const [motivoOtro, setMotivoOtro] = useState('');
+  const [motivoError, setMotivoError] = useState(null);
+  const [submittingSkip, setSubmittingSkip] = useState(false);
 
   // Sin argumentos: el chofer sale del `sub` del token. No hay forma de pedir
   // la ruta de otro, que es exactamente el punto.
@@ -78,7 +112,21 @@ export default function DriverStopsPage() {
   }, [load]);
 
   const paradas = route?.paradas ?? [];
-  const { confirmed, total } = stopsProgress(paradas);
+  const { confirmed, skipped, closed: closedStops, total } = stopsProgress(paradas);
+
+  /**
+   * El mensaje de la ultima parada se quedaba sin donde vivir.
+   *
+   * El feedback se dibuja adentro de su parada, y cerrar la ultima hace que
+   * `/rutas/mias` devuelva null: la lista entera desaparece en la recarga y con
+   * ella el cartel, justo el que dice que la ruta se cerro y el camion quedo
+   * libre. El chofer veia la pantalla vaciarse sin ninguna explicacion.
+   *
+   * Cuando la parada del feedback ya no esta en la lista, el cartel sube al
+   * nivel de la pantalla en vez de perderse.
+   */
+  const orphanFeedback =
+    feedback && !paradas.some((stop) => stop.id === feedback.stopId) ? feedback : null;
 
   /**
    * La posicion que se manda. Se pide FRESCA en cada confirmacion en vez de
@@ -178,6 +226,109 @@ export default function DriverStopsPage() {
     }
   };
 
+  /** Abre el formulario de omision de una parada, siempre en limpio. */
+  const openSkip = (stop) => {
+    setFeedback(null);
+    setMotivoError(null);
+    setMotivoOption(MOTIVOS[0]);
+    setMotivoOtro('');
+    setSkippingId(stop.id);
+  };
+
+  const closeSkip = () => {
+    setSkippingId(null);
+    setMotivoError(null);
+  };
+
+  /**
+   * CU-10 · El otro final de la parada.
+   *
+   * Tres diferencias con `confirm`, y las tres estan a la vista:
+   *
+   *  - No pide GPS. El backend no valida el radio de 100 m porque el caso
+   *    tipico es justamente no poder acercarse: exigirle estar al lado para
+   *    declarar que no pudo llegar seria una contradiccion.
+   *  - Pide un motivo, y es obligatorio.
+   *  - El mensaje de exito dice explicitamente que el contenedor sigue lleno
+   *    y su alerta sigue abierta. Es lo unico que distingue esta operacion de
+   *    la de confirmar en la cabeza del chofer, y si no se dice, "listo" se
+   *    lee como "resuelto".
+   */
+  const skip = async (stop) => {
+    const motivo = (motivoOption === MOTIVO_OTRO ? motivoOtro : motivoOption).trim();
+
+    // El backend valida igual; esto es para no gastar un round trip en algo
+    // que ya se sabe, no para reemplazar la validacion.
+    if (motivo.length < MOTIVO_MIN) {
+      setMotivoError(`Contá en pocas palabras qué pasó (mínimo ${MOTIVO_MIN} caracteres).`);
+      return;
+    }
+
+    setFeedback(null);
+    setMotivoError(null);
+    setSubmittingSkip(true);
+
+    try {
+      // La respuesta NO trae `alertasCerradas`, y esa ausencia es el contrato:
+      // omitir no resuelve nada. Lo unico que cambia afuera de la parada es el
+      // estado de la ruta.
+      const result = await skipStop(stop.id, motivo);
+      const done = result?.rutaEstado === 'COMPLETADA';
+
+      setSkippingId(null);
+      setFeedback({
+        stopId: stop.id,
+        type: 'warning',
+        title: done ? 'Parada omitida: ruta cerrada' : 'Parada omitida',
+        body: [
+          'El contenedor sigue lleno y su alerta sigue abierta: el problema sigue ahí.',
+          done ? 'Era la última parada abierta, así que el camión ya quedó disponible.' : null,
+        ]
+          .filter(Boolean)
+          .join(' '),
+      });
+      await load();
+    } catch (err) {
+      const byField = fieldErrors(err);
+      if (byField.motivo) {
+        setMotivoError(byField.motivo);
+      } else if (err.code === 'PARADA_DE_OTRA_RUTA') {
+        // Mismo caso que al confirmar: la ruta que tiene abierta ya no es suya.
+        setSkippingId(null);
+        setFeedback({
+          stopId: stop.id,
+          type: 'error',
+          title: 'Esta parada no es de tu ruta',
+          body: 'Puede que te hayan reasignado. Estamos recargando tu ruta actual.',
+        });
+        await load();
+      } else if (err.code === 'PARADA_YA_OMITIDA' || err.code === 'PARADA_YA_CONFIRMADA') {
+        // Una parada cerrada no se reabre por ninguno de los dos caminos. Casi
+        // siempre es un doble tap, asi que es informacion y no una falla.
+        setSkippingId(null);
+        setFeedback({
+          stopId: stop.id,
+          type: 'info',
+          title:
+            err.code === 'PARADA_YA_OMITIDA'
+              ? 'Esta parada ya figura omitida'
+              : 'Esta parada ya figura confirmada',
+        });
+        await load();
+      } else {
+        setSkippingId(null);
+        setFeedback({
+          stopId: stop.id,
+          type: 'error',
+          title: `[${err.code}]`,
+          body: generalMessage(err) ?? err.message,
+        });
+      }
+    } finally {
+      setSubmittingSkip(false);
+    }
+  };
+
   return (
     <div className="driver-shell">
       <header className="driver-header">
@@ -192,8 +343,15 @@ export default function DriverStopsPage() {
               <strong className="mono">{route.camion?.patente ?? 'sin camión'}</strong>
               <Chip variant={ROUTE_STATE_CHIP[route.estado]}>{ROUTE_STATE_LABEL[route.estado]}</Chip>
             </div>
-            <FillBar levelPct={total ? (confirmed / total) * 100 : 0} state="NORMAL" compact />
-            <p className="driver-progress">{confirmed} de {total} vaciados</p>
+            {/* La barra mide paradas CERRADAS y el texto mide VACIADOS. No es
+                lo mismo: una parada omitida cierra y avanza la ruta pero no
+                vacia nada, asi que la barra llega al final justo cuando la
+                ruta se completa, sin decir que se vacio algo que no se vacio. */}
+            <FillBar levelPct={total ? (closedStops / total) * 100 : 0} state="NORMAL" compact />
+            <p className="driver-progress">
+              {confirmed} de {total} vaciados
+              {skipped > 0 && ` · ${skipped} ${skipped === 1 ? 'omitida' : 'omitidas'}`}
+            </p>
           </>
         ) : (
           !loading && <p className="driver-progress">Sin ruta activa</p>
@@ -227,6 +385,12 @@ export default function DriverStopsPage() {
         {error && (
           <Notice type="error" title={`[${error.code}]`}>
             {generalMessage(error) ?? error.message}
+          </Notice>
+        )}
+
+        {orphanFeedback && (
+          <Notice type={orphanFeedback.type} title={orphanFeedback.title}>
+            {orphanFeedback.body}
           </Notice>
         )}
 
@@ -264,7 +428,9 @@ export default function DriverStopsPage() {
                       >
                         {STOP_STATE_LABEL[stop.estado]}
                       </Chip>
-                      {stop.confirmadaEn && <span className="muted">{timeAgo(stop.confirmadaEn)}</span>}
+                      {(stop.confirmadaEn ?? stop.omitidaEn) && (
+                        <span className="muted">{timeAgo(stop.confirmadaEn ?? stop.omitidaEn)}</span>
+                      )}
                     </div>
 
                     {stop.contenedor && (
@@ -278,7 +444,15 @@ export default function DriverStopsPage() {
                       </div>
                     )}
 
-                    {canConfirmStop(stop) && (
+                    {/* El motivo es lo unico que el operador va a tener despues
+                        para decidir si vuelve a rutear este contenedor hoy o si
+                        el problema es de la calle. Por eso se muestra, no se
+                        guarda y se olvida. */}
+                    {stop.estado === 'OMITIDA' && stop.motivo && (
+                      <p className="stop-motivo">No se pudo vaciar: {stop.motivo}</p>
+                    )}
+
+                    {canConfirmStop(stop) && skippingId !== stop.id && (
                       <div className="stop-actions">
                         <Button
                           variant="success"
@@ -289,6 +463,72 @@ export default function DriverStopsPage() {
                             ? 'Ubicando…'
                             : 'Confirmar vaciado'}
                         </Button>
+
+                        {/* El segundo final de la parada. Va al lado del primero
+                            y no escondido en un menu: el chofer que no puede
+                            vaciar necesita salir de esta parada, y si no
+                            encuentra como, la deja pendiente y traba la ruta. */}
+                        {canSkipStop(stop) && (
+                          <Button variant="warning" onClick={() => openSkip(stop)}>
+                            No pude vaciar
+                          </Button>
+                        )}
+                      </div>
+                    )}
+
+                    {skippingId === stop.id && (
+                      <div className="stop-skip-form">
+                        <Field
+                          label="¿Por qué no se pudo vaciar?"
+                          htmlFor={`motivo-${stop.id}`}
+                          required
+                          error={motivoError}
+                        >
+                          <select
+                            id={`motivo-${stop.id}`}
+                            value={motivoOption}
+                            onChange={(e) => setMotivoOption(e.target.value)}
+                          >
+                            {MOTIVOS.map((motivo) => (
+                              <option key={motivo} value={motivo}>{motivo}</option>
+                            ))}
+                            <option value={MOTIVO_OTRO}>Otro</option>
+                          </select>
+                        </Field>
+
+                        {motivoOption === MOTIVO_OTRO && (
+                          <Field label="Contá qué pasó" htmlFor={`motivo-otro-${stop.id}`} required>
+                            <input
+                              id={`motivo-otro-${stop.id}`}
+                              type="text"
+                              maxLength={MOTIVO_MAX}
+                              value={motivoOtro}
+                              onChange={(e) => setMotivoOtro(e.target.value)}
+                              placeholder="Ej: el contenedor no estaba en el lugar"
+                            />
+                          </Field>
+                        )}
+
+                        {/* Se dice ANTES de omitir, no despues: si el chofer cree
+                            que omitir es una forma de dar la parada por hecha, lo
+                            va a usar para salir del paso y el contenedor se queda
+                            lleno sin que nadie se entere. */}
+                        <p className="stop-skip-hint">
+                          El contenedor va a seguir lleno y su alerta abierta. La ruta avanza igual.
+                        </p>
+
+                        <div className="stop-actions">
+                          <Button
+                            variant="warning"
+                            onClick={() => skip(stop)}
+                            disabled={submittingSkip}
+                          >
+                            {submittingSkip ? 'Omitiendo…' : 'Omitir parada'}
+                          </Button>
+                          <Button variant="secondary" onClick={closeSkip} disabled={submittingSkip}>
+                            Cancelar
+                          </Button>
+                        </div>
                       </div>
                     )}
 

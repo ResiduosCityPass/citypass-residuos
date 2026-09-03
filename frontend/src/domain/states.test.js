@@ -5,6 +5,7 @@ import {
   neverReported,
   timeAgo,
   canConfirmStop,
+  canSkipStop,
   stopsProgress,
   isRouteLive,
   colorForWasteType,
@@ -48,15 +49,35 @@ describe('vocabulario del dominio', () => {
     expect(canConfirmStop(undefined)).toBe(false);
   });
 
-  it('el progreso cuenta las confirmadas sobre el total', () => {
+  /**
+   * Omitir es el otro final de la parada, y cierra igual que confirmar. Una
+   * parada ya cerrada no se reabre por ninguno de los dos caminos: los dos
+   * devuelven 409.
+   */
+  it('solo una parada PENDIENTE se puede omitir', () => {
+    expect(canSkipStop({ estado: 'PENDIENTE' })).toBe(true);
+    expect(canSkipStop({ estado: 'CONFIRMADA' })).toBe(false);
+    expect(canSkipStop({ estado: 'OMITIDA' })).toBe(false);
+    expect(canSkipStop(undefined)).toBe(false);
+  });
+
+  it('el progreso separa lo vaciado de lo cerrado', () => {
     expect(stopsProgress([{ estado: 'CONFIRMADA' }, { estado: 'PENDIENTE' }])).toEqual({
       confirmed: 1,
+      skipped: 0,
+      closed: 1,
       total: 2,
     });
-    // Una parada omitida no esta vaciada, pero si esta recorrida: cuenta en el
-    // total y no en el numerador.
-    expect(stopsProgress([{ estado: 'OMITIDA' }])).toEqual({ confirmed: 0, total: 1 });
-    expect(stopsProgress()).toEqual({ confirmed: 0, total: 0 });
+    // Una parada omitida NO esta vaciada, pero SI esta cerrada. Si las dos
+    // cosas se contaran juntas, una ruta donde el chofer no pudo vaciar nada
+    // mostraria "1 de 1 vaciados", que es lo contrario de lo que paso.
+    expect(stopsProgress([{ estado: 'OMITIDA' }])).toEqual({
+      confirmed: 0,
+      skipped: 1,
+      closed: 1,
+      total: 1,
+    });
+    expect(stopsProgress()).toEqual({ confirmed: 0, skipped: 0, closed: 0, total: 0 });
   });
 
   it('una ruta viva es la que el chofer todavia tiene que recorrer', () => {

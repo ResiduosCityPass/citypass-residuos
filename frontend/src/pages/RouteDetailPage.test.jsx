@@ -35,8 +35,8 @@ const route = (extras = {}) => ({
   // La ruta NO trae un objeto `chofer`: los choferes son usuarios del Squad 2 y
   // este modulo no guarda copia de sus datos. Solo viaja `choferId`.
   paradas: [
-    { id: 'pd-1', orden: 1, estado: 'PENDIENTE', confirmadaEn: null, contenedor: container('ct-1', 'CT-0001') },
-    { id: 'pd-2', orden: 2, estado: 'PENDIENTE', confirmadaEn: null, contenedor: container('ct-2', 'CT-0002') },
+    { id: 'pd-1', orden: 1, estado: 'PENDIENTE', confirmadaEn: null, omitidaEn: null, motivo: null, contenedor: container('ct-1', 'CT-0001') },
+    { id: 'pd-2', orden: 2, estado: 'PENDIENTE', confirmadaEn: null, omitidaEn: null, motivo: null, contenedor: container('ct-2', 'CT-0002') },
   ],
   ...extras,
 });
@@ -53,6 +53,35 @@ const mount = () =>
 describe('CU-08 / CU-09 · revisar y asignar una ruta', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  /**
+   * El motivo se le pide al chofer como obligatorio. Este es el unico lugar
+   * donde el operador lo lee, y de aca sale la decision de si vuelve a rutear
+   * ese contenedor hoy. Si no se mostrara, pedirlo no serviria para nada.
+   */
+  it('una parada omitida muestra por que no se pudo vaciar', async () => {
+    fetchRoute.mockResolvedValue(
+      route({
+        estado: 'COMPLETADA',
+        paradas: [
+          {
+            id: 'pd-1',
+            orden: 1,
+            estado: 'OMITIDA',
+            confirmadaEn: null,
+            omitidaEn: new Date().toISOString(),
+            motivo: 'Calle cortada por obra',
+            contenedor: container('ct-1', 'CT-0001'),
+          },
+        ],
+      }),
+    );
+    mount();
+
+    expect(await screen.findByText(/No se pudo vaciar: Calle cortada por obra/)).toBeInTheDocument();
+    // El contenedor sigue en CRITICO al 90%: omitir no vacia nada.
+    expect(screen.getByText('90%')).toBeInTheDocument();
   });
 
   it('una propuesta avisa que todavia no la ve ningun chofer', async () => {

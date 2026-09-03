@@ -59,6 +59,7 @@ export const resolveAlert = (...args) => source.resolveAlert(...args);
 /* CU-10 · Confirmar vaciado */
 export const fetchMyRoute = (...args) => source.fetchMyRoute(...args);
 export const confirmStop = (...args) => source.confirmStop(...args);
+export const skipStop = (...args) => source.skipStop(...args);
 
 /* CU-11 · Consulta ciudadana */
 export const fetchNearbyContainers = (...args) => source.fetchNearbyContainers(...args);

@@ -755,6 +755,29 @@
 
 .stop-feedback { margin-top: var(--space-1); }
 
+/* El motivo de una parada omitida. Ambar como el borde de .stop-omitida: es
+   una parada cerrada sin vaciar, no una falla ni un exito. */
+.stop-motivo {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--amber);
+}
+
+.stop-skip-form { display: grid; gap: var(--space-1); margin-top: var(--space-1); }
+
+/* El formulario ya es angosto; el margen inferior de .field lo estira de mas. */
+.stop-skip-form .field { margin-bottom: 0; }
+
+/* 44px tambien aca: el select y el input los toca la misma mano con guantes. */
+.stop-skip-form select,
+.stop-skip-form input[type="text"] { min-height: 44px; }
+
+.stop-skip-hint {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+
 @media (max-width: 900px) {
   .nearby-layout { grid-template-columns: 1fr; }
 }
