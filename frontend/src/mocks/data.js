@@ -267,13 +267,17 @@ export const ROUTES = [
 ];
 
 export const STOPS = [
-  { id: 'pd-01', rutaId: 'rt-01', contenedorId: 'ct-02', orden: 1, estado: 'CONFIRMADA', confirmadaEn: minutesAgo(20) },
-  { id: 'pd-02', rutaId: 'rt-01', contenedorId: 'ct-10', orden: 2, estado: 'PENDIENTE', confirmadaEn: null },
-  { id: 'pd-03', rutaId: 'rt-01', contenedorId: 'ct-14', orden: 3, estado: 'PENDIENTE', confirmadaEn: null },
+  // `omitidaEn` y `motivo` viajan siempre, en null mientras la parada no este
+  // omitida: son columnas de la entidad y la ruta se serializa entera. Si el
+  // fixture los omitiera, la pantalla se escribiria contra una forma mas pobre
+  // que la real y el bug aparece recien al conectar.
+  { id: 'pd-01', rutaId: 'rt-01', contenedorId: 'ct-02', orden: 1, estado: 'CONFIRMADA', confirmadaEn: minutesAgo(20), omitidaEn: null, motivo: null },
+  { id: 'pd-02', rutaId: 'rt-01', contenedorId: 'ct-10', orden: 2, estado: 'PENDIENTE', confirmadaEn: null, omitidaEn: null, motivo: null },
+  { id: 'pd-03', rutaId: 'rt-01', contenedorId: 'ct-14', orden: 3, estado: 'PENDIENTE', confirmadaEn: null, omitidaEn: null, motivo: null },
 
-  { id: 'pd-04', rutaId: 'rt-02', contenedorId: 'ct-01', orden: 1, estado: 'CONFIRMADA', confirmadaEn: hoursAgo(26) },
-  { id: 'pd-05', rutaId: 'rt-02', contenedorId: 'ct-04', orden: 2, estado: 'CONFIRMADA', confirmadaEn: hoursAgo(25) },
-  // Omitida: el chofer llego y no pudo vaciarlo (auto mal estacionado, calle
-  // cortada). El caso existe en el enum y la UI tiene que saber mostrarlo.
-  { id: 'pd-06', rutaId: 'rt-02', contenedorId: 'ct-05', orden: 3, estado: 'OMITIDA', confirmadaEn: null },
+  { id: 'pd-04', rutaId: 'rt-02', contenedorId: 'ct-01', orden: 1, estado: 'CONFIRMADA', confirmadaEn: hoursAgo(26), omitidaEn: null, motivo: null },
+  { id: 'pd-05', rutaId: 'rt-02', contenedorId: 'ct-04', orden: 2, estado: 'CONFIRMADA', confirmadaEn: hoursAgo(25), omitidaEn: null, motivo: null },
+  // Omitida: el chofer llego y no pudo vaciarlo. Ya no es solo decorado del
+  // enum — CU-10 tiene endpoint para producir este estado.
+  { id: 'pd-06', rutaId: 'rt-02', contenedorId: 'ct-05', orden: 3, estado: 'OMITIDA', confirmadaEn: null, omitidaEn: hoursAgo(24), motivo: 'Calle cortada por obra' },
 ];

@@ -6,6 +6,7 @@ import {
   deleteZone,
   fetchMyRoute,
   confirmStop,
+  skipStop,
   fetchNearbyContainers,
 } from './waste.http.js';
 import { saveToken } from './client.js';
@@ -70,6 +71,21 @@ describe('rutas contra la API real', () => {
     expect(calledPath()).toMatch(/\/paradas\/pd-02\/confirmar$/);
     expect(calledOptions().method).toBe('PATCH');
     expect(calledOptions().body).toBe('{"lat":-34.6,"lng":-58.38}');
+  });
+
+  /**
+   * El otro final de la parada. El motivo va en el CUERPO —no como query param
+   * como el bloqueo de zonas o el fuera de servicio—, porque es texto libre de
+   * hasta 200 caracteres escrito por una persona, no un booleano.
+   *
+   * Y no viaja ninguna posicion: omitir no valida el radio de 100 m.
+   */
+  it('omitir una parada manda el motivo en el cuerpo y nada mas', async () => {
+    await skipStop('pd-02', 'Calle cortada');
+
+    expect(calledPath()).toMatch(/\/paradas\/pd-02\/omitir$/);
+    expect(calledOptions().method).toBe('PATCH');
+    expect(calledOptions().body).toBe('{"motivo":"Calle cortada"}');
   });
 
   /**

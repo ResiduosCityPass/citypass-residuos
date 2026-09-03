@@ -120,8 +120,20 @@ export default function RouteDetailPage() {
                     <Chip variant={stop.estado === 'CONFIRMADA' ? 'success' : stop.estado === 'OMITIDA' ? 'warning' : 'neutral'}>
                       {STOP_STATE_LABEL[stop.estado]}
                     </Chip>
-                    {stop.confirmadaEn && <span className="muted">{timeAgo(stop.confirmadaEn)}</span>}
+                    {(stop.confirmadaEn ?? stop.omitidaEn) && (
+                      <span className="muted">{timeAgo(stop.confirmadaEn ?? stop.omitidaEn)}</span>
+                    )}
                   </div>
+
+                  {/* El motivo se le pide al chofer como obligatorio, y este es
+                      el unico lugar donde el operador lo lee. Sin mostrarlo,
+                      pedirlo no sirve para nada: la decision de si vuelve a
+                      rutear este contenedor hoy o si el problema es de la
+                      calle sale de aca. */}
+                  {stop.estado === 'OMITIDA' && stop.motivo && (
+                    <p className="stop-motivo">No se pudo vaciar: {stop.motivo}</p>
+                  )}
+
                   {stop.contenedor && (
                     <div className="stop-fill">
                       <FillBar
