@@ -4,6 +4,7 @@ import TokenBar from '../TokenBar.jsx';
 import Chip from '../ui/Chip.jsx';
 import Button from '../ui/Button.jsx';
 import { USING_MOCKS } from '../../api/waste.js';
+import { usingDevToken } from '../../api/client.js';
 
 /**
  * Barra superior: titulo de la pantalla, alertas abiertas, sesion.
@@ -12,9 +13,17 @@ import { USING_MOCKS } from '../../api/waste.js';
  * hasta que el Squad 2 publique el login federado (ADR-005), y un input de JWT
  * permanentemente a la vista en la cabecera de la app no es una pantalla que uno
  * quiera mostrar en la defensa.
+ *
+ * Con VITE_DEV_TOKEN configurada no aparece siquiera el boton: la app ya elige
+ * el token segun la pantalla. Dejarlo visible solo daba lugar a pegar ahi el
+ * token equivocado y dejar el resto del modulo en 401, que es exactamente lo
+ * que pasaba.
  */
 export default function TopBar({ title, subtitle, openAlerts, onTokenChange }) {
   const [tokenOpen, setTokenOpen] = useState(false);
+
+  // Sin backend no hay token que pegar; con token de desarrollo, tampoco.
+  const mostrarToken = !USING_MOCKS && !usingDevToken();
 
   return (
     <header className="topbar">
@@ -38,7 +47,7 @@ export default function TopBar({ title, subtitle, openAlerts, onTokenChange }) {
           {openAlerts > 0 && <span className="topbar-dot">{openAlerts}</span>}
         </button>
 
-        {!USING_MOCKS && (
+        {mostrarToken && (
           <Button variant="ghost" size="sm" onClick={() => setTokenOpen((v) => !v)}>
             {tokenOpen ? 'Ocultar token' : 'Token'}
           </Button>
@@ -50,7 +59,7 @@ export default function TopBar({ title, subtitle, openAlerts, onTokenChange }) {
         </div>
       </div>
 
-      {tokenOpen && !USING_MOCKS && (
+      {tokenOpen && mostrarToken && (
         <div className="topbar-token">
           <TokenBar onChange={onTokenChange} />
         </div>

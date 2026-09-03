@@ -15,11 +15,18 @@ export const saveToken = (token) => localStorage.setItem(TOKEN_KEY, token.trim()
 export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
 
 /**
- * Deja listo el token de VITE_DEV_TOKEN para no tener que pegarlo a mano.
+ * Deja puesto el token de desarrollo que corresponde a la pantalla.
  *
  * Existe porque el login federado del Squad 2 recien llega en el Sprint 3
- * (ADR-005). Hasta entonces el token se fabrica con `npm run token:dev` y dura
- * 8 horas, y pegarlo a mano en cada vencimiento es incomodo en la demo.
+ * (ADR-005). Hasta entonces el token se fabrica con `npm run token:dev`, dura
+ * 8 horas, y cada rol necesita el suyo: la pantalla del chofer solo la abre un
+ * CHOFER, y el resto del modulo, un ADMINISTRADOR u OPERADOR. Elegirlo a mano
+ * significaba pegar y despegar JWTs en una barra para moverse por la app.
+ *
+ * PISA el token guardado a proposito. La version anterior lo respetaba, y eso
+ * dejaba la app trabada: bastaba pegar el token de chofer una vez para que
+ * todas las demas pantallas quedaran en 401 hasta borrarlo a mano. En
+ * desarrollo el token no es una decision del usuario, es andamiaje.
  *
  * Dos condiciones, y hacen falta las dos:
  *
@@ -29,20 +36,27 @@ export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
  *  2. Que la variable este definida. No tiene valor por defecto y `.env.local`
  *     no se versiona, asi que un clon del repo no hereda el token de nadie.
  *
- * No pisa un token ya guardado: si pegaste uno de CHOFER a mano, sigue siendo
- * el tuyo hasta que lo borres desde la barra.
- *
- * @returns {boolean} true si sembro el token en este llamado.
+ * @param {string} pathname - Ruta actual. `/chofer` usa el token de CHOFER.
+ * @returns {boolean} true si dejo un token puesto.
  */
-export function seedDevToken() {
+export function seedDevToken(pathname = '') {
   if (!import.meta.env.DEV) return false;
 
-  const preset = import.meta.env.VITE_DEV_TOKEN;
-  if (!preset || readToken()) return false;
+  const esChofer = pathname.startsWith('/chofer');
+  const preset = esChofer
+    ? import.meta.env.VITE_DEV_TOKEN_CHOFER
+    : import.meta.env.VITE_DEV_TOKEN;
+
+  if (!preset || readToken() === preset) return false;
 
   saveToken(preset);
   return true;
 }
+
+/** Hay token de desarrollo configurado, asi que la barra manual sobra. */
+export const usingDevToken = () =>
+  Boolean(import.meta.env.DEV && import.meta.env.VITE_DEV_TOKEN);
+
 
 /**
  * Error de API con el `code` estable del backend.
