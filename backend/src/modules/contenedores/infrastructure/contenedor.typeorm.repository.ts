@@ -35,8 +35,18 @@ export class ContenedorTypeormRepository
     return this.repo().findOne({ where: { codigo } });
   }
 
+  /**
+   * El sensor viene en el listado porque "sin sensor" y "sensor que nunca
+   * reporto" se ven identicos sin el: los dos muestran 0% y sin fecha de
+   * ultima lectura. Es un LEFT JOIN 1:1 sobre una FK unica, y `apiKeyHash`
+   * esta declarado `select: false`, asi que la credencial no viaja.
+   */
   listar(filtro: FiltroContenedores): Promise<Contenedor[]> {
-    return this.repo().find({ where: this.armarWhere(filtro), order: { codigo: 'ASC' } });
+    return this.repo().find({
+      where: this.armarWhere(filtro),
+      order: { codigo: 'ASC' },
+      relations: { sensor: true },
+    });
   }
 
   listarConZona(filtro: FiltroContenedores): Promise<Contenedor[]> {

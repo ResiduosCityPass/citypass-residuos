@@ -408,9 +408,13 @@ stateDiagram-v2
     NORMAL --> CRITICO: cruza el umbral de la zona
     CRITICO --> NORMAL: vaciado confirmado (CU-10)
 
-    NORMAL --> FUERA_DE_SERVICIO: decisión del administrador
-    ADVERTENCIA --> FUERA_DE_SERVICIO: decisión del administrador
-    CRITICO --> FUERA_DE_SERVICIO: decisión del administrador
+    NORMAL --> FUERA_DE_SERVICIO: servicio?fuera=true
+    ADVERTENCIA --> FUERA_DE_SERVICIO: servicio?fuera=true
+    CRITICO --> FUERA_DE_SERVICIO: servicio?fuera=true
+
+    FUERA_DE_SERVICIO --> NORMAL: servicio?fuera=false<br/>reevaluado bajo el umbral
+    FUERA_DE_SERVICIO --> ADVERTENCIA: servicio?fuera=false<br/>reevaluado cerca del umbral
+    FUERA_DE_SERVICIO --> CRITICO: servicio?fuera=false<br/>reevaluado sobre el umbral
 
     note right of CRITICO
         La alerta se emite solo en
@@ -420,8 +424,11 @@ stateDiagram-v2
     end note
 
     note right of FUERA_DE_SERVICIO
-        Ninguna lectura lo saca
-        de este estado.
+        Ninguna lectura lo saca de acá.
+        Al reintegrarlo se lo reevalúa
+        contra el umbral de su zona con
+        el último nivel conocido: si
+        quedó lleno, vuelve en rojo.
     end note
 ```
 
@@ -449,8 +456,8 @@ stateDiagram-v2
 stateDiagram-v2
     [*] --> PROPUESTA: CU-08 genera
     PROPUESTA --> ASIGNADA: CU-09 confirma<br/>(el camión pasa a EN_RUTA)
-    ASIGNADA --> EN_CURSO: primera parada confirmada
-    EN_CURSO --> COMPLETADA: última parada confirmada<br/>(el camión vuelve a DISPONIBLE)
+    ASIGNADA --> EN_CURSO: primera parada cerrada
+    EN_CURSO --> COMPLETADA: última parada cerrada<br/>(el camión vuelve a DISPONIBLE)
     PROPUESTA --> CANCELADA
     ASIGNADA --> CANCELADA
     COMPLETADA --> [*]
@@ -462,7 +469,44 @@ stateDiagram-v2
         no permite sacarlo de
         EN_RUTA a mano.
     end note
+
+    note right of EN_CURSO
+        "Cerrada" es confirmada
+        u omitida. Si solo contara
+        la confirmación, una calle
+        cortada dejaría la ruta y
+        el camión trabados para
+        siempre.
+    end note
 ```
+
+### Parada
+
+```mermaid
+stateDiagram-v2
+    [*] --> PENDIENTE: CU-08 arma el recorrido
+    PENDIENTE --> CONFIRMADA: el chofer vació<br/>(dentro de 100 m)
+    PENDIENTE --> OMITIDA: el chofer no pudo<br/>(con motivo obligatorio)
+    CONFIRMADA --> [*]
+    OMITIDA --> [*]
+
+    note right of CONFIRMADA
+        El contenedor vuelve a 0%
+        y a NORMAL, y sus alertas
+        de saturación se cierran.
+    end note
+
+    note right of OMITIDA
+        El contenedor queda como
+        estaba: lleno y con su
+        alerta abierta. No exige
+        estar dentro del radio.
+    end note
+```
+
+Ninguno de los dos finales se reabre: los dos devuelven `409`. Si el contenedor se puede vaciar
+después, se genera una ruta nueva — reabrir la parada obligaría a revivir una ruta ya `COMPLETADA`
+y a volver a tomar un camión que ya se liberó.
 
 ---
 

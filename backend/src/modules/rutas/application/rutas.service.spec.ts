@@ -73,6 +73,7 @@ describe('RutasService (CU-08, CU-09)', () => {
       listar: jest.fn().mockResolvedValue([]),
       buscarActivaDeChofer: jest.fn().mockResolvedValue(null),
       contenedoresEnRutasVivas: jest.fn().mockResolvedValue([]),
+      avanceDeParadas: jest.fn().mockResolvedValue(new Map()),
     };
     paradas = {
       crearVarias: jest.fn().mockResolvedValue([]),
@@ -197,15 +198,15 @@ describe('RutasService (CU-08, CU-09)', () => {
       const ruta = rutaCreada();
       rutas.buscarPorId.mockResolvedValue(ruta);
 
-      await service.asignar('rt-1', { choferId: 'user:jperez' });
+      await service.asignar('rt-1', { choferId: 'U000042' });
 
       expect(ruta.estado).toBe(EstadoRuta.ASIGNADA);
-      expect(ruta.choferId).toBe('user:jperez');
+      expect(ruta.choferId).toBe('U000042');
       expect(ruta.asignadaEn).toBeInstanceOf(Date);
     });
 
     it('recien ahi toma el camion', async () => {
-      await service.asignar('rt-1', { choferId: 'user:jperez' });
+      await service.asignar('rt-1', { choferId: 'U000042' });
 
       expect(flota.guardarEstado).toHaveBeenCalledWith(
         expect.objectContaining({ estado: EstadoCamion.EN_RUTA }),
@@ -213,7 +214,7 @@ describe('RutasService (CU-08, CU-09)', () => {
     });
 
     it('publica residuos.ruta.asignada', async () => {
-      await service.asignar('rt-1', { choferId: 'user:jperez' });
+      await service.asignar('rt-1', { choferId: 'U000042' });
 
       expect(eventos.getPublished(EventTypes.RUTA_ASIGNADA)).toHaveLength(1);
     });
@@ -235,15 +236,53 @@ describe('RutasService (CU-08, CU-09)', () => {
     });
   });
 
+  describe('listar · avance de paradas', () => {
+    it('adjunta el avance a cada ruta con una sola consulta', async () => {
+      rutas.listar.mockResolvedValue([rutaCreada({ id: 'rt-1' }), rutaCreada({ id: 'rt-2' })]);
+      rutas.avanceDeParadas.mockResolvedValue(
+        new Map([
+          ['rt-1', { total: 3, confirmadas: 2, omitidas: 0, pendientes: 1 }],
+          ['rt-2', { total: 2, confirmadas: 1, omitidas: 1, pendientes: 0 }],
+        ]),
+      );
+
+      const listado = await service.listar({});
+
+      expect(rutas.avanceDeParadas).toHaveBeenCalledTimes(1);
+      expect(rutas.avanceDeParadas).toHaveBeenCalledWith(['rt-1', 'rt-2']);
+      expect(listado[0].avance).toEqual({ total: 3, confirmadas: 2, omitidas: 0, pendientes: 1 });
+      expect(listado[1].avance).toEqual({ total: 2, confirmadas: 1, omitidas: 1, pendientes: 0 });
+    });
+
+    it('una ruta sin paradas trae el avance en cero, no undefined', async () => {
+      // La tabla del frontend hace `avance.confirmadas` sin preguntar: dejarlo
+      // en undefined le rompe la fila en vez de mostrarle "0 de 0".
+      rutas.listar.mockResolvedValue([rutaCreada()]);
+      rutas.avanceDeParadas.mockResolvedValue(new Map());
+
+      const [ruta] = await service.listar({});
+
+      expect(ruta.avance).toEqual({ total: 0, confirmadas: 0, omitidas: 0, pendientes: 0 });
+    });
+
+    it('no consulta el avance cuando no hay rutas', async () => {
+      rutas.listar.mockResolvedValue([]);
+
+      await service.listar({});
+
+      expect(rutas.avanceDeParadas).toHaveBeenCalledWith([]);
+    });
+  });
+
   describe('rutaActivaDe', () => {
     it('devuelve null si el chofer no tiene ruta activa', async () => {
-      await expect(service.rutaActivaDe('user:jperez')).resolves.toBeNull();
+      await expect(service.rutaActivaDe('U000042')).resolves.toBeNull();
     });
 
     it('pide la ruta del chofer indicado', async () => {
-      await service.rutaActivaDe('user:jperez');
+      await service.rutaActivaDe('U000042');
 
-      expect(rutas.buscarActivaDeChofer).toHaveBeenCalledWith('user:jperez');
+      expect(rutas.buscarActivaDeChofer).toHaveBeenCalledWith('U000042');
     });
   });
 });

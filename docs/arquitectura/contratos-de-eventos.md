@@ -92,13 +92,36 @@ Se emite cuando el chofer confirma la parada y el contenedor vuelve a estado nor
   "contenedorId": "CT-0421",
   "rutaId": "RT-2026-09-15-03",
   "camionId": "CM-07",
-  "choferId": "user:jperez",
+  "choferId": "U000042",
   "nivelPrevio": 87.4,
   "confirmadoEn": "2026-09-15T16:05:22.100Z"
 }
 ```
 
 **Consumidores esperados:** Analítica Urbana (Squad 8), para métricas de tiempo de respuesta.
+
+---
+
+### `residuos.parada.omitida` — CU-10
+
+Se emite cuando el chofer llega pero no puede vaciar. El contenedor **queda como estaba**: sigue
+lleno y con su alerta abierta.
+
+```json
+{
+  "paradaId": "b1f0...",
+  "rutaId": "RT-2026-09-15-03",
+  "contenedorId": "CT-0421",
+  "camionId": "CM-07",
+  "choferId": "U000042",
+  "motivo": "Auto mal estacionado tapando el contenedor",
+  "nivelLlenadoPct": 88,
+  "omitidaEn": "2026-09-15T16:12:40.900Z"
+}
+```
+
+**Consumidores esperados:** Analítica Urbana (Squad 8), para medir cuántas recolecciones se
+pierden y por qué. Es el dato que justifica cambiar un horario o una frecuencia de recorrido.
 
 ---
 

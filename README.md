@@ -56,8 +56,7 @@ La API queda en `http://localhost:3000` y la documentación Swagger en `http://l
 
 ## Documentación clave
 
-- **[ESTADO.md](ESTADO.md) — qué hace cada caso de uso, dónde vive y qué falta. Empezá por acá.**
-- [Guía de integración para frontend](docs/arquitectura/guia-frontend.md) — el contrato de la API, con capturas reales de cada endpoint.
+- [Guion de la demo del Hito 1](docs/sprints/guion-demo-hito-1.md) — que mostrar, en que orden y con que comandos.
 - [Backlog priorizado](docs/sprints/backlog-priorizado.md) — qué construimos y en qué orden, con el recorte de alcance justificado.
 - [Diagramas](docs/arquitectura/diagramas.md) — casos de uso, C4, secuencia y máquinas de estado.
 - [Modelo de datos](docs/arquitectura/modelo-de-datos.md)

@@ -3,9 +3,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsWhere, In, Repository } from 'typeorm';
 import { ContextoTransaccional } from '../../../shared/persistence/contexto-transaccional';
 import { RepositorioTypeorm } from '../../../shared/persistence/repositorio-typeorm';
-import { EstadoRuta } from '../../../shared/domain/enums';
+import { EstadoParada, EstadoRuta } from '../../../shared/domain/enums';
 import { Parada } from '../domain/parada.entity';
-import { ESTADOS_VIVOS, FiltroRutas, RutaRepository } from '../domain/ruta.repository';
+import {
+  AvanceParadas,
+  ESTADOS_VIVOS,
+  FiltroRutas,
+  RutaRepository,
+} from '../domain/ruta.repository';
 import { Ruta } from '../domain/ruta.entity';
 
 const RELACIONES_COMPLETAS = {
@@ -74,6 +79,49 @@ export class RutaTypeormRepository extends RepositorioTypeorm<Ruta> implements R
       .getRawMany<{ contenedorId: string }>();
 
     return filas.map((f) => f.contenedorId);
+  }
+
+  /**
+   * Una sola consulta agrupada para todas las rutas del listado. Traer las
+   * paradas enteras por ruta seria mover cientos de filas para mostrar un
+   * contador, y pedirlas de a una seria el N+1 que el listado tiene que evitar.
+   */
+  async avanceDeParadas(rutaIds: string[]): Promise<Map<string, AvanceParadas>> {
+    const avances = new Map<string, AvanceParadas>();
+
+    if (rutaIds.length === 0) {
+      return avances;
+    }
+
+    const filas = await this.paradas
+      .createQueryBuilder('parada')
+      .select('parada.rutaId', 'rutaId')
+      .addSelect('parada.estado', 'estado')
+      .addSelect('COUNT(*)', 'cantidad')
+      .where('parada.rutaId IN (:...rutaIds)', { rutaIds })
+      .groupBy('parada.rutaId')
+      .addGroupBy('parada.estado')
+      .getRawMany<{ rutaId: string; estado: EstadoParada; cantidad: string }>();
+
+    for (const fila of filas) {
+      const avance = avances.get(fila.rutaId) ?? {
+        total: 0,
+        confirmadas: 0,
+        omitidas: 0,
+        pendientes: 0,
+      };
+      // Postgres devuelve COUNT como string: sin Number, "2" + "1" daria "21".
+      const cantidad = Number(fila.cantidad);
+
+      avance.total += cantidad;
+      if (fila.estado === EstadoParada.CONFIRMADA) avance.confirmadas += cantidad;
+      if (fila.estado === EstadoParada.OMITIDA) avance.omitidas += cantidad;
+      if (fila.estado === EstadoParada.PENDIENTE) avance.pendientes += cantidad;
+
+      avances.set(fila.rutaId, avance);
+    }
+
+    return avances;
   }
 
   /**

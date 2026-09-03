@@ -1,5 +1,9 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { aplicarCambios } from '../../../shared/application/aplicar-cambios';
+import { EstadoContenedor } from '../../../shared/domain/enums';
+// Regla de CU-05, no del modulo de lecturas: es una funcion pura sobre numeros.
+// Reimplementar acá la comparacion contra el umbral seria tener dos verdades.
+import { evaluarEstadoContenedor } from '../../lecturas/domain/reglas/evaluador-estado';
 import { ZonasService } from '../../zonas/application/zonas.service';
 import { generarApiKey, hashearApiKey } from '../domain/api-key';
 import { Contenedor } from '../domain/contenedor.entity';
@@ -73,6 +77,56 @@ export class ContenedoresService {
     }
 
     aplicarCambios(contenedor, dto);
+
+    return this.contenedores.guardar(contenedor);
+  }
+
+  /**
+   * Pone el contenedor fuera de servicio, o lo reintegra.
+   *
+   * No viaja en el `PATCH` general a proposito. `estado` es de la maquina de
+   * reglas: NORMAL, ADVERTENCIA y CRITICO los decide la lectura del sensor
+   * (CU-05), y dejarlos editar a mano seria pelearle al motor que los calcula.
+   * FUERA_DE_SERVICIO es lo unico que decide una persona, y es un acto
+   * operativo, no la edicion de un campo. Mismo criterio que el bloqueo de
+   * zonas (CU-02) y que el estado del camion (CU-03).
+   *
+   * Mientras esta fuera de servicio ninguna lectura le cambia el estado —el
+   * evaluador de CU-05 ya lo respeta— y el ruteo de CU-08 no lo elige, porque
+   * solo toma contenedores CRITICO.
+   *
+   * Al reintegrarlo NO vuelve a NORMAL a ciegas: se lo reevalua contra el
+   * umbral de su zona con el ultimo nivel conocido. Un contenedor que quedo al
+   * 92% tiene que volver en rojo. Las alertas abiertas no se tocan ni al salir
+   * ni al volver: el contenedor sigue lleno, y esa alerta es justamente lo que
+   * hace falta que alguien atienda.
+   */
+  async cambiarServicio(id: string, fueraDeServicio: boolean): Promise<Contenedor> {
+    const contenedor = await this.obtener(id);
+    const estaFuera = contenedor.estado === EstadoContenedor.FUERA_DE_SERVICIO;
+
+    // Idempotente: pedir dos veces lo mismo no es un error ni cambia nada.
+    if (fueraDeServicio === estaFuera) {
+      return contenedor;
+    }
+
+    if (fueraDeServicio) {
+      contenedor.estado = EstadoContenedor.FUERA_DE_SERVICIO;
+    } else {
+      const zona = await this.zonas.obtener(contenedor.zonaId);
+
+      contenedor.estado = evaluarEstadoContenedor(
+        {
+          nivelLlenadoPct: contenedor.nivelLlenadoPct,
+          temperaturaC: contenedor.temperaturaC ?? 0,
+        },
+        zona,
+        // Se pasa NORMAL como estado actual porque el evaluador cortocircuita
+        // cuando el estado que recibe ya es FUERA_DE_SERVICIO, que es justo lo
+        // que estamos dejando atras.
+        EstadoContenedor.NORMAL,
+      );
+    }
 
     return this.contenedores.guardar(contenedor);
   }

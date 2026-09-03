@@ -14,6 +14,7 @@ describe('ContenedoresController (CU-01)', () => {
       obtener: jest.fn(),
       actualizar: jest.fn(),
       darDeBaja: jest.fn(),
+      cambiarServicio: jest.fn(),
       vincularSensor: jest.fn(),
     } as unknown as jest.Mocked<ContenedoresService>;
     controller = new ContenedoresController(service);
@@ -72,5 +73,15 @@ describe('ContenedoresController (CU-01)', () => {
 
       expect(respuesta).not.toHaveProperty('apiKeyHash');
     });
+  });
+
+  it('delega el cambio de servicio con el valor del query param', async () => {
+    await controller.cambiarServicio('c-1', true);
+    expect(service.cambiarServicio).toHaveBeenCalledWith('c-1', true);
+  });
+
+  it('el reintegro viaja como false, no como ausencia del parametro', async () => {
+    await controller.cambiarServicio('c-1', false);
+    expect(service.cambiarServicio).toHaveBeenCalledWith('c-1', false);
   });
 });
