@@ -105,7 +105,7 @@ Payload liviano pensado para renderizar marcadores: `id`, `lat`, `lng`, `estado`
 |---|---|---|
 | `POST` | `/rutas/generar` | Operador | Devuelve una ruta en estado `PROPUESTA`, no la persiste como asignada |
 | `PATCH` | `/rutas/:id/asignar` | Operador | Confirma, asigna chofer y pasa a `ASIGNADA` |
-| `GET` | `/rutas/:id` | Admin, Operador, Chofer |
+| `GET` | `/rutas/:id` | Admin, Operador | Detalle de cualquier ruta. Sin Chofer: no verifica de quien es la ruta |
 | `GET` | `/rutas/mias` | Chofer | Ruta activa del chofer autenticado |
 
 La separación entre generar y asignar es deliberada: **mantiene a una persona en el medio**, que es

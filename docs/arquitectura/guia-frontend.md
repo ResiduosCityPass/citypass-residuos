@@ -928,6 +928,17 @@ Errores: `409 RUTA_NO_PROPUESTA` · `404 RUTA_NO_ENCONTRADA`.
 > tu `<select>` puede seguir con datos falsos, y la pantalla ya aclara que es una limitación
 > conocida.
 
+### `GET /rutas/:id` — detalle
+
+Roles: `ADMINISTRADOR`, `OPERADOR`. **Ya no acepta `CHOFER`.**
+
+Devuelve cualquier ruta por id y **no verifica de quién es**, así que dejarlo abierto al chofer
+permitía que uno leyera la ruta de otro con solo conocer el id. El chofer tiene `/rutas/mias`, que
+resuelve la identidad desde el token. Si tu pantalla del chofer llegara a pegarle a este endpoint,
+va a recibir `403`: usá `/rutas/mias`.
+
+No trae `avance`: acá tenés las paradas enteras y contarlas es trivial.
+
 ### `GET /rutas/mias` — CU-10
 
 Rol: `CHOFER`. **Sin parámetros:** la identidad sale del `sub` del token. Si viajara por query
