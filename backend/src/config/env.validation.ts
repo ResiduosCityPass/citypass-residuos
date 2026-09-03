@@ -1,6 +1,16 @@
 import { plainToInstance } from 'class-transformer';
 import { IsEnum, IsInt, IsOptional, IsString, Max, Min, validateSync } from 'class-validator';
 
+/**
+ * Emisor con el que se firman y se leen los tokens.
+ *
+ * Tiene un valor por defecto porque la aplicacion tiene que poder arrancar sin
+ * un `.env`: el CI no tiene uno, y `jsonwebtoken` rechaza `issuer: undefined`
+ * con "issuer must be a string" recien al firmar el primer token, no al
+ * arrancar. En el Sprint 3 pasa a ser el emisor del Squad 2, por configuracion.
+ */
+export const EMISOR_TOKEN_DEFAULT = 'citypass-squad2';
+
 enum Entorno {
   Development = 'development',
   Test = 'test',
@@ -35,6 +45,14 @@ class VariablesEntorno {
 
   @IsString()
   JWT_SECRET!: string;
+
+  @IsString()
+  @IsOptional()
+  JWT_ISSUER: string = EMISOR_TOKEN_DEFAULT;
+
+  @IsString()
+  @IsOptional()
+  JWT_EXPIRES_IN: string = '8h';
 
   @IsString()
   @IsOptional()
