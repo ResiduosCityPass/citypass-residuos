@@ -466,12 +466,24 @@ function expandRoute(route) {
   };
 }
 
+/**
+ * El LISTADO no trae `paradas`: solo el detalle las expande. Antes este mock
+ * devolvia la ruta entera y la pantalla de rutas se escribio contra esa forma,
+ * asi que al conectar el backend real reventaba leyendo `r.paradas.length` de
+ * un campo que nunca existio. Un mock mas generoso que el backend no ayuda:
+ * esconde el error hasta el peor momento.
+ */
+const listRoute = (route) => ({
+  ...route,
+  camion: store.trucks.find((t) => t.id === route.camionId) ?? null,
+});
+
 export const fetchRoutes = (filters = {}) =>
   respond(
     store.routes
       .filter((r) => !filters.estado || r.estado === filters.estado)
       .sort((a, b) => new Date(b.generadaEn) - new Date(a.generadaEn))
-      .map(expandRoute),
+      .map(listRoute),
   );
 
 export function fetchRoute(id) {
@@ -555,6 +567,7 @@ export function generateRoute(data = {}) {
     litrosEstimados: Math.round(load),
     generadaEn: now(),
     asignadaEn: null,
+    completadaEn: null,
   };
   store.routes.push(route);
 

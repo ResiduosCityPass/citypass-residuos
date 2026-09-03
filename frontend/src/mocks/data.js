@@ -256,11 +256,13 @@ export const TRUCKS = [
 export const ROUTES = [
   {
     id: 'rt-01', camionId: 'cm-02', choferId: 'ldap:mgomez', estado: 'EN_CURSO',
-    distanciaEstimadaKm: 7.4, generadaEn: minutesAgo(55), asignadaEn: minutesAgo(48),
+    distanciaEstimadaKm: 7.4, litrosEstimados: 3300,
+    generadaEn: minutesAgo(55), asignadaEn: minutesAgo(48), completadaEn: null,
   },
   {
     id: 'rt-02', camionId: 'cm-01', choferId: 'ldap:jperez', estado: 'COMPLETADA',
-    distanciaEstimadaKm: 11.2, generadaEn: hoursAgo(28), asignadaEn: hoursAgo(27),
+    distanciaEstimadaKm: 11.2, litrosEstimados: 8100,
+    generadaEn: hoursAgo(28), asignadaEn: hoursAgo(27), completadaEn: hoursAgo(25),
   },
 ];
 
