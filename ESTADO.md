@@ -404,8 +404,22 @@ de alto mínimo y cabecera fija con el progreso. Por eso vive fuera del panel de
   coordinarse.
 - El contenedor vuelve a `NORMAL` **salvo que esté `FUERA_DE_SERVICIO`**: lo que tiene roto es el
   sensor o la tapa, no el nivel.
-- **`OMITIDA` se muestra pero no se puede setear.** El estado existe en el modelo y la lista lo
-  pinta, pero no hay endpoint que lo produzca.
+- **`OMITIDA` es el otro final de la parada, y cierra igual que confirmar.** El chofer que llega y
+  no puede vaciar —auto mal estacionado, calle cortada— marca la parada con un motivo
+  **obligatorio** (3 a 200 caracteres). Las tres diferencias con confirmar son el caso de uso
+  entero: **no vacía el contenedor** (sigue lleno y en `CRITICO`), **no cierra las alertas** —por
+  eso la respuesta no trae `alertasCerradas`, y esa ausencia es el punto— y **no exige estar a
+  menos de 100 m**, porque el caso típico es justamente no poder acercarse. Lo que sí comparte:
+  **si era la última parada abierta, cierra la ruta y libera el camión.** Sin eso una calle cortada
+  dejaba la ruta trabada en `EN_CURSO` y el camión tomado para siempre, y CU-03 no deja sacarlo de
+  `EN_RUTA` a mano.
+- **Una parada cerrada no se reabre**, ni confirmada ni omitida (`409 PARADA_YA_OMITIDA`). Si el
+  auto se movió y ahora sí se puede vaciar, se genera una ruta nueva.
+- **El motivo se muestra en las dos pantallas.** En `/chofer` y en `/rutas/:id`: pedirlo como
+  obligatorio y después no mostrarlo lo convierte en un campo que se llena para nada. De ahí sale
+  la decisión del operador de si vuelve a rutear ese contenedor hoy.
+- **El progreso cuenta las vaciadas, la barra cuenta las cerradas.** No es lo mismo: una ruta donde
+  el chofer no pudo vaciar nada diría "3 de 3 vaciados" si se contaran juntas.
 - **Recortado:** sin soporte offline ([ADR-004](docs/adr/ADR-004-alcance-y-recortes.md)). Es el
   ítem más caro del relevamiento y ninguna dimensión de la rúbrica lo exige.
 
@@ -543,7 +557,7 @@ de disimulados.
 | **No se puede poner un contenedor en `FUERA_DE_SERVICIO`** | El estado existe en el modelo y el motor de reglas lo respeta, pero `PATCH /contenedores/:id` no acepta `estado` y no hay otro endpoint. El botón está en el detalle, deshabilitado y con el motivo en el tooltip. |
 | **`GET /contenedores` no dice si el contenedor ya tiene sensor** | No devuelve `sensor` ni un `tieneSensor`. La UI deja intentar y muestra el `409 CONTENEDOR_YA_TIENE_SENSOR` si corresponde. En el listado no se puede distinguir "sin sensor" de "sensor que nunca reportó". |
 | **`GET /rutas` no trae el avance de paradas** | El listado no incluye las paradas, así que la tabla no puede mostrar "2 de 3 vaciadas" sin una llamada por fila. Hoy muestra la carga estimada en litros, que sí viene. |
-| **No hay endpoint para omitir una parada** | `OMITIDA` existe en el modelo y la pantalla lo dibuja, pero el único endpoint es `/confirmar`. El caso real es el chofer que llega y no puede vaciar: auto mal estacionado, calle cortada. |
+| ~~**No hay endpoint para omitir una parada**~~ | **Resuelto.** `PATCH /paradas/:id/omitir` con `{ motivo }` está en `develop` y la pantalla del chofer ya lo usa. |
 
 ## 3. Lo que depende de otros equipos
 

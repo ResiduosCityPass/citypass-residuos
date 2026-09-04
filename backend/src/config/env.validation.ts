@@ -32,19 +32,40 @@ class VariablesEntorno {
   PORT: number = 3000;
 
   @IsString()
-  DB_HOST!: string;
+  @IsOptional()
+  DATABASE_URL?: string;
+
+  @IsString()
+  @IsOptional()
+  DB_HOST?: string;
 
   @IsInt()
-  DB_PORT!: number;
+  @IsOptional()
+  DB_PORT?: number;
 
   @IsString()
-  DB_USER!: string;
+  @IsOptional()
+  DB_USER?: string;
 
   @IsString()
-  DB_PASSWORD!: string;
+  @IsOptional()
+  DB_PASSWORD?: string;
 
   @IsString()
-  DB_NAME!: string;
+  @IsOptional()
+  DB_NAME?: string;
+
+  @IsString()
+  @IsOptional()
+  DB_SSL: string = 'false';
+
+  @IsString()
+  @IsOptional()
+  DB_SYNCHRONIZE: string = 'false';
+
+  @IsString()
+  @IsOptional()
+  DB_MIGRATIONS_RUN: string = 'false';
 
   @IsString()
   JWT_SECRET!: string;
@@ -68,6 +89,10 @@ class VariablesEntorno {
   @IsString()
   @IsOptional()
   EVENT_BUS_DRIVER: string = 'inmemory';
+
+  @IsString()
+  @IsOptional()
+  CORS_ORIGIN?: string;
 }
 
 /**
@@ -86,6 +111,19 @@ export function validarEntorno(config: Record<string, unknown>) {
       'Configuracion de entorno invalida:\n' +
         errores
           .map((e) => `  - ${e.property}: ${Object.values(e.constraints ?? {}).join(', ')}`)
+          .join('\n'),
+    );
+  }
+
+  const faltantesBase = ['DB_HOST', 'DB_PORT', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'].filter(
+    (key) => !instancia.DATABASE_URL && instancia[key as keyof VariablesEntorno] === undefined,
+  );
+
+  if (faltantesBase.length > 0) {
+    throw new Error(
+      'Configuracion de entorno invalida:\n' +
+        faltantesBase
+          .map((key) => `  - ${key}: requerido cuando DATABASE_URL no esta definido`)
           .join('\n'),
     );
   }

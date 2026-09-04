@@ -651,6 +651,12 @@ export function confirmStop(id, position = {}) {
     return fail('PARADA_YA_CONFIRMADA', 409, `La parada ${stop.orden} ya fue confirmada`);
   }
 
+  // Una parada cerrada no se reabre por el otro camino: omitida tampoco se
+  // confirma. Antes esto no hacia falta porque nada podia setear OMITIDA.
+  if (stop.estado === 'OMITIDA') {
+    return fail('PARADA_YA_OMITIDA', 409, `La parada ${stop.orden} ya fue omitida`);
+  }
+
   const lat = Number(position.lat);
   const lng = Number(position.lng);
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
@@ -717,6 +723,77 @@ export function confirmStop(id, position = {}) {
     alertasCerradas: closed.length,
     rutaEstado: route.estado,
     distanciaMetros: meters,
+  });
+}
+
+/** Lo que el backend valida con @Length(3, 200) sobre el motivo. */
+export const MOTIVO_MIN = 3;
+export const MOTIVO_MAX = 200;
+
+/**
+ * Omite una parada que el chofer no pudo vaciar.
+ *
+ * Es deliberadamente MENOS que confirmar, y ahi esta todo el caso de uso: no
+ * toca el contenedor, no cierra alertas y no valida cercania. Lo unico que
+ * comparte es que cierra la parada y avanza la ruta, que es lo que evita que
+ * una calle cortada deje el camion tomado para siempre.
+ *
+ * El payload de la respuesta es el de confirmar MENOS `alertasCerradas` y
+ * `distanciaMetros`, MAS `motivo` y `omitidaEn`. Que no venga `alertasCerradas`
+ * no es un olvido: es la forma de decir que no se cerro ninguna.
+ */
+export function skipStop(id, motivo) {
+  const stop = store.stops.find((s) => s.id === id);
+  if (!stop) return fail('PARADA_NO_ENCONTRADA', 404, `No existe la parada ${id}`);
+
+  if (stop.estado === 'CONFIRMADA') {
+    return fail('PARADA_YA_CONFIRMADA', 409, `La parada ${stop.orden} ya fue confirmada`);
+  }
+
+  if (stop.estado === 'OMITIDA') {
+    return fail('PARADA_YA_OMITIDA', 409, `La parada ${stop.orden} ya fue omitida`);
+  }
+
+  // class-validator emite un mensaje por regla incumplida, con el nombre del
+  // campo al principio, que es de donde `fieldErrors` saca el campo.
+  const texto = typeof motivo === 'string' ? motivo : '';
+  if (texto.length < MOTIVO_MIN || texto.length > MOTIVO_MAX) {
+    return fail('HTTP_400', 400, [
+      `motivo must be longer than or equal to ${MOTIVO_MIN} characters`,
+    ]);
+  }
+
+  stop.estado = 'OMITIDA';
+  stop.omitidaEn = now();
+  stop.motivo = texto;
+
+  // El contenedor NO se toca: sigue lleno, sigue en CRITICO y su alerta sigue
+  // abierta. Vaciarlo porque el chofer no pudo llegar seria pintar de verde
+  // justo el que nadie recolecto.
+  const container = store.containers.find((c) => c.id === stop.contenedorId);
+
+  // Pero la ruta avanza igual que con una confirmacion. Si esta era la ultima
+  // parada abierta, la ruta se cierra y el camion se libera.
+  const route = store.routes.find((r) => r.id === stop.rutaId);
+  if (route.estado === 'ASIGNADA') route.estado = 'EN_CURSO';
+  if (routeStops(route.id).every((s) => s.estado !== 'PENDIENTE')) {
+    route.estado = 'COMPLETADA';
+    const truck = store.trucks.find((t) => t.id === route.camionId);
+    if (truck) {
+      truck.estado = 'DISPONIBLE';
+      truck.actualizadoEn = now();
+    }
+  }
+
+  return respond({
+    paradaId: stop.id,
+    estado: stop.estado,
+    omitidaEn: stop.omitidaEn,
+    motivo: stop.motivo,
+    contenedorId: container.id,
+    estadoContenedor: container.estado,
+    nivelLlenadoPct: container.nivelLlenadoPct,
+    rutaEstado: route.estado,
   });
 }
 

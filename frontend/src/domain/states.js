@@ -203,21 +203,35 @@ export const canAssign = (route) => route.estado === 'PROPUESTA';
 export const isRouteLive = (route) => route?.estado === 'ASIGNADA' || route?.estado === 'EN_CURSO';
 
 /**
- * CU-10 · Solo una parada PENDIENTE se puede confirmar.
+ * CU-10 · Una parada PENDIENTE tiene DOS finales posibles, y los dos la cierran:
+ * confirmar el vaciado u omitirla porque no se pudo vaciar.
  *
  * Igual que canAcknowledge y canResolve: esto es cortesia de la UI para no
- * comerse un 409 PARADA_YA_CONFIRMADA, no seguridad. El backend valida igual.
+ * comerse un 409, no seguridad. El backend valida igual.
  *
- * OMITIDA se muestra pero no se puede setear: no hay endpoint que la produzca.
+ * Una parada cerrada no se reabre, ni confirmada ni omitida: los dos casos dan
+ * 409. Si el auto que tapaba el contenedor se movio, se genera una ruta nueva.
+ * Por eso las dos preguntas son la misma.
  */
 export const canConfirmStop = (stop) => stop?.estado === 'PENDIENTE';
+export const canSkipStop = (stop) => stop?.estado === 'PENDIENTE';
 
-/** "2 de 3 vaciados" en la cabecera del chofer. */
+/**
+ * "2 de 3 vaciados" en la cabecera del chofer.
+ *
+ * `confirmed` y `closed` NO son lo mismo, y la diferencia importa: una parada
+ * omitida cierra la parada y avanza la ruta, pero no vacia nada. Si se
+ * contaran juntas, una ruta donde el chofer no pudo vaciar ni un contenedor
+ * mostraria "3 de 3 vaciados", que es exactamente lo contrario de lo que paso.
+ *
+ * Por eso el texto cuenta `confirmed` —lo que realmente se vacio— y la barra
+ * usa `closed` —lo que ya no tiene nada pendiente—, que es lo que hace que la
+ * barra llegue al final justo cuando la ruta se completa.
+ */
 export function stopsProgress(paradas = []) {
-  return {
-    confirmed: paradas.filter((s) => s.estado === 'CONFIRMADA').length,
-    total: paradas.length,
-  };
+  const confirmed = paradas.filter((s) => s.estado === 'CONFIRMADA').length;
+  const skipped = paradas.filter((s) => s.estado === 'OMITIDA').length;
+  return { confirmed, skipped, closed: confirmed + skipped, total: paradas.length };
 }
 
 /* ------------------------------------------------------------------------

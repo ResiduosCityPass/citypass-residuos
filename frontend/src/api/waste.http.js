@@ -158,6 +158,34 @@ export const fetchMyRoute = () => api.get('/rutas/mias');
  */
 export const confirmStop = (id, position) => api.patch(`/paradas/${id}/confirmar`, position);
 
+/**
+ * CU-10 · El otro final de una parada: el chofer llego y NO pudo vaciar.
+ *
+ * El cuerpo es `{ motivo }` y el motivo es OBLIGATORIO (3 a 200 caracteres):
+ * sin el, el operador que despues tiene que decidir si manda otro camion no
+ * tiene con que decidirlo. Sin motivo el backend devuelve 400.
+ *
+ * Las tres diferencias con confirmar, todas deliberadas:
+ *
+ *  - NO vacia el contenedor: sigue lleno y en CRITICO. Pintarlo verde seria
+ *    mostrar como recolectado justo el que nadie recolecto.
+ *  - NO cierra las alertas, y por eso la respuesta NO trae `alertasCerradas`.
+ *    Esa ausencia es el punto: el problema sigue ahi.
+ *  - NO exige estar a menos de 100 m, asi que no pide GPS. El caso tipico es
+ *    justamente no poder acercarse.
+ *
+ * Lo que si comparte con confirmar: avanza la ruta. Si era la ultima parada
+ * abierta, la ruta pasa a COMPLETADA y el camion vuelve a DISPONIBLE. Ese era
+ * el agujero real: sin esto una calle cortada dejaba la ruta trabada en
+ * EN_CURSO y el camion tomado para siempre, y CU-03 no deja sacar un camion de
+ * EN_RUTA a mano.
+ *
+ * Errores: 400 por motivo invalido, 403 PARADA_DE_OTRA_RUTA, 409
+ * PARADA_YA_CONFIRMADA y 409 PARADA_YA_OMITIDA. Una parada cerrada no se
+ * reabre: si el auto se movio, se genera una ruta nueva.
+ */
+export const skipStop = (id, motivo) => api.patch(`/paradas/${id}/omitir`, { motivo });
+
 /* --- CU-11 · Consulta ciudadana (publico, sin token) -------------------- */
 
 /**

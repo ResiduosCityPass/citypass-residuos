@@ -16,12 +16,28 @@ describe('validarEntorno', () => {
     expect(config.DB_PORT).toBe(5432);
     expect(config.PORT).toBe(3000);
     expect(config.EVENT_BUS_DRIVER).toBe('inmemory');
+    expect(config.DB_SSL).toBe('false');
   });
 
   it('falla al arrancar si falta una variable obligatoria', () => {
     const { JWT_SECRET: _omitida, ...incompleto } = entornoValido;
 
     expect(() => validarEntorno(incompleto)).toThrow(/JWT_SECRET/);
+  });
+
+  it('acepta DATABASE_URL en lugar de variables separadas de base', () => {
+    const config = validarEntorno({
+      DATABASE_URL: 'postgresql://citypass:citypass@localhost:5432/residuos',
+      JWT_SECRET: 'dev-secret',
+    });
+
+    expect(config.DATABASE_URL).toBe('postgresql://citypass:citypass@localhost:5432/residuos');
+  });
+
+  it('falla si faltan datos de base y no hay DATABASE_URL', () => {
+    const { DB_HOST: _omitida, ...incompleto } = entornoValido;
+
+    expect(() => validarEntorno(incompleto)).toThrow(/DB_HOST/);
   });
 
   it('rechaza un puerto fuera de rango', () => {

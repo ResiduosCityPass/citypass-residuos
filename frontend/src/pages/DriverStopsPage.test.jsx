@@ -2,12 +2,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import DriverStopsPage from './DriverStopsPage.jsx';
-import { fetchMyRoute, confirmStop } from '../api/waste.js';
+import { fetchMyRoute, confirmStop, skipStop } from '../api/waste.js';
 import { ApiError } from '../api/client.js';
 
 vi.mock('../api/waste.js', () => ({
   fetchMyRoute: vi.fn(),
   confirmStop: vi.fn(),
+  skipStop: vi.fn(),
 }));
 
 vi.mock('../components/routes/RouteMap.jsx', () => ({
@@ -32,6 +33,8 @@ const stop = (extras = {}) => ({
   orden: 2,
   estado: 'PENDIENTE',
   confirmadaEn: null,
+  omitidaEn: null,
+  motivo: null,
   contenedor: CONTAINER,
   ...extras,
 });
@@ -74,9 +77,9 @@ describe('CU-10 · confirmar vaciado', () => {
     render(<DriverStopsPage />);
 
     await screen.findByText('Confirmada');
-    // Una sola parada pendiente, un solo boton.
+    // Una sola parada pendiente, un solo boton de cada final posible.
     expect(screen.getAllByRole('button', { name: 'Confirmar vaciado' })).toHaveLength(1);
-    // OMITIDA se muestra aunque no haya endpoint que la produzca.
+    expect(screen.getAllByRole('button', { name: 'No pude vaciar' })).toHaveLength(1);
     expect(screen.getByText('Omitida')).toBeInTheDocument();
   });
 
@@ -128,6 +131,23 @@ describe('CU-10 · confirmar vaciado', () => {
     await user.click(await screen.findByRole('button', { name: 'Confirmar vaciado' }));
 
     expect(await screen.findByText('Última parada: ruta completa')).toBeInTheDocument();
+    expect(screen.getByText(/El camión ya quedó disponible/)).toBeInTheDocument();
+  });
+
+  /** Mismo caso que al omitir: la ruta se cierra y la lista desaparece. */
+  it('el aviso de ruta completa sobrevive a que la ruta desaparezca', async () => {
+    const user = userEvent.setup();
+    fetchMyRoute.mockResolvedValueOnce(route()).mockResolvedValue(null);
+    confirmStop.mockResolvedValue({
+      paradaId: 'pd-02', estado: 'CONFIRMADA', estadoContenedor: 'NORMAL',
+      nivelLlenadoPct: 0, alertasCerradas: 1, rutaEstado: 'COMPLETADA',
+    });
+    render(<DriverStopsPage />);
+
+    await user.click(await screen.findByRole('button', { name: 'Confirmar vaciado' }));
+
+    await screen.findByText('No tenés ninguna ruta asignada');
+    expect(screen.getByText('Última parada: ruta completa')).toBeInTheDocument();
     expect(screen.getByText(/El camión ya quedó disponible/)).toBeInTheDocument();
   });
 
@@ -238,6 +258,25 @@ describe('CU-10 · confirmar vaciado', () => {
     expect(await screen.findByText('2 de 3 vaciados')).toBeInTheDocument();
   });
 
+  /**
+   * Una parada omitida NO se cuenta como vaciada. Si se contaran juntas, una
+   * ruta donde el chofer no pudo vaciar nada diria "3 de 3 vaciados", que es
+   * exactamente lo contrario de lo que paso.
+   */
+  it('el progreso no cuenta una parada omitida como vaciada', async () => {
+    fetchMyRoute.mockResolvedValue(
+      route([
+        stop({ id: 'pd-01', orden: 1, estado: 'CONFIRMADA' }),
+        stop({ id: 'pd-02', orden: 2, estado: 'OMITIDA', omitidaEn: new Date().toISOString(), motivo: 'Calle cortada' }),
+        stop({ id: 'pd-03', orden: 3, estado: 'PENDIENTE' }),
+      ]),
+    );
+    render(<DriverStopsPage />);
+
+    expect(await screen.findByText(/1 de 3 vaciados/)).toBeInTheDocument();
+    expect(screen.getByText(/1 omitida/)).toBeInTheDocument();
+  });
+
   it('sin ruta activa lo dice, en vez de mostrar una pantalla vacia', async () => {
     fetchMyRoute.mockResolvedValue(null);
     render(<DriverStopsPage />);
@@ -272,5 +311,181 @@ describe('CU-10 · confirmar vaciado', () => {
 
     const item = (await screen.findByText('CT-0010')).closest('li');
     expect(within(item).getByText('88%')).toBeInTheDocument();
+  });
+});
+
+/**
+ * CU-10 · El otro final de la parada: el chofer llego y no pudo vaciar.
+ *
+ * Lo que distingue estos tests de los de confirmar es todo lo que NO pasa:
+ * no se pide GPS, no se vacia el contenedor y no se cierran alertas.
+ */
+describe('CU-10 · omitir parada', () => {
+  const openForm = async (user) => {
+    await user.click(await screen.findByRole('button', { name: 'No pude vaciar' }));
+  };
+
+  it('manda el texto del motivo elegido, no una clave interna', async () => {
+    const user = userEvent.setup();
+    skipStop.mockResolvedValue({
+      paradaId: 'pd-02', estado: 'OMITIDA', motivo: 'Calle cortada',
+      estadoContenedor: 'CRITICO', nivelLlenadoPct: 88, rutaEstado: 'EN_CURSO',
+    });
+    render(<DriverStopsPage />);
+
+    await openForm(user);
+    await user.selectOptions(screen.getByLabelText(/Por qué no se pudo vaciar/), 'Calle cortada');
+    await user.click(screen.getByRole('button', { name: 'Omitir parada' }));
+
+    // El backend guarda un varchar libre que despues lee una persona.
+    await waitFor(() => expect(skipStop).toHaveBeenCalledWith('pd-02', 'Calle cortada'));
+  });
+
+  /**
+   * La diferencia con confirmar hay que decirla, porque "listo" se lee como
+   * "resuelto": el contenedor sigue lleno y su alerta sigue abierta.
+   */
+  it('el exito dice que el contenedor sigue lleno y la alerta abierta', async () => {
+    const user = userEvent.setup();
+    skipStop.mockResolvedValue({
+      paradaId: 'pd-02', estado: 'OMITIDA', motivo: 'Calle cortada',
+      estadoContenedor: 'CRITICO', nivelLlenadoPct: 88, rutaEstado: 'EN_CURSO',
+    });
+    render(<DriverStopsPage />);
+
+    await openForm(user);
+    await user.click(screen.getByRole('button', { name: 'Omitir parada' }));
+
+    expect(await screen.findByText('Parada omitida')).toBeInTheDocument();
+    expect(screen.getByText(/sigue lleno y su alerta sigue abierta/)).toBeInTheDocument();
+    // Nunca el texto de confirmar: no volvio a 0% ni se cerro nada.
+    expect(screen.queryByText(/volvió a 0%/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/alerta[s]? cerrada|Se cerr/)).not.toBeInTheDocument();
+  });
+
+  /**
+   * Este es el agujero que tapaba el endpoint: sin esto, una calle cortada
+   * dejaba la ruta trabada en EN_CURSO y el camion tomado para siempre, y
+   * CU-03 no deja sacar un camion de EN_RUTA a mano.
+   */
+  it('avisa cuando la omision cierra la ruta y libera el camion', async () => {
+    const user = userEvent.setup();
+    skipStop.mockResolvedValue({
+      paradaId: 'pd-02', estado: 'OMITIDA', motivo: 'Calle cortada',
+      estadoContenedor: 'CRITICO', nivelLlenadoPct: 88, rutaEstado: 'COMPLETADA',
+    });
+    render(<DriverStopsPage />);
+
+    await openForm(user);
+    await user.click(screen.getByRole('button', { name: 'Omitir parada' }));
+
+    expect(await screen.findByText('Parada omitida: ruta cerrada')).toBeInTheDocument();
+    expect(screen.getByText(/el camión ya quedó disponible/)).toBeInTheDocument();
+  });
+
+  /**
+   * A diferencia de confirmar, omitir NO valida el radio de 100 m: el caso
+   * tipico es justamente no poder acercarse. Pedirle estar al lado para
+   * declarar que no pudo llegar seria una contradiccion.
+   */
+  it('no pide GPS: se puede omitir con la ubicacion denegada', async () => {
+    const user = userEvent.setup();
+    deny();
+    skipStop.mockResolvedValue({
+      paradaId: 'pd-02', estado: 'OMITIDA', motivo: 'Calle cortada',
+      estadoContenedor: 'CRITICO', nivelLlenadoPct: 88, rutaEstado: 'EN_CURSO',
+    });
+    render(<DriverStopsPage />);
+
+    await openForm(user);
+    await user.click(screen.getByRole('button', { name: 'Omitir parada' }));
+
+    await waitFor(() => expect(skipStop).toHaveBeenCalled());
+    expect(getCurrentPosition).not.toHaveBeenCalled();
+  });
+
+  /** "Otro" existe para el caso no previsto, pero el motivo sigue siendo obligatorio. */
+  it('con "Otro" pide el texto y no gasta una llamada si esta vacio', async () => {
+    const user = userEvent.setup();
+    render(<DriverStopsPage />);
+
+    await openForm(user);
+    await user.selectOptions(screen.getByLabelText(/Por qué no se pudo vaciar/), 'OTRO');
+    await user.click(screen.getByRole('button', { name: 'Omitir parada' }));
+
+    expect(await screen.findByText(/mínimo 3 caracteres/)).toBeInTheDocument();
+    expect(skipStop).not.toHaveBeenCalled();
+
+    await user.type(screen.getByLabelText(/Contá qué pasó/), 'El contenedor no estaba');
+    await user.click(screen.getByRole('button', { name: 'Omitir parada' }));
+
+    await waitFor(() =>
+      expect(skipStop).toHaveBeenCalledWith('pd-02', 'El contenedor no estaba'),
+    );
+  });
+
+  /**
+   * El caso que se perdia: cerrar la ultima parada hace que /rutas/mias
+   * devuelva null, la lista desaparece en la recarga y el cartel se iba con
+   * ella —justo el que dice que la ruta se cerro y el camion quedo libre—.
+   * El chofer veia la pantalla vaciarse sin ninguna explicacion.
+   */
+  it('el aviso de cierre sobrevive a que la ruta desaparezca', async () => {
+    const user = userEvent.setup();
+    fetchMyRoute.mockResolvedValueOnce(route()).mockResolvedValue(null);
+    skipStop.mockResolvedValue({
+      paradaId: 'pd-02', estado: 'OMITIDA', motivo: 'Calle cortada',
+      estadoContenedor: 'CRITICO', nivelLlenadoPct: 88, rutaEstado: 'COMPLETADA',
+    });
+    render(<DriverStopsPage />);
+
+    await openForm(user);
+    await user.click(screen.getByRole('button', { name: 'Omitir parada' }));
+
+    await screen.findByText('No tenés ninguna ruta asignada');
+    expect(screen.getByText('Parada omitida: ruta cerrada')).toBeInTheDocument();
+    expect(screen.getByText(/el camión ya quedó disponible/)).toBeInTheDocument();
+  });
+
+  /** Una parada cerrada no se reabre. Casi siempre es un doble tap. */
+  it('una parada ya omitida se resincroniza sin alarmar', async () => {
+    const user = userEvent.setup();
+    skipStop.mockRejectedValue(
+      new ApiError({ code: 'PARADA_YA_OMITIDA', status: 409, message: 'La parada 2 ya fue omitida' }),
+    );
+    render(<DriverStopsPage />);
+
+    await openForm(user);
+    await user.click(screen.getByRole('button', { name: 'Omitir parada' }));
+
+    const notice = await screen.findByText('Esta parada ya figura omitida');
+    expect(notice.closest('.notice')).toHaveClass('notice-info');
+    await waitFor(() => expect(fetchMyRoute).toHaveBeenCalledTimes(2));
+  });
+
+  /**
+   * El motivo es lo unico que le queda al operador para decidir si vuelve a
+   * rutear ese contenedor hoy. Si no se muestra, se guardo para nada.
+   */
+  it('muestra el motivo de una parada ya omitida', async () => {
+    fetchMyRoute.mockResolvedValue(
+      route([
+        stop({
+          id: 'pd-02',
+          orden: 2,
+          estado: 'OMITIDA',
+          omitidaEn: new Date().toISOString(),
+          motivo: 'Auto mal estacionado tapando el contenedor',
+        }),
+      ]),
+    );
+    render(<DriverStopsPage />);
+
+    expect(
+      await screen.findByText(/No se pudo vaciar: Auto mal estacionado tapando el contenedor/),
+    ).toBeInTheDocument();
+    // Y ya no ofrece ninguno de los dos finales: la parada esta cerrada.
+    expect(screen.queryByRole('button', { name: 'No pude vaciar' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Confirmar vaciado' })).not.toBeInTheDocument();
   });
 });

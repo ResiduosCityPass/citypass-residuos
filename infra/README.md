@@ -3,12 +3,14 @@
 ## Entorno local
 
 ```bash
-docker compose -f infra/docker-compose.yml up -d
+docker compose -f infra/docker-compose.yml up -d --build
 docker compose -f infra/docker-compose.yml ps
 ```
 
 | Servicio | Puerto | Credenciales |
 |---|---|---|
+| Frontend | 8080 | `http://localhost:8080` |
+| Backend API | 3000 | Health: `http://localhost:3000/api/v1/health` |
 | PostgreSQL 16 | 5432 | `citypass` / `citypass` / db `residuos` |
 | RabbitMQ | 5672 (AMQP), 15672 (consola) | `citypass` / `citypass` |
 
@@ -19,11 +21,11 @@ RabbitMQ está declarado pero no se usa hasta el Sprint 2: hasta entonces el bac
 
 | # | Tarea | Sprint | Estado |
 |---|---|---|---|
-| 1 | Proteger `main` y `develop`: PR obligatorio, CI en verde, sin bypass | 0 | Pendiente |
+| 1 | Proteger `main` y `develop`: PR obligatorio, CI en verde, sin bypass | 0 | Guía lista en [`docs/devops/proteccion-ramas.md`](../docs/devops/proteccion-ramas.md) |
 | 2 | `Dockerfile` multi-stage para el backend | 1 | **Hecho** — ver abajo |
-| 3 | `Dockerfile` para el frontend (React + Vite: build y servir estáticos) | 2 | Pendiente |
+| 3 | `Dockerfile` para el frontend (React + Vite: build y servir estáticos) | 2 | **Hecho** — ver abajo |
 | 4 | Job de deploy en el pipeline | 3 | Pendiente |
-| 5 | Elegir destino cloud y escribirlo como IaC — la dimensión 7 pide *infraestructura como código*, no despliegue manual | 3-4 | Pendiente |
+| 5 | Elegir destino cloud y escribirlo como IaC — la dimensión 7 pide *infraestructura como código*, no despliegue manual | 3-4 | **Hecho** — Render + [`render.yaml`](../render.yaml) |
 
 ---
 
@@ -40,31 +42,7 @@ Verificado: arranca, se conecta a Postgres, responde la API, el `HEALTHCHECK` pa
 **corre como usuario `node` y no como root**, y las migraciones se pueden ejecutar desde la imagen.
 Pesa 404 MB, que es lo normal para NestJS con TypeORM.
 
-### Para sumarla al compose
-
-```yaml
-  api:
-    build: ../backend
-    container_name: citypass-residuos-api
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      DB_HOST: postgres
-      DB_PORT: '5432'
-      DB_USER: citypass
-      DB_PASSWORD: citypass
-      DB_NAME: residuos
-      # Corre las migraciones al arrancar. En un entorno desplegado suele
-      # preferirse un job aparte, para que un rollback de la app no dependa
-      # de haber revertido el esquema.
-      DB_MIGRATIONS_RUN: 'true'
-      JWT_SECRET: cambiar-en-produccion
-      EVENT_BUS_DRIVER: inmemory
-    ports:
-      - '3000:3000'
-```
+Ya está sumada al `docker-compose.yml` como servicio `api`.
 
 ### Migraciones en un entorno desplegado
 
@@ -90,5 +68,52 @@ Dos caminos, y conviene elegir a conciencia:
 - **Usuario `node`.** Correr como root es innecesario y es de lo primero que mira cualquier
   revisión de seguridad.
 
+## Imagen del frontend
+
+Está en [`frontend/Dockerfile`](../frontend/Dockerfile). Compila React + Vite y sirve el resultado
+con nginx.
+
+```bash
+docker build -t citypass-residuos-frontend ./frontend
+```
+
+Las variables `VITE_*` se inyectan al compilar la imagen. Para local, el compose deja
+`VITE_API_URL=http://localhost:3000/api/v1`, así el navegador llama al backend publicado en el
+puerto 3000.
+
 Toda decisión de infraestructura que tenga más de una opción razonable necesita su ADR
 en `docs/adr/`. Es requisito explícito de la cátedra.
+
+## Destino cloud
+
+El destino elegido para el despliegue académico es **Render**. La decisión está documentada en
+[`ADR-008`](../docs/adr/ADR-008-destino-cloud.md).
+
+La infraestructura está versionada en [`render.yaml`](../render.yaml): frontend estático, backend
+Docker, PostgreSQL administrado y secretos configurados fuera del repo.
+
+Para crear el entorno en Render:
+
+1. Crear un Blueprint desde el repositorio.
+2. Usar `render.yaml` desde la rama `main`.
+3. Completar `JWT_SECRET` cuando Render lo pida. Ese valor no se versiona.
+4. Mantener el mismo valor en el entorno local usado para `npm run token:dev`, si hace falta generar
+   tokens de demo hasta que llegue el login federado.
+
+El backend usa la `connectionString` interna que Render inyecta con `fromDatabase`, por eso
+`DB_SSL=false` dentro del Blueprint. Si se corre `migration:run:prod` desde una máquina externa
+contra la External Database URL de Render, ahí sí corresponde `DB_SSL=true`.
+
+El Blueprint usa planes gratuitos para evitar costos accidentales. Eso sirve para el TPO, pero tiene
+dos límites: el backend puede dormir por inactividad y la base gratuita de Render expira a los 30
+días.
+
+Antes de una demo en vivo conviene despertar el backend entrando a
+`https://<host-api>/api/v1/health`. Para validar app + base + esquema, usar el endpoint público:
+
+```bash
+curl "https://<host-api>/api/v1/publico/contenedores/cercanos?lat=-34.6037&lng=-58.3816&radioMetros=1500"
+```
+
+Si responde un array, la API llegó hasta PostgreSQL. Si un endpoint privado responde `401` sin token,
+los guards están activos.
