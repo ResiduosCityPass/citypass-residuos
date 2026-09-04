@@ -25,7 +25,7 @@ RabbitMQ está declarado pero no se usa hasta el Sprint 2: hasta entonces el bac
 | 2 | `Dockerfile` multi-stage para el backend | 1 | **Hecho** — ver abajo |
 | 3 | `Dockerfile` para el frontend (React + Vite: build y servir estáticos) | 2 | **Hecho** — ver abajo |
 | 4 | Job de deploy en el pipeline | 3 | Pendiente |
-| 5 | Elegir destino cloud y escribirlo como IaC — la dimensión 7 pide *infraestructura como código*, no despliegue manual | 3-4 | Destino elegido: Render ([ADR-008](../docs/adr/ADR-008-destino-cloud.md)). IaC pendiente |
+| 5 | Elegir destino cloud y escribirlo como IaC — la dimensión 7 pide *infraestructura como código*, no despliegue manual | 3-4 | **Hecho** — Render + [`render.yaml`](../render.yaml) |
 
 ---
 
@@ -89,5 +89,17 @@ en `docs/adr/`. Es requisito explícito de la cátedra.
 El destino elegido para el despliegue académico es **Render**. La decisión está documentada en
 [`ADR-008`](../docs/adr/ADR-008-destino-cloud.md).
 
-La infraestructura debe quedar versionada como `render.yaml`: frontend estático, backend Docker,
-PostgreSQL administrado y secretos configurados fuera del repo.
+La infraestructura está versionada en [`render.yaml`](../render.yaml): frontend estático, backend
+Docker, PostgreSQL administrado y secretos configurados fuera del repo.
+
+Para crear el entorno en Render:
+
+1. Crear un Blueprint desde el repositorio.
+2. Usar `render.yaml` desde la rama `main`.
+3. Completar `JWT_SECRET` cuando Render lo pida. Ese valor no se versiona.
+4. Mantener el mismo valor en el entorno local usado para `npm run token:dev`, si hace falta generar
+   tokens de demo hasta que llegue el login federado.
+
+El Blueprint usa planes gratuitos para evitar costos accidentales. Eso sirve para el TPO, pero tiene
+dos límites: el backend puede dormir por inactividad y la base gratuita de Render expira a los 30
+días.

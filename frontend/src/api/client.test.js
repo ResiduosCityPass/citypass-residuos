@@ -1,5 +1,14 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { api, apiPublic, ApiError, saveToken, clearToken, readToken, seedDevToken } from './client.js';
+import {
+  api,
+  apiPublic,
+  ApiError,
+  buildBaseUrl,
+  saveToken,
+  clearToken,
+  readToken,
+  seedDevToken,
+} from './client.js';
 
 describe('cliente de la API', () => {
   beforeEach(() => {
@@ -82,6 +91,21 @@ describe('cliente de la API', () => {
 
     expect(error).toBeInstanceOf(ApiError);
     expect(error.code).toBe('SIN_CONEXION');
+  });
+
+  it('arma la URL base a partir del origen y el prefijo de Render', () => {
+    expect(
+      buildBaseUrl({
+        apiOrigin: 'https://citypass-residuos-api.onrender.com/',
+        apiPrefix: '/api/v1/',
+      }),
+    ).toBe('https://citypass-residuos-api.onrender.com/api/v1');
+  });
+
+  it('mantiene compatibilidad con VITE_API_URL', () => {
+    expect(buildBaseUrl({ apiUrl: 'http://localhost:3000/api/v1/' })).toBe(
+      'http://localhost:3000/api/v1',
+    );
   });
 
   /**
