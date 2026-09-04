@@ -100,6 +100,20 @@ Para crear el entorno en Render:
 4. Mantener el mismo valor en el entorno local usado para `npm run token:dev`, si hace falta generar
    tokens de demo hasta que llegue el login federado.
 
+El backend usa la `connectionString` interna que Render inyecta con `fromDatabase`, por eso
+`DB_SSL=false` dentro del Blueprint. Si se corre `migration:run:prod` desde una máquina externa
+contra la External Database URL de Render, ahí sí corresponde `DB_SSL=true`.
+
 El Blueprint usa planes gratuitos para evitar costos accidentales. Eso sirve para el TPO, pero tiene
 dos límites: el backend puede dormir por inactividad y la base gratuita de Render expira a los 30
 días.
+
+Antes de una demo en vivo conviene despertar el backend entrando a
+`https://<host-api>/api/v1/health`. Para validar app + base + esquema, usar el endpoint público:
+
+```bash
+curl "https://<host-api>/api/v1/publico/contenedores/cercanos?lat=-34.6037&lng=-58.3816&radioMetros=1500"
+```
+
+Si responde un array, la API llegó hasta PostgreSQL. Si un endpoint privado responde `401` sin token,
+los guards están activos.

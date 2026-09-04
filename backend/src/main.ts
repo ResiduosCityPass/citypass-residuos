@@ -5,6 +5,18 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './shared/filters/http-exception.filter';
 
+function corsOrigin(config: ConfigService) {
+  const origins = config
+    .get<string>('CORS_ORIGIN')
+    ?.split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  if (origins?.length) return origins;
+
+  return config.get<string>('NODE_ENV') === 'production' ? false : true;
+}
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
@@ -22,8 +34,9 @@ async function bootstrap() {
 
   app.useGlobalFilters(new HttpExceptionFilter());
 
-  // El frontend de Maximo corre en otro origen durante el desarrollo.
-  app.enableCors({ origin: true, credentials: true });
+  // En desarrollo se aceptan varios origenes. En produccion, Render inyecta el
+  // dominio publico del frontend via CORS_ORIGIN.
+  app.enableCors({ origin: corsOrigin(config), credentials: true });
 
   const swagger = new DocumentBuilder()
     .setTitle('CityPass+ · Gestion de Residuos Inteligente')
@@ -36,7 +49,7 @@ async function bootstrap() {
   SwaggerModule.setup('docs', app, SwaggerModule.createDocument(app, swagger));
 
   const port = config.get<number>('PORT', 3000);
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
 
   const logger = new Logger('Bootstrap');
   logger.log(`API escuchando en http://localhost:${port}/${prefix}`);
