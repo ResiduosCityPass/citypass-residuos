@@ -1,5 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
+import { sslDeBaseDeDatos } from './ssl-base-de-datos';
 
 export const buildTypeOrmOptions = (config: ConfigService): TypeOrmModuleOptions => ({
   type: 'postgres',
@@ -8,6 +9,8 @@ export const buildTypeOrmOptions = (config: ConfigService): TypeOrmModuleOptions
   username: config.get<string>('DB_USER'),
   password: config.get<string>('DB_PASSWORD'),
   database: config.get<string>('DB_NAME'),
+  // Los Postgres administrados exigen TLS; el de Docker en local no lo soporta.
+  ssl: sslDeBaseDeDatos(config.get<string>('DB_SSL')),
   entities: [__dirname + '/../**/*.entity{.ts,.js}'],
   migrations: [__dirname + '/../migrations/*{.ts,.js}'],
   // El esquema lo definen las migraciones (ADR-002). Esta bandera queda como

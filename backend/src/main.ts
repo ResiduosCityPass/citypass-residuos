@@ -36,7 +36,10 @@ async function bootstrap() {
   SwaggerModule.setup('docs', app, SwaggerModule.createDocument(app, swagger));
 
   const port = config.get<number>('PORT', 3000);
-  await app.listen(port);
+  // Explicitamente 0.0.0.0: los orquestadores enrutan el trafico desde afuera
+  // del contenedor, y una aplicacion escuchando solo en loopback no recibe
+  // nada. El sintoma es un despliegue que arranca bien y no responde jamas.
+  await app.listen(port, '0.0.0.0');
 
   const logger = new Logger('Bootstrap');
   logger.log(`API escuchando en http://localhost:${port}/${prefix}`);

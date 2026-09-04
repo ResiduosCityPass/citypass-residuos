@@ -1,5 +1,6 @@
 import { config as cargarEnv } from 'dotenv';
 import { DataSource } from 'typeorm';
+import { sslDeBaseDeDatos } from './ssl-base-de-datos';
 
 /**
  * DataSource que usa el CLI de TypeORM para generar y correr migraciones.
@@ -24,6 +25,9 @@ export default new DataSource({
   username: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
+  // Mismo TLS que la aplicacion: sin esto, `migration:run` contra la base
+  // desplegada falla aunque la aplicacion arranque bien.
+  ssl: sslDeBaseDeDatos(process.env.DB_SSL),
   entities: [__dirname + '/../**/*.entity{.ts,.js}'],
   migrations: [__dirname + '/../migrations/*{.ts,.js}'],
   synchronize: false,

@@ -56,6 +56,7 @@ La API queda en `http://localhost:3000` y la documentación Swagger en `http://l
 
 ## Documentación clave
 
+- [Desplegar el backend](docs/devops/despliegue-backend.md) — variables de entorno, migraciones y las trampas del plan gratuito.
 - [Guion de la demo del Hito 1](docs/sprints/guion-demo-hito-1.md) — que mostrar, en que orden y con que comandos.
 - [Backlog priorizado](docs/sprints/backlog-priorizado.md) — qué construimos y en qué orden, con el recorte de alcance justificado.
 - [Diagramas](docs/arquitectura/diagramas.md) — casos de uso, C4, secuencia y máquinas de estado.
