@@ -14,6 +14,7 @@ import {
   CONTENEDOR_REPOSITORY,
   ContenedorRepository,
 } from '../../contenedores/domain/contenedor.repository';
+import { ChoferesService } from '../../choferes/application/choferes.service';
 import { FlotaService } from '../../flota/application/flota.service';
 import { ZonasService } from '../../zonas/application/zonas.service';
 import { PARADA_REPOSITORY, ParadaRepository } from '../domain/parada.repository';
@@ -52,6 +53,7 @@ export class RutasService {
     @Inject(EVENT_PUBLISHER)
     private readonly eventos: EventPublisher,
     private readonly flota: FlotaService,
+    private readonly choferes: ChoferesService,
     private readonly zonas: ZonasService,
     private readonly transaccion: ContextoTransaccional,
     config: ConfigService,
@@ -139,7 +141,11 @@ export class RutasService {
         });
       }
 
-      ruta.choferId = dto.choferId;
+      // Valida que el chofer exista y siga activo. Sin esto, un id equivocado
+      // asignaba la ruta con exito y el chofer no la veia nunca.
+      const chofer = await this.choferes.obtenerActivo(dto.choferId);
+
+      ruta.choferId = chofer.id;
       ruta.estado = EstadoRuta.ASIGNADA;
       ruta.asignadaEn = new Date();
       await this.rutas.guardar(ruta);
@@ -154,7 +160,8 @@ export class RutasService {
         buildEvent(EventTypes.RUTA_ASIGNADA, {
           rutaId: ruta.id,
           camionId: camion.patente,
-          choferId: dto.choferId,
+          choferId: chofer.legajo,
+          choferNombre: chofer.nombre,
           cantidadParadas: ruta.paradas?.length ?? 0,
           asignadaEn: ruta.asignadaEn.toISOString(),
         }),
@@ -193,13 +200,24 @@ export class RutasService {
   }
 
   /**
-   * CU-10 · La ruta activa del chofer.
+   * CU-10 · La ruta activa de quien esta autenticado.
    *
-   * Devuelve null con exito cuando no hay ninguna: un chofer que ya termino el
-   * turno no es un error.
+   * Recibe el `sub` de la sesion, no un id de chofer: la identidad sale del
+   * token y nunca de un parametro. Resuelve primero que chofer es esa sesion.
+   *
+   * Devuelve null con exito en los dos casos en que no hay nada que mostrar
+   * -la sesion no corresponde a ningun chofer, o el chofer no tiene ruta
+   * activa-. Terminar el turno no es un error, y distinguir los dos casos en la
+   * respuesta solo le diria a quien pregunta si ese `sub` existe.
    */
-  rutaActivaDe(choferId: string): Promise<Ruta | null> {
-    return this.rutas.buscarActivaDeChofer(choferId);
+  async rutaActivaDeSesion(sub: string): Promise<Ruta | null> {
+    const chofer = await this.choferes.buscarPorUsuarioSub(sub);
+
+    if (!chofer) {
+      return null;
+    }
+
+    return this.rutas.buscarActivaDeChofer(chofer.id);
   }
 
   /**

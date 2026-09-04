@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { EstadoRuta } from '../../../shared/domain/enums';
 import { columnaNumerica } from '../../../shared/persistence/columna-numerica';
+import { Chofer } from '../../choferes/domain/chofer.entity';
 import { Camion } from '../../flota/domain/camion.entity';
 import { Parada } from './parada.entity';
 import type { AvanceParadas } from './ruta.repository';
@@ -35,13 +36,21 @@ export class Ruta {
   camion?: Camion;
 
   /**
-   * Identificador del chofer en el modulo de identidad del Squad 2: el `sub`
-   * de su JWT. No es una clave foranea porque los usuarios no son entidades
-   * nuestras.
+   * Chofer asignado. Es una clave foranea de verdad: los choferes son entidades
+   * de este modulo.
+   *
+   * Antes era texto libre con el `sub` del token, bajo el supuesto de que los
+   * choferes eran usuarios del Squad 2. Con texto libre nadie validaba nada: un
+   * identificador mal tipeado asignaba la ruta igual y el chofer no la veia
+   * nunca.
    */
-  @Column({ type: 'varchar', length: 120, nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   @Index()
   choferId!: string | null;
+
+  @ManyToOne(() => Chofer, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'choferId' })
+  chofer?: Chofer;
 
   @Column({ type: 'enum', enum: EstadoRuta, default: EstadoRuta.PROPUESTA })
   estado!: EstadoRuta;

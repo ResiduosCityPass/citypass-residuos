@@ -23,9 +23,30 @@ describe('Ciclo de recoleccion (e2e)', () => {
   let admin: string;
 
   const DEPOSITO = { lat: -34.6037, lng: -58.3816 };
-  const CHOFER_ID = 'test-CHOFER';
+
+  /**
+   * `sub` con el que firma el helper de tokens para el rol CHOFER. Es lo que
+   * une la sesion con el chofer: sin un chofer que lo tenga en `usuarioSub`,
+   * `GET /rutas/mias` no devuelve nada.
+   */
+  const SESION_CHOFER = 'test-CHOFER';
 
   const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
+
+  /** Da de alta un chofer y devuelve su id, que es lo que espera CU-09. */
+  const crearChofer = async (usuarioSub?: string) => {
+    const respuesta = await http
+      .post('/api/v1/choferes')
+      .set(auth(admin))
+      .send({
+        nombre: 'Juana Perez',
+        legajo: `CH-${Date.now().toString().slice(-8)}${Math.floor(Math.random() * 100)}`,
+        ...(usuarioSub ? { usuarioSub } : {}),
+      })
+      .expect(201);
+
+    return respuesta.body.id as string;
+  };
 
   /** Crea zona, contenedores saturados y un camion listo para salir. */
   const prepararEscenario = async (cantidadContenedores = 2) => {
@@ -76,7 +97,9 @@ describe('Ciclo de recoleccion (e2e)', () => {
       })
       .expect(201);
 
-    return { zona: zona.body, contenedores, camion: camion.body };
+    const choferId = await crearChofer(SESION_CHOFER);
+
+    return { zona: zona.body, contenedores, camion: camion.body, choferId };
   };
 
   beforeAll(async () => {
@@ -94,7 +117,7 @@ describe('Ciclo de recoleccion (e2e)', () => {
   });
 
   it('recorre el ciclo entero: de contenedor saturado a contenedor vaciado', async () => {
-    const { contenedores, camion } = await prepararEscenario(2);
+    const { contenedores, camion, choferId } = await prepararEscenario(2);
 
     // --- CU-08 · el operador pide una propuesta -----------------------------
     const propuesta = await http
@@ -116,7 +139,7 @@ describe('Ciclo de recoleccion (e2e)', () => {
     const asignada = await http
       .patch(`/api/v1/rutas/${propuesta.body.id}/asignar`)
       .set(auth(admin))
-      .send({ choferId: CHOFER_ID })
+      .send({ choferId })
       .expect(200);
 
     expect(asignada.body.estado).toBe(EstadoRuta.ASIGNADA);
@@ -235,7 +258,7 @@ describe('Ciclo de recoleccion (e2e)', () => {
     });
 
     it('no ofrece un camion que ya esta en ruta', async () => {
-      const { camion } = await prepararEscenario(1);
+      const { camion, choferId } = await prepararEscenario(1);
 
       const ruta = await http
         .post('/api/v1/rutas/generar')
@@ -245,7 +268,7 @@ describe('Ciclo de recoleccion (e2e)', () => {
       await http
         .patch(`/api/v1/rutas/${ruta.body.id}/asignar`)
         .set(auth(admin))
-        .send({ choferId: CHOFER_ID })
+        .send({ choferId })
         .expect(200);
 
       const respuesta = await http
@@ -255,6 +278,141 @@ describe('Ciclo de recoleccion (e2e)', () => {
         .expect(409);
 
       expect(respuesta.body.code).toBe('CAMION_NO_DISPONIBLE');
+    });
+  });
+
+  describe('CU-09 · el chofer se elige de una lista, no se escribe', () => {
+    it('asignar a un chofer que no existe falla, en vez de asignar en silencio', async () => {
+      // Este es el caso que motivo todo el ABM. Antes `choferId` era texto
+      // libre: un identificador mal tipeado asignaba la ruta con exito y el
+      // chofer no la veia nunca. La pantalla quedaba vacia y sin error, y
+      // parecia que la ruta no se habia generado.
+      const { camion } = await prepararEscenario(1);
+      const ruta = await http
+        .post('/api/v1/rutas/generar')
+        .set(auth(admin))
+        .send({ camionId: camion.id })
+        .expect(201);
+
+      const respuesta = await http
+        .patch(`/api/v1/rutas/${ruta.body.id}/asignar`)
+        .set(auth(admin))
+        .send({ choferId: '00000000-0000-4000-8000-000000000000' })
+        .expect(404);
+
+      expect(respuesta.body.code).toBe('CHOFER_NO_ENCONTRADO');
+    });
+
+    it('no acepta cualquier texto como chofer', async () => {
+      const { camion } = await prepararEscenario(1);
+      const ruta = await http
+        .post('/api/v1/rutas/generar')
+        .set(auth(admin))
+        .send({ camionId: camion.id })
+        .expect(201);
+
+      await http
+        .patch(`/api/v1/rutas/${ruta.body.id}/asignar`)
+        .set(auth(admin))
+        .send({ choferId: 'jperez' })
+        .expect(400);
+    });
+
+    it('no se le asigna una ruta a un chofer dado de baja', async () => {
+      const { camion, choferId } = await prepararEscenario(1);
+      const ruta = await http
+        .post('/api/v1/rutas/generar')
+        .set(auth(admin))
+        .send({ camionId: camion.id })
+        .expect(201);
+
+      await http.delete(`/api/v1/choferes/${choferId}`).set(auth(admin)).expect(204);
+
+      const respuesta = await http
+        .patch(`/api/v1/rutas/${ruta.body.id}/asignar`)
+        .set(auth(admin))
+        .send({ choferId })
+        .expect(409);
+
+      expect(respuesta.body.code).toBe('CHOFER_INACTIVO');
+    });
+
+    it('la ruta trae el chofer expandido: la pantalla muestra su nombre', async () => {
+      const { camion, choferId } = await prepararEscenario(1);
+      const ruta = await http
+        .post('/api/v1/rutas/generar')
+        .set(auth(admin))
+        .send({ camionId: camion.id })
+        .expect(201);
+
+      const asignada = await http
+        .patch(`/api/v1/rutas/${ruta.body.id}/asignar`)
+        .set(auth(admin))
+        .send({ choferId })
+        .expect(200);
+
+      expect(asignada.body.chofer).toMatchObject({ id: choferId, nombre: 'Juana Perez' });
+
+      // Y tambien en el listado, que es donde el operador lo lee.
+      const listado = await http.get('/api/v1/rutas').set(auth(admin)).expect(200);
+      expect(listado.body[0].chofer.nombre).toBe('Juana Perez');
+    });
+
+    it('la baja es logica: el chofer sigue existiendo con sus rutas', async () => {
+      const { choferId } = await prepararEscenario(1);
+
+      await http.delete(`/api/v1/choferes/${choferId}`).set(auth(admin)).expect(204);
+
+      const activos = await http.get('/api/v1/choferes').set(auth(admin)).expect(200);
+      expect(activos.body.find((c: { id: string }) => c.id === choferId)).toBeUndefined();
+
+      const todos = await http
+        .get('/api/v1/choferes?incluirInactivos=true')
+        .set(auth(admin))
+        .expect(200);
+      expect(todos.body.find((c: { id: string }) => c.id === choferId)).toMatchObject({
+        activo: false,
+      });
+    });
+
+    it('el legajo no se repite', async () => {
+      await http
+        .post('/api/v1/choferes')
+        .set(auth(admin))
+        .send({ nombre: 'Juana Perez', legajo: 'CH-REPETIDO' })
+        .expect(201);
+
+      const respuesta = await http
+        .post('/api/v1/choferes')
+        .set(auth(admin))
+        .send({ nombre: 'Otro Distinto', legajo: 'CH-REPETIDO' })
+        .expect(409);
+
+      expect(respuesta.body.code).toBe('CHOFER_LEGAJO_DUPLICADO');
+    });
+
+    it('una sesion que no es de ningun chofer no ve ninguna ruta', async () => {
+      const { camion, choferId } = await prepararEscenario(1);
+      const ruta = await http
+        .post('/api/v1/rutas/generar')
+        .set(auth(admin))
+        .send({ camionId: camion.id })
+        .expect(201);
+      await http
+        .patch(`/api/v1/rutas/${ruta.body.id}/asignar`)
+        .set(auth(admin))
+        .send({ choferId })
+        .expect(200);
+
+      // Rol CHOFER valido, pero su `sub` no corresponde a ningun chofer dado de
+      // alta. Devuelve vacio, no un error: distinguir "no sos chofer" de "no
+      // tenes ruta" solo le diria a quien pregunta si ese `sub` existe.
+      const respuesta = await http
+        .get('/api/v1/rutas/mias')
+        .set(auth(ctx.token(Rol.CHOFER, 'sesion-sin-chofer')))
+        .expect(200);
+
+      expect(respuesta.body).toEqual({});
     });
   });
 
@@ -270,7 +428,7 @@ describe('Ciclo de recoleccion (e2e)', () => {
       await http
         .patch(`/api/v1/rutas/${ruta.body.id}/asignar`)
         .set(auth(admin))
-        .send({ choferId: CHOFER_ID })
+        .send({ choferId: escenario.choferId })
         .expect(200);
 
       const chofer = ctx.token(Rol.CHOFER);
@@ -366,7 +524,8 @@ describe('Ciclo de recoleccion (e2e)', () => {
     it('un chofer no puede omitir la parada de otro', async () => {
       const { paradas } = await rutaAsignada(1);
 
-      // Token de CHOFER valido, pero con otro `sub`: no es el de esta ruta.
+      // Un chofer de verdad, dado de alta, pero que no es el de esta ruta.
+      await crearChofer('test-OTRO-CHOFER');
       const otroChofer = ctx.token(Rol.CHOFER, 'test-OTRO-CHOFER');
 
       const respuesta = await http
@@ -469,7 +628,7 @@ describe('Ciclo de recoleccion (e2e)', () => {
 
   describe('CU-10 · quien confirma y desde donde', () => {
     it('rechaza confirmar desde lejos y dice a cuantos metros esta', async () => {
-      const { camion } = await prepararEscenario(1);
+      const { camion, choferId } = await prepararEscenario(1);
       const ruta = await http
         .post('/api/v1/rutas/generar')
         .set(auth(admin))
@@ -478,7 +637,7 @@ describe('Ciclo de recoleccion (e2e)', () => {
       await http
         .patch(`/api/v1/rutas/${ruta.body.id}/asignar`)
         .set(auth(admin))
-        .send({ choferId: CHOFER_ID })
+        .send({ choferId })
         .expect(200);
 
       const chofer = ctx.token(Rol.CHOFER);
@@ -495,7 +654,7 @@ describe('Ciclo de recoleccion (e2e)', () => {
     });
 
     it('un operador no puede confirmar paradas', async () => {
-      const { camion } = await prepararEscenario(1);
+      const { camion, choferId } = await prepararEscenario(1);
       const ruta = await http
         .post('/api/v1/rutas/generar')
         .set(auth(admin))
@@ -504,7 +663,7 @@ describe('Ciclo de recoleccion (e2e)', () => {
       await http
         .patch(`/api/v1/rutas/${ruta.body.id}/asignar`)
         .set(auth(admin))
-        .send({ choferId: CHOFER_ID })
+        .send({ choferId })
         .expect(200);
 
       const detalle = await http.get(`/api/v1/rutas/${ruta.body.id}`).set(auth(admin)).expect(200);

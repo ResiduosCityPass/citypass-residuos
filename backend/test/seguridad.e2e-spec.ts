@@ -125,10 +125,16 @@ describe('Seguridad (e2e)', () => {
         .send({ camionId: camion.body.id })
         .expect(201);
 
+      const chofer = await http
+        .post('/api/v1/choferes')
+        .set(auth(admin))
+        .send({ nombre: 'Juana Perez', legajo: `CH-${Date.now()}`, usuarioSub: 'test-CHOFER' })
+        .expect(201);
+
       await http
         .patch(`/api/v1/rutas/${ruta.body.id}/asignar`)
         .set(auth(admin))
-        .send({ choferId: 'U000001' })
+        .send({ choferId: chofer.body.id })
         .expect(200);
 
       return ruta.body.id;
@@ -161,14 +167,15 @@ describe('Seguridad (e2e)', () => {
 
     it('el chofer sigue viendo la suya por /rutas/mias', async () => {
       await rutaDeOtroChofer();
-      const suDueno = ctx.token(Rol.CHOFER, 'U000001');
 
       const respuesta = await http
         .get('/api/v1/rutas/mias')
-        .set('Authorization', `Bearer ${suDueno}`)
+        .set('Authorization', `Bearer ${ctx.token(Rol.CHOFER)}`)
         .expect(200);
 
-      expect(respuesta.body.choferId).toBe('U000001');
+      // La ruta llega con el chofer expandido: la pantalla muestra su nombre,
+      // no un uuid.
+      expect(respuesta.body.chofer).toMatchObject({ nombre: 'Juana Perez' });
     });
   });
 

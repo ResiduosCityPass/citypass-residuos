@@ -1,15 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { IsUUID } from 'class-validator';
 
 export class AsignarRutaDto {
   @ApiProperty({
-    example: 'U000042',
+    format: 'uuid',
     description:
-      'Identificador del chofer en el modulo de identidad del Squad 2 (el `sub` de su JWT). ' +
-      'No se valida contra un padron propio: los usuarios no son entidades de este modulo.',
+      'Id del chofer, de los que devuelve GET /choferes. Se valida: si no existe, ' +
+      '404 CHOFER_NO_ENCONTRADO; si esta dado de baja, 409 CHOFER_INACTIVO.',
   })
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(120)
+  @IsUUID()
   choferId!: string;
 }

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ChoferesModule } from '../choferes/choferes.module';
 import { AlertasModule } from '../alertas/alertas.module';
 import { ContenedoresModule } from '../contenedores/contenedores.module';
 import { FlotaModule } from '../flota/flota.module';
@@ -17,6 +18,7 @@ import { RutasController } from './rutas.controller';
 
 @Module({
   imports: [
+    ChoferesModule,
     TypeOrmModule.forFeature([Ruta, Parada]),
     ContenedoresModule,
     FlotaModule,

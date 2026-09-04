@@ -78,9 +78,20 @@ async function main() {
     console.log(`  ${contenedor.codigo} <- ${sensor.codigo}`);
   }
 
+  // Un chofer con la sesion de desarrollo asociada. Sin esto la pantalla de
+  // CU-10 queda vacia: `GET /rutas/mias` resuelve el chofer por el `sub` del
+  // token, y el que genera `npm run token:dev -- CHOFER` es `dev-chofer`.
+  const chofer = await pedir('POST', '/choferes', {
+    nombre: 'Juana Perez',
+    legajo: 'CH-001',
+    usuarioSub: 'dev-chofer',
+  });
+  console.log(`  chofer ${chofer.nombre} (${chofer.legajo}) <- sesion dev-chofer`);
+
   writeFileSync('sensores.json', JSON.stringify({ zonaId: zona.id, sensores }, null, 2));
   console.log(`\nListo: ${sensores.length} sensores en sensores.json`);
   console.log('Ahora corre:  npm start');
+  console.log('El chofer de la demo es Juana Perez: al asignar la ruta, elegila a ella.');
 }
 
 main().catch((error) => {

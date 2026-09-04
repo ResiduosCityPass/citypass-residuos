@@ -18,6 +18,7 @@ import { distanciaMetros } from '../../../shared/domain/geo';
 import { EVENT_PUBLISHER, EventPublisher } from '../../../shared/events/event-publisher';
 import { ContextoTransaccional } from '../../../shared/persistence/contexto-transaccional';
 import { AlertasService } from '../../alertas/application/alertas.service';
+import { ChoferesService } from '../../choferes/application/choferes.service';
 import {
   CONTENEDOR_REPOSITORY,
   ContenedorRepository,
@@ -83,6 +84,7 @@ export class ParadasService {
     @Inject(EVENT_PUBLISHER)
     private readonly eventos: EventPublisher,
     private readonly alertas: AlertasService,
+    private readonly choferes: ChoferesService,
     private readonly flota: FlotaService,
     private readonly transaccion: ContextoTransaccional,
     config: ConfigService,
@@ -94,20 +96,18 @@ export class ParadasService {
 
   async confirmar(
     paradaId: string,
-    choferId: string,
+    sub: string,
     posicion: ConfirmarParadaDto,
   ): Promise<ResultadoConfirmacion> {
-    return this.transaccion.ejecutar(() =>
-      this.confirmarEnTransaccion(paradaId, choferId, posicion),
-    );
+    return this.transaccion.ejecutar(() => this.confirmarEnTransaccion(paradaId, sub, posicion));
   }
 
   private async confirmarEnTransaccion(
     paradaId: string,
-    choferId: string,
+    sub: string,
     posicion: ConfirmarParadaDto,
   ): Promise<ResultadoConfirmacion> {
-    const { parada, ruta } = await this.buscarParadaPendiente(paradaId, choferId);
+    const { parada, ruta } = await this.buscarParadaPendiente(paradaId, sub);
 
     const contenedor = await this.contenedores.buscarPorId(parada.contenedorId);
 
@@ -158,7 +158,7 @@ export class ParadasService {
           contenedorId: contenedor.codigo,
           rutaId: parada.rutaId,
           camionId: ruta.camion?.patente ?? ruta.camionId,
-          choferId,
+          choferId: ruta.chofer?.legajo ?? sub,
           nivelPrevio,
           confirmadoEn: confirmadaEn.toISOString(),
         },
@@ -192,20 +192,16 @@ export class ParadasService {
    * tiene que ver. Tampoco pide estar a menos de 100 m: el caso tipico es no
    * poder acercarse.
    */
-  async omitir(
-    paradaId: string,
-    choferId: string,
-    dto: OmitirParadaDto,
-  ): Promise<ResultadoOmision> {
-    return this.transaccion.ejecutar(() => this.omitirEnTransaccion(paradaId, choferId, dto));
+  async omitir(paradaId: string, sub: string, dto: OmitirParadaDto): Promise<ResultadoOmision> {
+    return this.transaccion.ejecutar(() => this.omitirEnTransaccion(paradaId, sub, dto));
   }
 
   private async omitirEnTransaccion(
     paradaId: string,
-    choferId: string,
+    sub: string,
     dto: OmitirParadaDto,
   ): Promise<ResultadoOmision> {
-    const { parada, ruta } = await this.buscarParadaPendiente(paradaId, choferId);
+    const { parada, ruta } = await this.buscarParadaPendiente(paradaId, sub);
 
     const contenedor = await this.contenedores.buscarPorId(parada.contenedorId);
 
@@ -233,7 +229,7 @@ export class ParadasService {
           rutaId: parada.rutaId,
           contenedorId: contenedor.codigo,
           camionId: ruta.camion?.patente ?? ruta.camionId,
-          choferId,
+          choferId: ruta.chofer?.legajo ?? sub,
           motivo: dto.motivo,
           nivelLlenadoPct: contenedor.nivelLlenadoPct,
           omitidaEn: omitidaEn.toISOString(),
@@ -265,8 +261,9 @@ export class ParadasService {
    */
   private async buscarParadaPendiente(
     paradaId: string,
-    choferId: string,
+    sub: string,
   ): Promise<{ parada: Parada; ruta: Ruta }> {
+    const chofer = await this.choferes.buscarPorUsuarioSub(sub);
     const parada = await this.paradas.buscarPorId(paradaId);
 
     if (!parada) {
@@ -279,8 +276,9 @@ export class ParadasService {
     const ruta = await this.rutas.buscarPorId(parada.rutaId);
 
     // Un chofer solo cierra paradas de su propia ruta. Sin esto, cualquiera con
-    // un id de parada podria cerrar el trabajo de otro.
-    if (!ruta || ruta.choferId !== choferId) {
+    // un id de parada podria cerrar el trabajo de otro. Una sesion que no
+    // corresponde a ningun chofer tampoco cierra nada.
+    if (!chofer || !ruta || ruta.choferId !== chofer.id) {
       throw new ForbiddenException({
         message: 'Esta parada no pertenece a tu ruta activa',
         code: 'PARADA_DE_OTRA_RUTA',

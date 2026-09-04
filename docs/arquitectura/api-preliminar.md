@@ -104,7 +104,11 @@ Payload liviano pensado para renderizar marcadores: `id`, `lat`, `lng`, `estado`
 | Método | Ruta | Rol |
 |---|---|---|
 | `POST` | `/rutas/generar` | Operador | Devuelve una ruta en estado `PROPUESTA`, no la persiste como asignada |
-| `PATCH` | `/rutas/:id/asignar` | Operador | Confirma, asigna chofer y pasa a `ASIGNADA` |
+| `GET` | `/choferes` | Admin, Operador | Lista para elegir a quien asignarle la ruta |
+| `POST` | `/choferes` | Admin | Alta. `legajo` unico |
+| `PATCH` | `/choferes/:id` | Admin | Editar nombre, legajo o la sesion asociada |
+| `DELETE` | `/choferes/:id` | Admin | Baja logica |
+| `PATCH` | `/rutas/:id/asignar` | Operador | Confirma, asigna chofer y pasa a `ASIGNADA`. Valida el chofer |
 | `GET` | `/rutas/:id` | Admin, Operador | Detalle de cualquier ruta. Sin Chofer: no verifica de quien es la ruta |
 | `GET` | `/rutas/mias` | Chofer | Ruta activa del chofer autenticado |
 
