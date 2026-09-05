@@ -131,7 +131,12 @@ Si responde un array, la API llegó hasta PostgreSQL. Si responde `[]`, la app f
 sembrar datos. Si un endpoint privado responde `401` sin token, es buena señal: los guards están
 activos.
 
-## 7. Documentos relacionados
+## 7. Evidencia del despliegue
+
+La evidencia del Blueprint creado, URLs publicas y chequeos post-deploy esta en
+[`evidencia-despliegue.md`](evidencia-despliegue.md).
+
+## 8. Documentos relacionados
 
 - [ADR-002](../adr/ADR-002-persistencia.md) — por qué el esquema sale de migraciones.
 - [ADR-005](../adr/ADR-005-seguridad-identidad.md) — identidad, roles y health público.

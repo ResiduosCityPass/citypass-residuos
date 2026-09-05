@@ -92,6 +92,9 @@ El destino elegido para el despliegue académico es **Render**. La decisión est
 La infraestructura está versionada en [`render.yaml`](../render.yaml): frontend estático, backend
 Docker, PostgreSQL administrado y secretos configurados fuera del repo.
 
+La evidencia del despliegue creado esta documentada en
+[`docs/devops/evidencia-despliegue.md`](../docs/devops/evidencia-despliegue.md).
+
 Para crear el entorno en Render:
 
 1. Crear un Blueprint desde el repositorio.
