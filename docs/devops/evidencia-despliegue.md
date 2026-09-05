@@ -24,6 +24,9 @@ El `JWT_SECRET` esta configurado como secreto en Render y no se documenta en el 
 | Backend API | Web service Docker | `https://citypass-residuos-api.onrender.com` |
 | PostgreSQL | Managed database | `citypass-residuos-db` |
 
+La base PostgreSQL gratuita informa vencimiento el **2026-10-04**. Render indica que la base sera
+eliminada si no se actualiza a un plan pago antes del vencimiento.
+
 ## CI en `main`
 
 La rama `main` quedo sincronizada desde `develop` en el commit `fbba3aa`.
@@ -143,7 +146,6 @@ Esto verifica que los guards estan activos en el despliegue.
 
 ## Pendientes operativos para la demo
 
-- Anotar la fecha de vencimiento de la base gratuita de Render.
 - Cargar datos de demo antes de la presentacion para que el endpoint publico no responda `[]`.
 - Despertar el backend unos minutos antes de mostrar la demo, porque el plan gratuito puede dormir
   por inactividad.
