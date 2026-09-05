@@ -131,3 +131,36 @@ jobs:
 
       - name: Build imagen frontend
         run: docker build -t citypass-residuos-frontend:ci ./frontend
+
+  deploy-info:
+    name: Deploy — Render auto deploy
+    runs-on: ubuntu-latest
+    needs: [backend, frontend, docker-images]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Verificar configuracion de Render
+        run: |
+          grep -q "autoDeployTrigger: checksPass" render.yaml
+          grep -q "citypass-residuos-api" render.yaml
+          grep -q "citypass-residuos-frontend" render.yaml
+          grep -q "citypass-residuos-db" render.yaml
+
+      - name: Publicar resumen de deploy
+        run: |
+          {
+            echo "## Deploy en Render"
+            echo ""
+            echo "El despliegue cloud se gestiona con el Blueprint versionado en \`render.yaml\`."
+            echo ""
+            echo "- Branch desplegada: \`main\`"
+            echo "- Commit validado: \`${GITHUB_SHA}\`"
+            echo "- Politica Render: \`autoDeployTrigger: checksPass\`"
+            echo "- Frontend: https://citypass-residuos-frontend.onrender.com"
+            echo "- API: https://citypass-residuos-api.onrender.com"
+            echo "- Health: https://citypass-residuos-api.onrender.com/api/v1/health"
+            echo ""
+            echo "Render inicia el deploy automaticamente cuando los checks de GitHub terminan en verde."
+          } >> "$GITHUB_STEP_SUMMARY"

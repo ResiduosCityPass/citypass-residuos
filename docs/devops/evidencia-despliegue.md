@@ -38,6 +38,18 @@ Workflow verificado:
 - Frontend: lint, build y tests con cobertura en verde.
 - Docker: build de imagen backend y frontend en verde.
 
+## CD hacia Render
+
+El deploy productivo se gestiona con el Blueprint de Render declarado en `render.yaml`.
+
+El workflow `CI` incluye un job final `Deploy — Render auto deploy`, que corre solo en pushes a
+`main` despues de que backend, frontend y Docker terminan correctamente. Ese job deja visible en
+GitHub Actions la URL de la API, la URL del frontend y la politica de deploy.
+
+Render es quien dispara el despliegue real porque los servicios tienen
+`autoDeployTrigger: checksPass`: cuando los checks de GitHub pasan sobre `main`, Render despliega la
+nueva revision.
+
 ## Chequeos del despliegue
 
 ### Health de la API
