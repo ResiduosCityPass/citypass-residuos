@@ -53,7 +53,7 @@ describe('RutasService (CU-08, CU-09)', () => {
   let contenedores: jest.Mocked<ContenedorRepository>;
   let eventos: InMemoryEventPublisher;
   let flota: jest.Mocked<Pick<FlotaService, 'obtener' | 'guardarEstado'>>;
-  let choferes: jest.Mocked<Pick<ChoferesService, 'obtenerActivo' | 'buscarPorUsuarioSub'>>;
+  let choferes: jest.Mocked<Pick<ChoferesService, 'obtenerActivo' | 'buscarActivoPorUsuarioSub'>>;
   let zonas: jest.Mocked<Pick<ZonasService, 'listar'>>;
   let service: RutasService;
 
@@ -102,7 +102,7 @@ describe('RutasService (CU-08, CU-09)', () => {
     };
     choferes = {
       obtenerActivo: jest.fn().mockResolvedValue(CHOFER),
-      buscarPorUsuarioSub: jest.fn().mockResolvedValue(CHOFER),
+      buscarActivoPorUsuarioSub: jest.fn().mockResolvedValue(CHOFER),
     };
     zonas = { listar: jest.fn().mockResolvedValue([ZONA]) };
 
@@ -309,7 +309,7 @@ describe('RutasService (CU-08, CU-09)', () => {
       // llama no elige de quien es la ruta que pide.
       await service.rutaActivaDeSesion('dev-chofer');
 
-      expect(choferes.buscarPorUsuarioSub).toHaveBeenCalledWith('dev-chofer');
+      expect(choferes.buscarActivoPorUsuarioSub).toHaveBeenCalledWith('dev-chofer');
       expect(rutas.buscarActivaDeChofer).toHaveBeenCalledWith('ch-1');
     });
 
@@ -320,7 +320,7 @@ describe('RutasService (CU-08, CU-09)', () => {
     it('devuelve null si la sesion no es de ningun chofer, sin consultar rutas', async () => {
       // Distinguir "no sos chofer" de "no tenes ruta" solo le diria a quien
       // pregunta si ese identificador existe.
-      choferes.buscarPorUsuarioSub.mockResolvedValue(null);
+      choferes.buscarActivoPorUsuarioSub.mockResolvedValue(null);
 
       await expect(service.rutaActivaDeSesion('alguien-mas')).resolves.toBeNull();
       expect(rutas.buscarActivaDeChofer).not.toHaveBeenCalled();

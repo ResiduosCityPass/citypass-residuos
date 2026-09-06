@@ -43,11 +43,17 @@ export class ChoferesService {
   }
 
   /**
-   * El chofer que corresponde a una sesion, o null si esa sesion no es de
-   * ningun chofer. Lo usa CU-10 para resolver de quien es la ruta.
+   * El chofer activo que corresponde a una sesion, o null. Lo usa CU-10 para
+   * resolver de quien es la ruta y quien puede cerrar una parada.
+   *
+   * Devuelve null tambien para un chofer dado de baja, y eso es lo que hace que
+   * la baja sirva como revocacion: sin login no hay sesion que cerrar, asi que
+   * el unico modo de sacarle el acceso a alguien es que esta consulta deje de
+   * encontrarlo. Un chofer dado de baja a mitad de turno deja de ver su ruta y
+   * de poder confirmar paradas en el request siguiente.
    */
-  buscarPorUsuarioSub(sub: string): Promise<Chofer | null> {
-    return this.choferes.buscarPorUsuarioSub(sub);
+  buscarActivoPorUsuarioSub(sub: string): Promise<Chofer | null> {
+    return this.choferes.buscarActivoPorUsuarioSub(sub);
   }
 
   /**

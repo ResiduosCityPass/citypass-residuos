@@ -18,7 +18,7 @@ describe('ChoferesService (CU-09)', () => {
       guardar: jest.fn().mockImplementation(async (c) => c),
       buscarPorId: jest.fn().mockResolvedValue(chofer()),
       buscarPorLegajo: jest.fn().mockResolvedValue(null),
-      buscarPorUsuarioSub: jest.fn().mockResolvedValue(null),
+      buscarActivoPorUsuarioSub: jest.fn().mockResolvedValue(null),
       listar: jest.fn().mockResolvedValue([]),
     };
     service = new ChoferesService(choferes);
@@ -115,6 +115,15 @@ describe('ChoferesService (CU-09)', () => {
       await service.darDeBaja('ch-1');
 
       expect(choferes.guardar).toHaveBeenCalledWith(expect.objectContaining({ activo: false }));
+    });
+
+    it('la baja es lo que revoca el acceso: la sesion deja de resolver', async () => {
+      // Sin login no hay sesion que cerrar ni contrasena que cambiar. Dar de
+      // baja al chofer es el unico mecanismo de revocacion que tenemos, y solo
+      // funciona porque la consulta por sesion filtra por activo.
+      await service.buscarActivoPorUsuarioSub('dev-chofer');
+
+      expect(choferes.buscarActivoPorUsuarioSub).toHaveBeenCalledWith('dev-chofer');
     });
   });
 });

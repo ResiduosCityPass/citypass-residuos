@@ -263,7 +263,7 @@ export class ParadasService {
     paradaId: string,
     sub: string,
   ): Promise<{ parada: Parada; ruta: Ruta }> {
-    const chofer = await this.choferes.buscarPorUsuarioSub(sub);
+    const chofer = await this.choferes.buscarActivoPorUsuarioSub(sub);
     const parada = await this.paradas.buscarPorId(paradaId);
 
     if (!parada) {

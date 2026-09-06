@@ -205,13 +205,14 @@ export class RutasService {
    * Recibe el `sub` de la sesion, no un id de chofer: la identidad sale del
    * token y nunca de un parametro. Resuelve primero que chofer es esa sesion.
    *
-   * Devuelve null con exito en los dos casos en que no hay nada que mostrar
-   * -la sesion no corresponde a ningun chofer, o el chofer no tiene ruta
-   * activa-. Terminar el turno no es un error, y distinguir los dos casos en la
-   * respuesta solo le diria a quien pregunta si ese `sub` existe.
+   * Devuelve null con exito en los tres casos en que no hay nada que mostrar:
+   * la sesion no corresponde a ningun chofer, el chofer esta dado de baja, o no
+   * tiene ruta activa. Terminar el turno no es un error, y distinguirlos en la
+   * respuesta solo le diria a quien pregunta si ese `sub` existe y si sigue
+   * habilitado.
    */
   async rutaActivaDeSesion(sub: string): Promise<Ruta | null> {
-    const chofer = await this.choferes.buscarPorUsuarioSub(sub);
+    const chofer = await this.choferes.buscarActivoPorUsuarioSub(sub);
 
     if (!chofer) {
       return null;

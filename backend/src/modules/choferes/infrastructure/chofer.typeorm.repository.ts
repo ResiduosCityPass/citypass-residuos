@@ -35,8 +35,8 @@ export class ChoferTypeormRepository
     return this.repo().findOne({ where: { legajo } });
   }
 
-  buscarPorUsuarioSub(sub: string): Promise<Chofer | null> {
-    return this.repo().findOne({ where: { usuarioSub: sub } });
+  buscarActivoPorUsuarioSub(sub: string): Promise<Chofer | null> {
+    return this.repo().findOne({ where: { usuarioSub: sub, activo: true } });
   }
 
   listar(filtro: FiltroChoferes): Promise<Chofer[]> {

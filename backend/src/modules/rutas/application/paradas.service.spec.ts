@@ -35,7 +35,7 @@ describe('ParadasService (CU-10)', () => {
   let contenedores: jest.Mocked<ContenedorRepository>;
   let eventos: InMemoryEventPublisher;
   let alertas: jest.Mocked<Pick<AlertasService, 'resolverAbiertasPorTipo'>>;
-  let choferes: jest.Mocked<Pick<ChoferesService, 'buscarPorUsuarioSub'>>;
+  let choferes: jest.Mocked<Pick<ChoferesService, 'buscarActivoPorUsuarioSub'>>;
   let flota: jest.Mocked<Pick<FlotaService, 'obtener' | 'guardarEstado'>>;
   let service: ParadasService;
 
@@ -103,7 +103,7 @@ describe('ParadasService (CU-10)', () => {
     // para cualquier `sub` deja pasar los tests de "no podes tocar lo de otro"
     // sin probar nada.
     choferes = {
-      buscarPorUsuarioSub: jest
+      buscarActivoPorUsuarioSub: jest
         .fn()
         .mockImplementation(async (sub) => (sub === SESION ? CHOFER : null)),
     };

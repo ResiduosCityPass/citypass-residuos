@@ -391,6 +391,46 @@ describe('Ciclo de recoleccion (e2e)', () => {
       expect(respuesta.body.code).toBe('CHOFER_LEGAJO_DUPLICADO');
     });
 
+    it('dar de baja al chofer le revoca el acceso en el acto', async () => {
+      // Sin login no hay sesion que cerrar ni contrasena que cambiar: la baja es
+      // el unico mecanismo de revocacion que existe. Si un chofer dado de baja
+      // siguiera viendo su ruta y confirmando paradas, no habria forma de
+      // sacarle el acceso a nadie.
+      const { camion, choferId } = await prepararEscenario(1);
+      const ruta = await http
+        .post('/api/v1/rutas/generar')
+        .set(auth(admin))
+        .send({ camionId: camion.id })
+        .expect(201);
+      await http
+        .patch(`/api/v1/rutas/${ruta.body.id}/asignar`)
+        .set(auth(admin))
+        .send({ choferId })
+        .expect(200);
+
+      const chofer = ctx.token(Rol.CHOFER);
+
+      // Antes de la baja ve su ruta.
+      const antes = await http.get('/api/v1/rutas/mias').set(auth(chofer)).expect(200);
+      expect(antes.body.id).toBe(ruta.body.id);
+      const paradaId = antes.body.paradas[0].id;
+      const contenedor = antes.body.paradas[0].contenedor;
+
+      await http.delete(`/api/v1/choferes/${choferId}`).set(auth(admin)).expect(204);
+
+      // Despues no ve nada, y no puede cerrar la parada que tenia abierta.
+      const despues = await http.get('/api/v1/rutas/mias').set(auth(chofer)).expect(200);
+      expect(despues.body).toEqual({});
+
+      const intento = await http
+        .patch(`/api/v1/paradas/${paradaId}/confirmar`)
+        .set(auth(chofer))
+        .send({ lat: contenedor.lat, lng: contenedor.lng })
+        .expect(403);
+
+      expect(intento.body.code).toBe('PARADA_DE_OTRA_RUTA');
+    });
+
     it('una sesion que no es de ningun chofer no ve ninguna ruta', async () => {
       const { camion, choferId } = await prepararEscenario(1);
       const ruta = await http
