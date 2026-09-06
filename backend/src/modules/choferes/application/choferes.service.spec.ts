@@ -1,4 +1,5 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { Chofer } from '../domain/chofer.entity';
 import { ChoferRepository } from '../domain/chofer.repository';
 import { ChoferesService } from './choferes.service';
@@ -21,7 +22,7 @@ describe('ChoferesService (CU-09)', () => {
       buscarActivoPorUsuarioSub: jest.fn().mockResolvedValue(null),
       listar: jest.fn().mockResolvedValue([]),
     };
-    service = new ChoferesService(choferes);
+    service = new ChoferesService(choferes, new JwtService({ secret: 'secreto-de-tests' }));
   });
 
   describe('crear', () => {
@@ -124,6 +125,62 @@ describe('ChoferesService (CU-09)', () => {
       await service.buscarActivoPorUsuarioSub('dev-chofer');
 
       expect(choferes.buscarActivoPorUsuarioSub).toHaveBeenCalledWith('dev-chofer');
+    });
+  });
+
+  describe('emitirCredencial', () => {
+    const decodificar = (token: string) =>
+      JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString()) as Record<string, unknown>;
+
+    it('devuelve un token con los datos del chofer', async () => {
+      const credencial = await service.emitirCredencial('ch-1');
+
+      expect(credencial).toMatchObject({ choferId: 'ch-1', nombre: 'Juana Perez' });
+      expect(decodificar(credencial.token)).toMatchObject({
+        groups: ['chofer'],
+        preferred_username: 'CH-014',
+      });
+    });
+
+    it('rota el `usuarioSub` y lo guarda: eso es lo que revoca las anteriores', async () => {
+      // Emitir una credencial nueva no puede dejar viva a la anterior. Como el
+      // guard resuelve el chofer por `usuarioSub`, cambiarlo mata de golpe todo
+      // lo emitido antes, aunque su firma siga siendo valida.
+      const primera = await service.emitirCredencial('ch-1');
+      const guardado = choferes.guardar.mock.calls.at(-1)?.[0] as Chofer;
+
+      expect(guardado.usuarioSub).toEqual(expect.stringMatching(/^chofer_[0-9a-f]{48}$/));
+      expect(decodificar(primera.token).sub).toBe(guardado.usuarioSub);
+    });
+
+    it('dos emisiones dan `sub` distintos', async () => {
+      const primera = await service.emitirCredencial('ch-1');
+      const segunda = await service.emitirCredencial('ch-1');
+
+      expect(decodificar(primera.token).sub).not.toBe(decodificar(segunda.token).sub);
+    });
+
+    it('el `sub` no se puede adivinar desde el id ni el legajo del chofer', async () => {
+      const credencial = await service.emitirCredencial('ch-1');
+      const sub = String(decodificar(credencial.token).sub);
+
+      expect(sub).not.toContain('ch-1');
+      expect(sub).not.toContain('CH-014');
+    });
+
+    it('no le emite credencial a un chofer dado de baja', async () => {
+      choferes.buscarPorId.mockResolvedValue(chofer({ activo: false }));
+
+      await expect(service.emitirCredencial('ch-1')).rejects.toMatchObject({
+        response: { code: 'CHOFER_INACTIVO' },
+      });
+      expect(choferes.guardar).not.toHaveBeenCalled();
+    });
+
+    it('propaga el 404 si el chofer no existe', async () => {
+      choferes.buscarPorId.mockResolvedValue(null);
+
+      await expect(service.emitirCredencial('ch-fantasma')).rejects.toThrow(NotFoundException);
     });
   });
 });

@@ -12,6 +12,13 @@ describe('ChoferesController (CU-09)', () => {
       obtener: jest.fn(),
       actualizar: jest.fn(),
       darDeBaja: jest.fn(),
+      emitirCredencial: jest.fn().mockResolvedValue({
+        choferId: 'ch-1',
+        nombre: 'Juana Perez',
+        legajo: 'CH-014',
+        token: 'eyJ.token.firmado',
+        expiraEn: '30d',
+      }),
     } as unknown as jest.Mocked<ChoferesService>;
     controller = new ChoferesController(service);
   });
@@ -38,6 +45,16 @@ describe('ChoferesController (CU-09)', () => {
     await controller.actualizar('ch-1', { nombre: 'Juana P.' });
 
     expect(service.actualizar).toHaveBeenCalledWith('ch-1', { nombre: 'Juana P.' });
+  });
+
+  it('emite la credencial y avisa que no se vuelve a mostrar', async () => {
+    const respuesta = await controller.emitirCredencial('ch-1');
+
+    expect(service.emitirCredencial).toHaveBeenCalledWith('ch-1');
+    expect(respuesta.token).toBe('eyJ.token.firmado');
+    // El aviso es parte del contrato: el operador tiene que saber que si cierra
+    // el modal sin copiarla, la unica salida es emitir otra.
+    expect(respuesta.advertencia).toMatch(/no se puede volver a consultar/i);
   });
 
   it('delega la baja', async () => {

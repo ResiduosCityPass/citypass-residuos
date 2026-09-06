@@ -59,6 +59,27 @@ export class ChoferesController {
     return this.choferes.actualizar(id, dto);
   }
 
+  @Post(':id/credencial')
+  @Roles(Rol.ADMINISTRADOR)
+  @ApiOperation({
+    summary: 'CU-09 · Emitir la credencial con la que el chofer entra a su pantalla',
+  })
+  @ApiResponse({
+    status: 201,
+    description:
+      'Devuelve el token una unica vez. Emitir de nuevo invalida el anterior: la credencial ' +
+      'vieja deja de resolver contra ningun chofer.',
+  })
+  @ApiResponse({ status: 409, description: 'CHOFER_INACTIVO' })
+  async emitirCredencial(@Param('id', ParseUUIDPipe) id: string) {
+    const credencial = await this.choferes.emitirCredencial(id);
+
+    return {
+      ...credencial,
+      advertencia: 'Guardala ahora: no se puede volver a consultar. Emitir otra invalida esta.',
+    };
+  }
+
   @Delete(':id')
   @Roles(Rol.ADMINISTRADOR)
   @HttpCode(HttpStatus.NO_CONTENT)

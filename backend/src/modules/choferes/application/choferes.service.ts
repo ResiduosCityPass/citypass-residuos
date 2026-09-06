@@ -1,9 +1,24 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { aplicarCambios } from '../../../shared/application/aplicar-cambios';
+import {
+  CREDENCIAL_CHOFER_EXPIRA_EN,
+  generarSubDeChofer,
+  payloadDeCredencialChofer,
+} from '../../../shared/auth/credencial-chofer';
 import { Chofer } from '../domain/chofer.entity';
 import { CHOFER_REPOSITORY, ChoferRepository } from '../domain/chofer.repository';
 import { ActualizarChoferDto } from './dto/actualizar-chofer.dto';
 import { CrearChoferDto } from './dto/crear-chofer.dto';
+
+/** Credencial recien emitida. El token viaja una sola vez, como la API key del sensor. */
+export interface CredencialEmitida {
+  choferId: string;
+  nombre: string;
+  legajo: string;
+  token: string;
+  expiraEn: string;
+}
 
 /**
  * ABM de choferes (CU-09).
@@ -17,6 +32,7 @@ export class ChoferesService {
   constructor(
     @Inject(CHOFER_REPOSITORY)
     private readonly choferes: ChoferRepository,
+    private readonly jwt: JwtService,
   ) {}
 
   async crear(dto: CrearChoferDto): Promise<Chofer> {
@@ -83,6 +99,46 @@ export class ChoferesService {
     aplicarCambios(chofer, dto);
 
     return this.choferes.guardar(chofer);
+  }
+
+  /**
+   * Emite la credencial con la que el chofer entra a la pantalla de CU-10.
+   *
+   * Mismo trato que la API key del sensor: se muestra una sola vez y no se
+   * puede volver a consultar. La diferencia es que no hace falta guardarla, ni
+   * siquiera hasheada — un JWT se valida con su firma, asi que el backend no
+   * necesita recordar nada.
+   *
+   * Lo que se guarda es el `usuarioSub`, y ROTARLO ES LO QUE REVOCA. Emitir una
+   * credencial nueva genera un `sub` nuevo, y las credenciales anteriores de ese
+   * chofer dejan de resolver contra nadie: quedan muertas en el acto, aunque su
+   * firma siga siendo valida y falte un mes para que venzan.
+   *
+   * Eso da dos niveles de revocacion, que es justo lo que faltaba: perder el
+   * celular se resuelve emitiendo otra credencial, sin sacar al chofer de
+   * circulacion; que la persona deje de trabajar se resuelve dandola de baja.
+   *
+   * El precio: emitir dos veces por error deja al chofer afuera hasta que le
+   * pasen la nueva. Es el mismo precio que revincular un sensor, y se paga por
+   * la misma razon.
+   */
+  async emitirCredencial(id: string): Promise<CredencialEmitida> {
+    const chofer = await this.obtenerActivo(id);
+
+    chofer.usuarioSub = generarSubDeChofer();
+    await this.choferes.guardar(chofer);
+
+    const token = this.jwt.sign(payloadDeCredencialChofer(chofer.usuarioSub, chofer.legajo), {
+      expiresIn: CREDENCIAL_CHOFER_EXPIRA_EN,
+    });
+
+    return {
+      choferId: chofer.id,
+      nombre: chofer.nombre,
+      legajo: chofer.legajo,
+      token,
+      expiraEn: CREDENCIAL_CHOFER_EXPIRA_EN,
+    };
   }
 
   /**

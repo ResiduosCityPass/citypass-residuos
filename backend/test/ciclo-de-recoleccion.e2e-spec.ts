@@ -391,6 +391,73 @@ describe('Ciclo de recoleccion (e2e)', () => {
       expect(respuesta.body.code).toBe('CHOFER_LEGAJO_DUPLICADO');
     });
 
+    it('la credencial emitida sirve para entrar, y emitir otra mata la anterior', async () => {
+      // Es el flujo real de la demo: el chofer no tiene login, entra con la
+      // credencial que le emitieron desde el ABM. Y perder el celular tiene que
+      // poder resolverse sin dar de baja a la persona.
+      const { camion, choferId } = await prepararEscenario(1);
+      const ruta = await http
+        .post('/api/v1/rutas/generar')
+        .set(auth(admin))
+        .send({ camionId: camion.id })
+        .expect(201);
+      await http
+        .patch(`/api/v1/rutas/${ruta.body.id}/asignar`)
+        .set(auth(admin))
+        .send({ choferId })
+        .expect(200);
+
+      const primera = await http
+        .post(`/api/v1/choferes/${choferId}/credencial`)
+        .set(auth(admin))
+        .expect(201);
+
+      expect(primera.body.advertencia).toMatch(/no se puede volver a consultar/i);
+
+      // Con la credencial recien emitida ve su ruta.
+      const conPrimera = await http
+        .get('/api/v1/rutas/mias')
+        .set(auth(primera.body.token))
+        .expect(200);
+      expect(conPrimera.body.id).toBe(ruta.body.id);
+
+      // Se pierde el celular: se emite otra sin tocar al chofer.
+      const segunda = await http
+        .post(`/api/v1/choferes/${choferId}/credencial`)
+        .set(auth(admin))
+        .expect(201);
+
+      expect(segunda.body.token).not.toBe(primera.body.token);
+
+      // La nueva anda...
+      const conSegunda = await http
+        .get('/api/v1/rutas/mias')
+        .set(auth(segunda.body.token))
+        .expect(200);
+      expect(conSegunda.body.id).toBe(ruta.body.id);
+
+      // ...y la vieja quedo muerta, aunque su firma siga siendo valida y le
+      // falte un mes para vencer.
+      const conVieja = await http
+        .get('/api/v1/rutas/mias')
+        .set(auth(primera.body.token))
+        .expect(200);
+      expect(conVieja.body).toEqual({});
+    });
+
+    it('no se le emite credencial a un chofer dado de baja', async () => {
+      const { choferId } = await prepararEscenario(1);
+
+      await http.delete(`/api/v1/choferes/${choferId}`).set(auth(admin)).expect(204);
+
+      const respuesta = await http
+        .post(`/api/v1/choferes/${choferId}/credencial`)
+        .set(auth(admin))
+        .expect(409);
+
+      expect(respuesta.body.code).toBe('CHOFER_INACTIVO');
+    });
+
     it('dar de baja al chofer le revoca el acceso en el acto', async () => {
       // Sin login no hay sesion que cerrar ni contrasena que cambiar: la baja es
       // el unico mecanismo de revocacion que existe. Si un chofer dado de baja

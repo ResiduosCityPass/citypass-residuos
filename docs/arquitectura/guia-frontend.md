@@ -924,6 +924,44 @@ Errores: `409 CHOFER_LEGAJO_DUPLICADO`.
 >
 > En desarrollo el valor es `dev-chofer`, que es el `sub` que genera
 > `npm run token:dev -- CHOFER`. El seed ya crea a Juana Perez con ese valor.
+>
+> **Ojo en la demo:** emitir una credencial le rota el `usuarioSub`, así que a partir de ahí el
+> token de `npm run token:dev -- CHOFER` deja de servir para ese chofer. Usá uno o el otro, no los
+> dos.
+
+### `POST /choferes/:id/credencial`
+
+Rol: `ADMINISTRADOR`. Sin cuerpo. Es **cómo entra el chofer a `/chofer`**: no hay login, así que
+alguien le tiene que emitir la credencial desde el ABM.
+
+```json
+{
+  "choferId": "8f2c...",
+  "nombre": "Juana Perez",
+  "legajo": "CH-001",
+  "token": "eyJhbGciOiJIUzI1NiIs...",
+  "expiraEn": "30d",
+  "advertencia": "Guardala ahora: no se puede volver a consultar. Emitir otra invalida esta."
+}
+```
+
+**Tratala igual que la API key del sensor**, porque es el mismo trato: se muestra una sola vez y no
+se puede volver a consultar. Mismo modal, misma fricción — bloque monoespaciado, botón de copiar, y
+que no se cierre hasta confirmar que la guardó.
+
+El chofer la pega en su celular y queda en `localStorage`, que es lo que ya hace tu `TokenBar`.
+
+> **Emitir una credencial nueva mata la anterior**, y eso es a propósito: es lo que resuelve un
+> celular perdido sin tener que dar de baja a la persona. La credencial vieja deja de funcionar en
+> el acto, aunque su firma siga siendo válida y le falte un mes para vencer.
+>
+> El precio: si el operador la emite dos veces por error, el chofer queda afuera hasta que le pasen
+> la nueva. Conviene que el modal lo diga.
+
+**Dura 30 días.** Es larga a propósito: sin login el chofer no puede volver a entrar por su cuenta,
+así que una credencial que vence a mitad de turno lo deja tildado en la calle.
+
+Errores: `409 CHOFER_INACTIVO` · `404 CHOFER_NO_ENCONTRADO`.
 
 ### `PATCH /choferes/:id` y `DELETE /choferes/:id`
 
