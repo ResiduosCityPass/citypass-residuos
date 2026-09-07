@@ -11,6 +11,17 @@ import { IsEnum, IsInt, IsOptional, IsString, Max, Min, validateSync } from 'cla
  */
 export const EMISOR_TOKEN_DEFAULT = 'citypass-squad2';
 
+/**
+ * Emisor de la credencial del chofer (ADR-009).
+ *
+ * Distinto de `EMISOR_TOKEN_DEFAULT` a proposito: ese representa al Squad 2
+ * (real en produccion, una mentira temporal y documentada en desarrollo). El
+ * del chofer nunca es el Squad 2 -- el chofer no se registra ni inicia sesion
+ * contra ellos -- asi que reusar el mismo emisor seria una mentira permanente,
+ * no una de desarrollo. Ver ADR-009, seccion de acciones abiertas.
+ */
+export const EMISOR_CHOFERES_DEFAULT = 'citypass-residuos-choferes';
+
 /** Esta API como destinatario del token. Viaja en `aud`, siempre como lista. */
 export const AUDIENCIA_TOKEN_DEFAULT = 'citypass-residuos-api';
 
@@ -73,6 +84,10 @@ class VariablesEntorno {
   @IsString()
   @IsOptional()
   JWT_ISSUER: string = EMISOR_TOKEN_DEFAULT;
+
+  @IsString()
+  @IsOptional()
+  JWT_ISSUER_CHOFERES: string = EMISOR_CHOFERES_DEFAULT;
 
   @IsString()
   @IsOptional()
