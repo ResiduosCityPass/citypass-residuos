@@ -17,6 +17,7 @@ describe('validarEntorno', () => {
     expect(config.PORT).toBe(3000);
     expect(config.EVENT_BUS_DRIVER).toBe('inmemory');
     expect(config.DB_SSL).toBe('false');
+    expect(config.JWT_ISSUER_CHOFERES).toBe('citypass-residuos-choferes');
   });
 
   it('falla al arrancar si falta una variable obligatoria', () => {
