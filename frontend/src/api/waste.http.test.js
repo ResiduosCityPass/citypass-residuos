@@ -4,6 +4,8 @@ import {
   linkSensor,
   fetchMapContainers,
   deleteZone,
+  fetchDrivers,
+  assignRoute,
   fetchMyRoute,
   confirmStop,
   skipStop,
@@ -61,6 +63,34 @@ describe('rutas contra la API real', () => {
     await fetchMapContainers();
 
     expect(calledOptions().headers.Authorization).toBe('Bearer un-jwt');
+  });
+
+  /* --- CU-09 ------------------------------------------------------------ */
+
+  /**
+   * El selector se llena con los ACTIVOS, que es el default del endpoint: son
+   * los unicos a los que se les puede asignar una ruta. Pedir los inactivos es
+   * una decision explicita de una pantalla de administracion, no del selector.
+   */
+  it('el listado de choferes no pide los inactivos', async () => {
+    await fetchDrivers();
+
+    expect(calledPath()).toMatch(/\/choferes$/);
+    expect(calledPath()).not.toContain('incluirInactivos');
+  });
+
+  /**
+   * Lo que cambio en el Sprint 3 (ADR-009): `choferId` era un string libre que
+   * el backend no validaba contra nada, y un identificador mal tipeado asignaba
+   * la ruta CON EXITO dejando al chofer sin verla nunca. Ahora es el uuid de un
+   * chofer de `GET /choferes`. El test fija que viaja tal cual, sin envolver.
+   */
+  it('asignar manda el uuid del chofer en el cuerpo', async () => {
+    await assignRoute('rt-1', { choferId: '8f2c1d4e-6b3a-4f21-9c07-5d2e1a9b4c33' });
+
+    expect(calledPath()).toMatch(/\/rutas\/rt-1\/asignar$/);
+    expect(calledOptions().method).toBe('PATCH');
+    expect(calledOptions().body).toBe('{"choferId":"8f2c1d4e-6b3a-4f21-9c07-5d2e1a9b4c33"}');
   });
 
   /* --- CU-10 ------------------------------------------------------------ */

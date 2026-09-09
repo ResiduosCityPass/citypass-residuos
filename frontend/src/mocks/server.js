@@ -1,5 +1,5 @@
 import { ApiError } from '../api/client.js';
-import { ZONES, CONTAINERS, SENSORS, ALERTS, TRUCKS, ROUTES, STOPS } from './data.js';
+import { ZONES, CONTAINERS, SENSORS, ALERTS, TRUCKS, DRIVERS, ROUTES, STOPS } from './data.js';
 import { DEPOT, distanceKm, distanceMeters } from '../domain/geo.js';
 
 /**
@@ -27,6 +27,7 @@ const store = {
   sensors: SENSORS.map((s) => ({ ...s })),
   alerts: ALERTS.map((a) => ({ ...a })),
   trucks: TRUCKS.map((t) => ({ ...t })),
+  drivers: DRIVERS.map((d) => ({ ...d })),
   routes: ROUTES.map((r) => ({ ...r })),
   stops: STOPS.map((s) => ({ ...s })),
 };
@@ -51,6 +52,9 @@ const fail = (code, status, message) =>
       LATENCY_MS,
     ),
   );
+
+/** Lo que valida `@IsUUID()` en el backend. Se replica para producir el mismo 400. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const now = () => new Date().toISOString();
 const newId = (prefix) => `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
@@ -440,6 +444,30 @@ export function updateTruck(id, changes) {
 }
 
 /* ========================================================================
+ * CU-09 · Choferes
+ * ====================================================================== */
+
+/**
+ * El listado que llena el <select> de la pantalla de asignacion.
+ *
+ * Por defecto trae SOLO los activos, que son los unicos a los que se les puede
+ * asignar una ruta: un selector que ofrece opciones que el backend va a
+ * rechazar con 409 no es un selector, es una trampa. `incluirInactivos` existe
+ * para una pantalla de administracion, no para elegir a quien mandar.
+ */
+export function fetchDrivers({ incluirInactivos = false } = {}) {
+  const drivers = incluirInactivos ? store.drivers : store.drivers.filter((d) => d.activo);
+  return respond(drivers);
+}
+
+/**
+ * El ABM de choferes y la emision de credenciales viven en el backend (PR #13)
+ * y todavia no tienen pantalla. Cuando la tengan, el alta va aca con su
+ * CHOFER_LEGAJO_DUPLICADO: mockearla antes de escribir la pantalla seria
+ * inventar la forma de algo que nadie va a leer.
+ */
+
+/* ========================================================================
  * CU-08 / CU-09 · Rutas
  * ====================================================================== */
 
@@ -449,20 +477,45 @@ const litersIn = (container) => (container.capacidadLitros * container.nivelLlen
 const routeStops = (routeId) =>
   store.stops.filter((s) => s.rutaId === routeId).sort((a, b) => a.orden - b.orden);
 
+const driverOf = (route) => store.drivers.find((d) => d.id === route.choferId) ?? null;
+
 /**
- * Una ruta con camion y paradas (con su contenedor) anidados.
+ * Una ruta con camion, chofer y paradas (con su contenedor) anidados.
  *
- * NO hay objeto `chofer`, solo `choferId`: los choferes son usuarios del
- * directorio del Squad 2 y este modulo no guarda una copia de sus datos.
+ * El `chofer` viaja expandido —nombre y legajo— porque ahora es una entidad de
+ * este modulo. Un chofer dado de baja SIGUE apareciendo aca: sus rutas
+ * historicas son el registro de quien ejecuto cada recoleccion, y borrarlo del
+ * detalle seria perder ese dato. Lo que la baja impide es recibir rutas nuevas.
  */
 function expandRoute(route) {
   return {
     ...route,
     camion: store.trucks.find((t) => t.id === route.camionId) ?? null,
+    chofer: driverOf(route),
     paradas: routeStops(route.id).map((stop) => ({
       ...stop,
       contenedor: store.containers.find((c) => c.id === stop.contenedorId) ?? null,
     })),
+  };
+}
+
+/**
+ * El avance del listado: cuantas paradas se cerraron y como.
+ *
+ * Viene SIEMPRE, aunque la ruta no tenga paradas —ahi los cuatro valores son
+ * 0—, para que la pantalla pueda leer `ruta.avance.confirmadas` sin preguntar.
+ * Del lado del backend es una sola consulta agrupada para todo el listado, no
+ * una por fila; el detalle no lo trae porque ahi estan las paradas enteras.
+ */
+function routeProgress(routeId) {
+  const stops = routeStops(routeId);
+  const confirmadas = stops.filter((s) => s.estado === 'CONFIRMADA').length;
+  const omitidas = stops.filter((s) => s.estado === 'OMITIDA').length;
+  return {
+    total: stops.length,
+    confirmadas,
+    omitidas,
+    pendientes: stops.length - confirmadas - omitidas,
   };
 }
 
@@ -476,6 +529,8 @@ function expandRoute(route) {
 const listRoute = (route) => ({
   ...route,
   camion: store.trucks.find((t) => t.id === route.camionId) ?? null,
+  chofer: driverOf(route),
+  avance: routeProgress(route.id),
 });
 
 export const fetchRoutes = (filters = {}) =>
@@ -600,10 +655,19 @@ export function assignRoute(id, data = {}) {
   }
   if (!data.choferId) return fail('HTTP_400', 400, ['choferId should not be empty']);
 
-  // `choferId` es un string libre: el `sub` del JWT del chofer. El backend NO
-  // lo valida contra ningun padron —no tiene contra cual—, asi que aca tampoco.
-  // Por eso CHOFER_NO_ENCONTRADO no existe del lado del servidor.
-  route.choferId = data.choferId;
+  // Las tres fallas del chofer, en el mismo orden que el backend. Antes no
+  // habia ninguna: `choferId` era texto libre y cualquier cosa asignaba la ruta
+  // con exito. Que el mock las replique es lo unico que hace que las pantallas
+  // de error se puedan disenar sin levantar el backend.
+  if (!UUID.test(data.choferId)) return fail('HTTP_400', 400, ['choferId must be a UUID']);
+
+  const driver = store.drivers.find((d) => d.id === data.choferId);
+  if (!driver) return fail('CHOFER_NO_ENCONTRADO', 404, `No existe el chofer ${data.choferId}`);
+  if (!driver.activo) {
+    return fail('CHOFER_INACTIVO', 409, `${driver.nombre} esta dado de baja y no recibe rutas nuevas`);
+  }
+
+  route.choferId = driver.id;
   route.estado = 'ASIGNADA';
   route.asignadaEn = now();
 
