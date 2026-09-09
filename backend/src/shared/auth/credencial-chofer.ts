@@ -12,20 +12,19 @@ import { JwtPayload } from './jwt-payload';
 export const CREDENCIAL_CHOFER_EXPIRA_EN = '30d';
 
 /**
- * `token_use` de la credencial del chofer.
+ * `token_use` de la credencial del chofer (ADR-009).
  *
- * TODAVIA dice 'human' porque es lo unico que el guard acepta hoy. Segun
- * ADR-009 pasa a 'chofer-interno' apenas el guard lo admita, y el orden no es
- * intercambiable: un `if` que acepta un valor que nadie emite es inerte, un
- * emisor que emite un valor que el guard rechaza corta todos los ingresos de
- * chofer. Cuando eso pase, este es el unico lugar que hay que cambiar.
+ * No es el 'human' del contrato del Squad 2: ese valor significa, para ellos,
+ * una persona autenticada por ellos con un `sub` de ellos. El chofer no paso
+ * por ahi. Reusarlo contaminaba el campo que existe para trazar quien hizo que:
+ * alguien mirando ese `sub` en un evento de residuos dentro de dos meses habria
+ * creido que era un identificador del Squad 2.
  *
- * El motivo del cambio: 'human' significa, en el contrato del Squad 2, una
- * persona autenticada por ellos con un `sub` de ellos. El chofer no paso por
- * ahi, y reusar el valor contamina el campo que existe para trazar quien hizo
- * que.
+ * Va de la mano con el emisor propio. El guard cruza los dos -- un token
+ * `human` con el emisor del chofer se rechaza, y al reves tambien -- asi que
+ * cambiar uno solo no alcanza.
  */
-export const TOKEN_USE_CHOFER = 'human';
+export const TOKEN_USE_CHOFER = 'chofer-interno';
 
 /**
  * Identificador de sesion de un chofer.

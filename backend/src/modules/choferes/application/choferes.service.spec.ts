@@ -1,4 +1,5 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Chofer } from '../domain/chofer.entity';
 import { ChoferRepository } from '../domain/chofer.repository';
@@ -22,7 +23,11 @@ describe('ChoferesService (CU-09)', () => {
       buscarActivoPorUsuarioSub: jest.fn().mockResolvedValue(null),
       listar: jest.fn().mockResolvedValue([]),
     };
-    service = new ChoferesService(choferes, new JwtService({ secret: 'secreto-de-tests' }));
+    service = new ChoferesService(
+      choferes,
+      new JwtService({ secret: 'secreto-de-tests' }),
+      new ConfigService({}),
+    );
   });
 
   describe('crear', () => {
@@ -140,6 +145,35 @@ describe('ChoferesService (CU-09)', () => {
         groups: ['chofer'],
         preferred_username: 'CH-014',
       });
+    });
+
+    it('declara su propio token_use, no el `human` del Squad 2', async () => {
+      // `human` significa, en el contrato del Squad 2, una persona autenticada
+      // por ellos. El chofer no paso por ahi, y reusar el valor contaminaria el
+      // campo que existe para trazar quien hizo que (ADR-009).
+      const credencial = await service.emitirCredencial('ch-1');
+
+      expect(decodificar(credencial.token).token_use).toBe('chofer-interno');
+    });
+
+    it('firma con el emisor de choferes, no con el humano', async () => {
+      // El guard cruza `token_use` contra `iss`: cambiar uno solo de los dos
+      // deja el token rechazado.
+      const credencial = await service.emitirCredencial('ch-1');
+
+      expect(decodificar(credencial.token).iss).toBe('citypass-residuos-choferes');
+    });
+
+    it('respeta el emisor configurado por entorno', async () => {
+      const conOtroEmisor = new ChoferesService(
+        choferes,
+        new JwtService({ secret: 'secreto-de-tests' }),
+        new ConfigService({ JWT_ISSUER_CHOFERES: 'otro-emisor' }),
+      );
+
+      const credencial = await conOtroEmisor.emitirCredencial('ch-1');
+
+      expect(decodificar(credencial.token).iss).toBe('otro-emisor');
     });
 
     it('rota el `usuarioSub` y lo guarda: eso es lo que revoca las anteriores', async () => {

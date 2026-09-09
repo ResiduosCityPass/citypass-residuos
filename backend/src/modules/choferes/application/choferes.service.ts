@@ -1,6 +1,8 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { aplicarCambios } from '../../../shared/application/aplicar-cambios';
+import { EMISOR_CHOFERES_DEFAULT } from '../../../config/env.validation';
 import {
   CREDENCIAL_CHOFER_EXPIRA_EN,
   generarSubDeChofer,
@@ -33,6 +35,7 @@ export class ChoferesService {
     @Inject(CHOFER_REPOSITORY)
     private readonly choferes: ChoferRepository,
     private readonly jwt: JwtService,
+    private readonly config: ConfigService,
   ) {}
 
   async crear(dto: CrearChoferDto): Promise<Chofer> {
@@ -130,6 +133,10 @@ export class ChoferesService {
 
     const token = this.jwt.sign(payloadDeCredencialChofer(chofer.usuarioSub, chofer.legajo), {
       expiresIn: CREDENCIAL_CHOFER_EXPIRA_EN,
+      // Emisor propio, distinto del humano. El guard cruza `token_use` contra
+      // `iss`, asi que firmar con el emisor equivocado rechaza el token aunque
+      // todo lo demas este bien.
+      issuer: this.config.get<string>('JWT_ISSUER_CHOFERES', EMISOR_CHOFERES_DEFAULT),
     });
 
     return {
