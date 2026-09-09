@@ -239,15 +239,57 @@ export const TRUCKS = [
   },
 ];
 
-/*
- * CU-09 · No hay fixture de choferes, y no puede haberlo.
+/* ------------------------------------------------------------------------
+ * CU-09 · Choferes
+ * ---------------------------------------------------------------------- */
+
+/**
+ * Los choferes son entidades de ESTE modulo (ADR-009).
  *
- * `RUTA.choferId` es un string libre: el `sub` del JWT de un usuario con rol
- * CHOFER del directorio del Squad 2 (ADR-005). No existe `GET /choferes` y el
- * backend no valida el id contra ningun padron. Mantener una lista falsa aca
- * hacia creer que el <select> se iba a poder llenar algun dia solo con conectar
- * la API; en la pantalla de asignacion el identificador se escribe a mano.
+ * Hasta el Sprint 3 asumimos lo contrario —que eran usuarios del directorio del
+ * Squad 2 y que guardar una copia aca solo se iba a desincronizar—, y mientras
+ * ese supuesto valio `RUTA.choferId` era un string libre que el backend no
+ * validaba contra nada: un identificador mal tipeado asignaba la ruta CON EXITO
+ * y el chofer no la veia nunca. Ahora es el uuid de uno de estos.
+ *
+ * `usuarioSub` es lo unico que une a la persona con su sesion: `GET /rutas/mias`
+ * resuelve el chofer buscando por ahi. Es OPCIONAL a proposito —se da de alta a
+ * alguien en la operacion antes de que le configuren el acceso—, y por eso el
+ * fixture tiene uno sin el: a ese se le puede asignar una ruta igual, pero no
+ * la ve. Es la trampa que reemplaza a la del identificador mal tipeado.
+ *
+ * Hay uno inactivo para que se pueda probar que `GET /choferes` no lo trae y
+ * que asignarle una ruta da 409.
  */
+export const DRIVERS = [
+  {
+    id: '8f2c1d4e-6b3a-4f21-9c07-5d2e1a9b4c33',
+    nombre: 'Juana Perez', legajo: 'CH-001',
+    // El `sub` que genera `npm run token:dev -- CHOFER`. Es el unico del
+    // fixture que puede abrir /chofer y ver su ruta.
+    usuarioSub: 'dev-chofer', activo: true,
+    creadoEn: hoursAgo(400), actualizadoEn: hoursAgo(400),
+  },
+  {
+    id: 'b1e7c9a2-04d5-4e88-a1f3-7c6b2d5e0917',
+    nombre: 'Martin Gomez', legajo: 'CH-002',
+    usuarioSub: 'ldap:mgomez', activo: true,
+    creadoEn: hoursAgo(380), actualizadoEn: hoursAgo(380),
+  },
+  {
+    id: 'c4a9f0b6-2d81-4c37-b5e2-9f13a7d6e480',
+    nombre: 'Rocio Ledesma', legajo: 'CH-003',
+    // Dada de alta en la operacion, sin acceso configurado todavia.
+    usuarioSub: null, activo: true,
+    creadoEn: hoursAgo(20), actualizadoEn: hoursAgo(20),
+  },
+  {
+    id: 'd7b3e5c1-9a24-4f60-8d19-3e0c6b8a2f55',
+    nombre: 'Hector Villalba', legajo: 'CH-004',
+    usuarioSub: 'ldap:hvillalba', activo: false,
+    creadoEn: hoursAgo(900), actualizadoEn: hoursAgo(72),
+  },
+];
 
 /* ------------------------------------------------------------------------
  * CU-08 / CU-09 · Rutas y paradas
@@ -255,12 +297,12 @@ export const TRUCKS = [
 
 export const ROUTES = [
   {
-    id: 'rt-01', camionId: 'cm-02', choferId: 'ldap:mgomez', estado: 'EN_CURSO',
+    id: 'rt-01', camionId: 'cm-02', choferId: '8f2c1d4e-6b3a-4f21-9c07-5d2e1a9b4c33', estado: 'EN_CURSO',
     distanciaEstimadaKm: 7.4, litrosEstimados: 3300,
     generadaEn: minutesAgo(55), asignadaEn: minutesAgo(48), completadaEn: null,
   },
   {
-    id: 'rt-02', camionId: 'cm-01', choferId: 'ldap:jperez', estado: 'COMPLETADA',
+    id: 'rt-02', camionId: 'cm-01', choferId: 'b1e7c9a2-04d5-4e88-a1f3-7c6b2d5e0917', estado: 'COMPLETADA',
     distanciaEstimadaKm: 11.2, litrosEstimados: 8100,
     generadaEn: hoursAgo(28), asignadaEn: hoursAgo(27), completadaEn: hoursAgo(25),
   },

@@ -106,6 +106,22 @@ export const fetchTrucks = (filters) => api.get('/camiones', filters);
 export const createTruck = (data) => api.post('/camiones', data);
 export const updateTruck = (id, changes) => api.patch(`/camiones/${id}`, changes);
 
+/* --- CU-09 · Choferes ---------------------------------------------------- */
+
+/**
+ * Los choferes con los que se llena el <select> de la pantalla de asignacion.
+ *
+ * Devuelve SOLO los activos salvo que se pida lo contrario, y son justo los
+ * unicos a los que se les puede asignar una ruta: ofrecer un inactivo es
+ * ofrecer un 409 CHOFER_INACTIVO. `incluirInactivos` es para una pantalla de
+ * administracion, no para el selector.
+ *
+ * Cada chofer trae `usuarioSub`, que es lo unico que lo une a su sesion. Puede
+ * ser null: la persona esta dada de alta en la operacion pero todavia no tiene
+ * acceso configurado. Se le puede asignar una ruta igual, pero no la ve.
+ */
+export const fetchDrivers = (filters) => api.get('/choferes', filters);
+
 /* --- CU-08 / CU-09 · Rutas ---------------------------------------------- */
 
 export const fetchRoutes = (filters) => api.get('/rutas', filters);
@@ -121,13 +137,16 @@ export const generateRoute = (data) => api.post('/rutas/generar', data);
 /**
  * CU-09. Confirma la propuesta, asigna chofer y pasa la ruta a ASIGNADA.
  *
- * `choferId` es un string libre: el `sub` del JWT de un usuario con rol CHOFER
- * del directorio del Squad 2 (ADR-005). El backend NO lo valida contra ningun
- * padron, asi que no existe CHOFER_NO_ENCONTRADO y un id mal tipeado asigna la
- * ruta igual. Tampoco hay `GET /choferes` para llenar un <select>: por eso la
- * pantalla lo pide escrito a mano. Pedido de contrato pendiente.
+ * `choferId` es el UUID de un chofer de `GET /choferes` (ADR-009). Hasta el
+ * Sprint 3 era un string libre que el backend no validaba contra nada, y esa
+ * era la falla: un identificador mal tipeado asignaba la ruta CON EXITO y el
+ * chofer no la veia nunca —su pantalla quedaba vacia y sin ningun error—.
+ * Ahora falla fuerte y temprano.
  *
- * Errores: 409 RUTA_NO_PROPUESTA, 404 RUTA_NO_ENCONTRADA.
+ * Devuelve la ruta con el `chofer` expandido.
+ *
+ * Errores: 400 si no es un uuid, 404 CHOFER_NO_ENCONTRADO, 409 CHOFER_INACTIVO,
+ * 409 RUTA_NO_PROPUESTA, 404 RUTA_NO_ENCONTRADA.
  */
 export const assignRoute = (id, data) => api.patch(`/rutas/${id}/asignar`, data);
 

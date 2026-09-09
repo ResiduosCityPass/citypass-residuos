@@ -45,6 +45,9 @@ export const fetchTrucks = (...args) => source.fetchTrucks(...args);
 export const createTruck = (...args) => source.createTruck(...args);
 export const updateTruck = (...args) => source.updateTruck(...args);
 
+/* CU-09 · Choferes */
+export const fetchDrivers = (...args) => source.fetchDrivers(...args);
+
 /* CU-08 / CU-09 · Rutas */
 export const fetchRoutes = (...args) => source.fetchRoutes(...args);
 export const fetchRoute = (...args) => source.fetchRoute(...args);
