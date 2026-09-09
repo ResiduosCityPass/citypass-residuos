@@ -7,7 +7,29 @@
  *     y nunca por el texto de `message` (que esta en castellano y puede cambiar).
  */
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api/v1';
+function trimRightSlash(value) {
+  return String(value ?? '').replace(/\/+$/, '');
+}
+
+function trimSlashes(value) {
+  return String(value ?? '').replace(/^\/+|\/+$/g, '');
+}
+
+export function buildBaseUrl({
+  apiUrl = import.meta.env.VITE_API_URL,
+  apiOrigin = import.meta.env.VITE_API_ORIGIN,
+  apiPrefix = import.meta.env.VITE_API_PREFIX ?? 'api/v1',
+} = {}) {
+  if (apiUrl) return trimRightSlash(apiUrl);
+
+  const origin = trimRightSlash(apiOrigin);
+  if (!origin) return 'http://localhost:3000/api/v1';
+
+  const prefix = trimSlashes(apiPrefix);
+  return prefix ? `${origin}/${prefix}` : origin;
+}
+
+const BASE_URL = buildBaseUrl();
 const TOKEN_KEY = 'citypass.token';
 
 export const readToken = () => localStorage.getItem(TOKEN_KEY) ?? '';

@@ -11,6 +11,17 @@ import { IsEnum, IsInt, IsOptional, IsString, Max, Min, validateSync } from 'cla
  */
 export const EMISOR_TOKEN_DEFAULT = 'citypass-squad2';
 
+/**
+ * Emisor de la credencial del chofer (ADR-009).
+ *
+ * Distinto de `EMISOR_TOKEN_DEFAULT` a proposito: ese representa al Squad 2
+ * (real en produccion, una mentira temporal y documentada en desarrollo). El
+ * del chofer nunca es el Squad 2 -- el chofer no se registra ni inicia sesion
+ * contra ellos -- asi que reusar el mismo emisor seria una mentira permanente,
+ * no una de desarrollo. Ver ADR-009, seccion de acciones abiertas.
+ */
+export const EMISOR_CHOFERES_DEFAULT = 'citypass-residuos-choferes';
+
 /** Esta API como destinatario del token. Viaja en `aud`, siempre como lista. */
 export const AUDIENCIA_TOKEN_DEFAULT = 'citypass-residuos-api';
 
@@ -32,19 +43,40 @@ class VariablesEntorno {
   PORT: number = 3000;
 
   @IsString()
-  DB_HOST!: string;
+  @IsOptional()
+  DATABASE_URL?: string;
+
+  @IsString()
+  @IsOptional()
+  DB_HOST?: string;
 
   @IsInt()
-  DB_PORT!: number;
+  @IsOptional()
+  DB_PORT?: number;
 
   @IsString()
-  DB_USER!: string;
+  @IsOptional()
+  DB_USER?: string;
 
   @IsString()
-  DB_PASSWORD!: string;
+  @IsOptional()
+  DB_PASSWORD?: string;
 
   @IsString()
-  DB_NAME!: string;
+  @IsOptional()
+  DB_NAME?: string;
+
+  @IsString()
+  @IsOptional()
+  DB_SSL: string = 'false';
+
+  @IsString()
+  @IsOptional()
+  DB_SYNCHRONIZE: string = 'false';
+
+  @IsString()
+  @IsOptional()
+  DB_MIGRATIONS_RUN: string = 'false';
 
   @IsString()
   JWT_SECRET!: string;
@@ -52,6 +84,10 @@ class VariablesEntorno {
   @IsString()
   @IsOptional()
   JWT_ISSUER: string = EMISOR_TOKEN_DEFAULT;
+
+  @IsString()
+  @IsOptional()
+  JWT_ISSUER_CHOFERES: string = EMISOR_CHOFERES_DEFAULT;
 
   @IsString()
   @IsOptional()
@@ -68,6 +104,10 @@ class VariablesEntorno {
   @IsString()
   @IsOptional()
   EVENT_BUS_DRIVER: string = 'inmemory';
+
+  @IsString()
+  @IsOptional()
+  CORS_ORIGIN?: string;
 }
 
 /**
@@ -86,6 +126,19 @@ export function validarEntorno(config: Record<string, unknown>) {
       'Configuracion de entorno invalida:\n' +
         errores
           .map((e) => `  - ${e.property}: ${Object.values(e.constraints ?? {}).join(', ')}`)
+          .join('\n'),
+    );
+  }
+
+  const faltantesBase = ['DB_HOST', 'DB_PORT', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'].filter(
+    (key) => !instancia.DATABASE_URL && instancia[key as keyof VariablesEntorno] === undefined,
+  );
+
+  if (faltantesBase.length > 0) {
+    throw new Error(
+      'Configuracion de entorno invalida:\n' +
+        faltantesBase
+          .map((key) => `  - ${key}: requerido cuando DATABASE_URL no esta definido`)
           .join('\n'),
     );
   }

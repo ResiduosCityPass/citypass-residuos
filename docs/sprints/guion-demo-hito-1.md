@@ -286,13 +286,16 @@ Sin volver al código:
 - **El CI en verde**: lint, build, y los tests de los dos lados. Backend: **344 unitarios y 58 de
   integración** contra PostgreSQL real, **91% de cobertura**. Frontend: **190 tests, 85,78% de
   líneas**. El mínimo exigido es 60% y se fuerza en el CI: si baja, el build falla.
+- **El despliegue cloud**: Render Blueprint, `render.yaml`, API, frontend, PostgreSQL y job
+  `Deploy — Render auto deploy`. La evidencia viva esta en
+  [`docs/devops/evidencia-despliegue.md`](../devops/evidencia-despliegue.md).
 
 > Los números cambian con cada PR. **Recontalos el día anterior** con `npm test` y `npm run
 > test:e2e` en `backend/`, y `npm test` en `frontend/`. Decir un número viejo en voz alta es peor
 > que no decir ninguno.
 - **Los diagramas**: casos de uso, C4 nivel 1 y 2, arquitectura de eventos, dos de secuencia y
   cuatro máquinas de estado.
-- **Las decisiones**: 7 ADRs, incluido el que documenta qué se recortó de cada caso de uso y por
+- **Las decisiones**: 8 ADRs, incluido el que documenta qué se recortó de cada caso de uso y por
   qué. Los recortes están decididos, no olvidados.
 
 > "El ciclo completo que acaban de ver está escrito como test de integración. Si eso pasa, el

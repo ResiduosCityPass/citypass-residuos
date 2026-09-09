@@ -11,6 +11,7 @@ export default defineConfig({
     globals: true,
     setupFiles: './src/test/setup.js',
     coverage: {
+      reporter: ['text', 'json', 'html', 'lcov'],
       // La catedra exige 60% sobre todo el modulo (dimension 6).
       thresholds: { lines: 60, functions: 60, branches: 60, statements: 60 },
       include: ['src/**/*.{js,jsx}'],

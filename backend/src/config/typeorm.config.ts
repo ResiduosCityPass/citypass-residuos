@@ -1,13 +1,29 @@
 import { ConfigService } from '@nestjs/config';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 
+const sslOptions = (config: ConfigService) =>
+  config.get<string>('DB_SSL') === 'true' ? { rejectUnauthorized: false } : false;
+
+const connectionOptions = (config: ConfigService) => {
+  const url = config.get<string>('DATABASE_URL');
+
+  if (url) {
+    return { url };
+  }
+
+  return {
+    host: config.get<string>('DB_HOST'),
+    port: config.get<number>('DB_PORT'),
+    username: config.get<string>('DB_USER'),
+    password: config.get<string>('DB_PASSWORD'),
+    database: config.get<string>('DB_NAME'),
+  };
+};
+
 export const buildTypeOrmOptions = (config: ConfigService): TypeOrmModuleOptions => ({
   type: 'postgres',
-  host: config.get<string>('DB_HOST'),
-  port: config.get<number>('DB_PORT'),
-  username: config.get<string>('DB_USER'),
-  password: config.get<string>('DB_PASSWORD'),
-  database: config.get<string>('DB_NAME'),
+  ...connectionOptions(config),
+  ssl: sslOptions(config),
   entities: [__dirname + '/../**/*.entity{.ts,.js}'],
   migrations: [__dirname + '/../migrations/*{.ts,.js}'],
   // El esquema lo definen las migraciones (ADR-002). Esta bandera queda como
