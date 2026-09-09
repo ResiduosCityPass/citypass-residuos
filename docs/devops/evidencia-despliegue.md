@@ -10,8 +10,8 @@ Evidencia del despliegue del modulo de Residuos en Render, usando la infraestruc
 | Proveedor cloud | Render |
 | Blueprint | `citypass-residuos` |
 | Branch desplegada | `main` |
-| Commit verificado | `b5530e8` - `Merge pull request #15 from ResiduosCityPass/feat/token-use-chofer-interno` |
-| Fecha de verificacion | 2026-09-08 ART |
+| Commit verificado | `03d0fca` - `ci: integrate SonarQube Cloud analysis` |
+| Fecha de verificacion | 2026-09-09 ART |
 | Responsable | Ramiro Souto |
 
 El `JWT_SECRET` esta configurado como secreto en Render y no se documenta en el repositorio.
@@ -38,14 +38,17 @@ Usar esta seccion como checklist de la parte DevOps de la demo.
 | Swagger | <https://citypass-residuos-api.onrender.com/docs> | La API expone documentacion navegable |
 | Endpoint publico | `curl -i "https://citypass-residuos-api.onrender.com/api/v1/publico/contenedores/cercanos?lat=-34.6037&lng=-58.3816&radioMetros=1500"` | API + PostgreSQL + esquema |
 | Endpoint privado | `curl -i https://citypass-residuos-api.onrender.com/api/v1/contenedores` | Los guards rechazan requests sin token |
-| CI/CD | <https://github.com/ResiduosCityPass/citypass-residuos/actions/runs/34258444000> | Backend, frontend, Docker y deploy-info en verde |
+| CI/CD | <https://github.com/ResiduosCityPass/citypass-residuos/actions/runs/34300063105> | Backend, frontend, Docker, SonarQube y deploy-info en verde |
+| Calidad de codigo | <https://sonarcloud.io/summary/overall?id=ResiduosCityPass_citypass-residuos2&branch=main> | Analisis de calidad, seguridad, fiabilidad y cobertura de SonarQube Cloud |
 | IaC | [`render.yaml`](../../render.yaml) | La infraestructura esta declarada como codigo |
 
 ### Capturas sugeridas
 
-- GitHub Actions con el run `34258444000` en verde.
+- GitHub Actions con el run `34300063105` en verde.
 - Job `Docker — build de imagenes` mostrando backend y frontend OK.
+- Job `SonarQube Cloud — calidad y cobertura` mostrando el analisis OK.
 - Job `Deploy — Render auto deploy` mostrando el resumen de URLs.
+- Dashboard de SonarQube Cloud para `main` con el Quality Gate aprobado.
 - Blueprint `citypass-residuos` en Render con API, frontend y DB creados.
 - API health en navegador con `status: ok`.
 - Frontend abierto en `https://citypass-residuos-frontend.onrender.com`.
@@ -61,14 +64,15 @@ Usar esta seccion como checklist de la parte DevOps de la demo.
 ## CI en `main`
 
 La rama `main` quedo sincronizada desde `develop` y el pipeline de CI/CD quedo verificado en el
-commit `b5530e8`.
+commit `03d0fca`.
 
 Workflow verificado:
 
-- CI run: <https://github.com/ResiduosCityPass/citypass-residuos/actions/runs/34258444000>
+- CI run: <https://github.com/ResiduosCityPass/citypass-residuos/actions/runs/34300063105>
 - Backend: lint, build, migraciones, cobertura y tests de integracion en verde.
 - Frontend: lint, build y tests con cobertura en verde.
 - Docker: build de imagen backend y frontend en verde.
+- SonarQube Cloud: analisis de calidad y cobertura en verde. Dashboard: <https://sonarcloud.io/summary/overall?id=ResiduosCityPass_citypass-residuos2&branch=main>.
 - Deploy-info: verificacion de Blueprint y resumen de URLs en verde.
 
 ## CD hacia Render
