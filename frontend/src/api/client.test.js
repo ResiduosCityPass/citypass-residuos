@@ -190,6 +190,38 @@ describe('cliente de la API', () => {
       expect(readToken()).toBe('jwt-admin');
     });
 
+    /**
+     * La excepcion, y la razon de que exista `citypass.token.origen`: en /chofer
+     * el token dejo de ser andamiaje. Es la credencial que le emitio el operador
+     * desde el ABM, se muestra una sola vez y no se puede volver a consultar, asi
+     * que pisarla obligaba a que se la emitieran de nuevo.
+     */
+    it('respeta en /chofer una credencial pegada a mano', () => {
+      vi.stubEnv('VITE_DEV_TOKEN_CHOFER', 'jwt-chofer');
+      saveToken('credencial-de-juana');
+
+      expect(seedDevToken('/chofer')).toBe(false);
+      expect(readToken()).toBe('credencial-de-juana');
+    });
+
+    /** Pero solo en /chofer: en el resto sigue siendo andamiaje que se pisa. */
+    it('el resto del modulo pisa igual una credencial pegada a mano', () => {
+      vi.stubEnv('VITE_DEV_TOKEN', 'jwt-admin');
+      saveToken('credencial-de-juana');
+
+      expect(seedDevToken('/mapa')).toBe(true);
+      expect(readToken()).toBe('jwt-admin');
+    });
+
+    /** Lo que siembra el andamiaje no es una credencial, y se pisa a si mismo. */
+    it('un token sembrado por el andamiaje no se respeta', () => {
+      vi.stubEnv('VITE_DEV_TOKEN_CHOFER', 'jwt-chofer-nuevo');
+      saveToken('jwt-chofer-viejo', 'dev');
+
+      expect(seedDevToken('/chofer')).toBe(true);
+      expect(readToken()).toBe('jwt-chofer-nuevo');
+    });
+
     it('no hace nada si la variable no esta definida', () => {
       vi.stubEnv('VITE_DEV_TOKEN', '');
 

@@ -3,9 +3,10 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import DriverStopsPage from './DriverStopsPage.jsx';
 import { fetchMyRoute, confirmStop, skipStop } from '../api/waste.js';
-import { ApiError } from '../api/client.js';
+import { ApiError, saveToken, clearToken, readToken } from '../api/client.js';
 
 vi.mock('../api/waste.js', () => ({
+  USING_MOCKS: false,
   fetchMyRoute: vi.fn(),
   confirmStop: vi.fn(),
   skipStop: vi.fn(),
@@ -44,9 +45,7 @@ const route = (paradas = [stop()]) => ({
   estado: 'EN_CURSO',
   distanciaEstimadaKm: 7.4,
   camion: { id: 'cm-01', patente: 'AB123CD' },
-  // Solo `choferId`: la ruta no trae un objeto `chofer` porque el backend no
-  // tiene el nombre. Los choferes son usuarios del directorio del Squad 2.
-  choferId: 'ldap:mgomez',
+  choferId: '8f2c1d4e-6b3a-4f21-9c07-5d2e1a9b4c33',
   paradas,
 });
 
@@ -59,10 +58,15 @@ beforeEach(() => {
   });
   fetchMyRoute.mockResolvedValue(route());
   grant(CONTAINER.lat, CONTAINER.lng);
+  // El chofer entra con su credencial guardada en el telefono. Sin esto la
+  // pantalla pide una antes de mostrar nada, que es lo correcto y no es lo que
+  // prueban los casos de abajo.
+  saveToken('credencial-del-chofer');
 });
 
 afterEach(() => {
   delete globalThis.navigator.geolocation;
+  clearToken();
 });
 
 describe('CU-10 · confirmar vaciado', () => {
@@ -487,5 +491,77 @@ describe('CU-10 · omitir parada', () => {
     // Y ya no ofrece ninguno de los dos finales: la parada esta cerrada.
     expect(screen.queryByRole('button', { name: 'No pude vaciar' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Confirmar vaciado' })).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * CU-10 · Como entra el chofer.
+ *
+ * `/chofer` vive fuera del Shell —columna angosta, sin sidebar, para el
+ * celular— y el Shell es quien monta la barra del token. Esta pantalla no tenia
+ * donde pegar nada: se abria desde un telefono y no habia forma de entrar. La
+ * credencial se la emite el operador desde el ABM y se muestra una sola vez.
+ */
+describe('CU-10 · credencial del chofer', () => {
+  it('sin credencial pide una en vez de mostrar la pantalla vacia', async () => {
+    clearToken();
+    render(<DriverStopsPage />);
+
+    expect(await screen.findByRole('heading', { name: 'Tu credencial' })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Pegá acá tu credencial/)).toBeInTheDocument();
+    // El cartel de "no tenes ninguna ruta asignada" mentiria: el problema no es
+    // que no le asignaron una, es que todavia no sabemos quien es.
+    expect(screen.queryByText('No tenés ninguna ruta asignada')).not.toBeInTheDocument();
+  });
+
+  it('pegar la credencial la guarda y vuelve a pedir la ruta', async () => {
+    const user = userEvent.setup();
+    clearToken();
+    render(<DriverStopsPage />);
+
+    await user.type(await screen.findByPlaceholderText(/Pegá acá tu credencial/), 'jwt-de-juana');
+    await user.click(screen.getByRole('button', { name: 'Entrar' }));
+
+    expect(readToken()).toBe('jwt-de-juana');
+    await waitFor(() => expect(fetchMyRoute).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText('CT-0010')).toBeInTheDocument();
+  });
+
+  /**
+   * Emitir una credencial nueva mata la anterior en el acto. Al chofer que
+   * quedo con la vieja le llega un 401, y el mensaje generico del token esta
+   * redactado para quien programa —manda a correr npm— y no para alguien
+   * parado en la vereda.
+   */
+  it('una credencial revocada pide otra, sin el mensaje de npm', async () => {
+    fetchMyRoute.mockRejectedValue(
+      new ApiError({ code: 'HTTP_401', status: 401, message: 'Unauthorized' }),
+    );
+    render(<DriverStopsPage />);
+
+    expect(await screen.findByText(/La credencial que tenías no sirve más/)).toBeInTheDocument();
+    expect(screen.queryByText(/npm run token:dev/)).not.toBeInTheDocument();
+    expect(screen.queryByText('[HTTP_401]')).not.toBeInTheDocument();
+  });
+
+  /** Un token valido con otro rol no sirve para entrar aca, y la salida es la misma. */
+  it('un token de otro rol tambien pide la credencial', async () => {
+    fetchMyRoute.mockRejectedValue(
+      new ApiError({ code: 'HTTP_403', status: 403, message: 'Rol insuficiente' }),
+    );
+    render(<DriverStopsPage />);
+
+    expect(await screen.findByRole('heading', { name: 'Tu credencial' })).toBeInTheDocument();
+  });
+
+  it('con la ruta a la vista la credencial se puede cambiar, pero no estorba', async () => {
+    const user = userEvent.setup();
+    render(<DriverStopsPage />);
+
+    await screen.findByText('CT-0010');
+    expect(screen.queryByRole('heading', { name: 'Tu credencial' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Cambiar credencial' }));
+    expect(screen.getByRole('heading', { name: 'Tu credencial' })).toBeInTheDocument();
   });
 });
