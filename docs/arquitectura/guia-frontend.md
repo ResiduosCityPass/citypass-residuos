@@ -875,7 +875,7 @@ Reglas de la heurística, todas verificadas:
 Errores: `409 CAMION_NO_DISPONIBLE` · `409 RUTA_SIN_CONTENEDORES` (también cuando hay críticos pero
 ninguno entra en la capacidad) · `404 CAMION_NO_ENCONTRADO`.
 
-## 8b. CU-09 · Choferes
+## 8e. CU-09 · Choferes
 
 **Implementado.** ABM chico. Existe para que el operador **elija de una lista** en vez de escribir
 un identificador a mano.
