@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from './App.jsx';
 import {
@@ -146,5 +146,89 @@ describe('shell de la aplicacion', () => {
     await waitFor(() => expect(fetchMyRoute).toHaveBeenCalled());
     expect(fetchAlerts).not.toHaveBeenCalled();
     expect(screen.queryByRole('navigation', { name: /Modulos de CityPass/ })).not.toBeInTheDocument();
+  });
+
+  /**
+   * El menu lateral en pantallas angostas.
+   *
+   * Lo que jsdom NO puede probar es el punto de corte: no evalua media queries,
+   * asi que aca el boton esta siempre presente y el sidebar siempre montado.
+   * Que se escondan en escritorio es cosa del CSS y se verifica en el navegador.
+   * Lo que si se puede fijar —y es lo que se rompe cuando alguien toca esto— es
+   * la maquinaria: que el boton abra, que Escape cierre y que navegar cierre.
+   */
+  describe('menu lateral', () => {
+    // Anclado: la X de adentro del cajon se llama "Cerrar el menu" y este
+    // boton, "Abrir menu" / "Cerrar menu". Sin anclar, el patron agarra los dos.
+    const menuButton = () => screen.getByRole('button', { name: /^(Abrir|Cerrar) menu$/ });
+
+    it('el boton abre y cierra el cajon', async () => {
+      const user = userEvent.setup();
+      window.history.pushState({}, '', '/mapa');
+      render(<App />);
+
+      const nav = await screen.findByRole('navigation', { name: /Modulos de CityPass/ });
+      expect(nav).not.toHaveClass('open');
+      expect(menuButton()).toHaveAttribute('aria-expanded', 'false');
+
+      await user.click(menuButton());
+      expect(nav).toHaveClass('open');
+      expect(menuButton()).toHaveAttribute('aria-expanded', 'true');
+
+      await user.click(menuButton());
+      expect(nav).not.toHaveClass('open');
+    });
+
+    /**
+     * Sin esto el menu queda tapando la pantalla a la que se acaba de entrar, y
+     * en un celular ocupa el ancho entero: parece que el click no hizo nada.
+     */
+    it('navegar desde el cajon lo cierra', async () => {
+      const user = userEvent.setup();
+      window.history.pushState({}, '', '/mapa');
+      render(<App />);
+
+      const nav = await screen.findByRole('navigation', { name: /Modulos de CityPass/ });
+      await user.click(menuButton());
+      expect(nav).toHaveClass('open');
+
+      await user.click(within(nav).getByRole('link', { name: /Zonas y umbrales/ }));
+
+      expect(await screen.findByRole('heading', { name: 'Zonas y umbrales' })).toBeInTheDocument();
+      expect(nav).not.toHaveClass('open');
+    });
+
+    it('Escape cierra el cajon', async () => {
+      const user = userEvent.setup();
+      window.history.pushState({}, '', '/mapa');
+      render(<App />);
+
+      const nav = await screen.findByRole('navigation', { name: /Modulos de CityPass/ });
+      await user.click(menuButton());
+      expect(nav).toHaveClass('open');
+
+      await user.keyboard('{Escape}');
+      expect(nav).not.toHaveClass('open');
+    });
+
+    /**
+     * Mientras el cajon esta abierto la pantalla de atras no scrollea. Es lo que
+     * evita que arrastrar el dedo sobre el menu mueva el contenido y al cerrar
+     * aparezca en otro lugar del que estaba.
+     */
+    it('el cajon abierto traba el scroll de atras y al cerrarlo lo devuelve', async () => {
+      const user = userEvent.setup();
+      window.history.pushState({}, '', '/mapa');
+      render(<App />);
+
+      await screen.findByRole('navigation', { name: /Modulos de CityPass/ });
+      expect(document.body).not.toHaveClass('no-scroll');
+
+      await user.click(menuButton());
+      expect(document.body).toHaveClass('no-scroll');
+
+      await user.keyboard('{Escape}');
+      expect(document.body).not.toHaveClass('no-scroll');
+    });
   });
 });
