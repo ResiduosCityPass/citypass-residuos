@@ -209,7 +209,7 @@ export function linkSensor(containerId, data = {}) {
     sensorId: created.id,
     codigo: created.codigo,
     contenedorId: containerId,
-    apiKey: Array.from({ length: 48 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join(''),
+    apiKey: randomHex(48),
     advertencia: 'Guardala ahora: no se puede volver a consultar.',
   });
 }
@@ -461,11 +461,131 @@ export function fetchDrivers({ incluirInactivos = false } = {}) {
 }
 
 /**
- * El ABM de choferes y la emision de credenciales viven en el backend (PR #13)
- * y todavia no tienen pantalla. Cuando la tengan, el alta va aca con su
- * CHOFER_LEGAJO_DUPLICADO: mockearla antes de escribir la pantalla seria
- * inventar la forma de algo que nadie va a leer.
+ * Lo que valida CrearChoferDto con @Length. Un mensaje por regla incumplida,
+ * con el campo adelante, que es de donde `fieldErrors` saca el campo. En el
+ * PATCH los campos son opcionales: se valida solo lo que vino.
  */
+function driverErrors(data, { partial = false } = {}) {
+  const errors = [];
+  const check = (field, min, max) => {
+    const value = data[field];
+    if (partial && value === undefined) return;
+    if (typeof value !== 'string' || value.length < min) {
+      errors.push(`${field} must be longer than or equal to ${min} characters`);
+    } else if (value.length > max) {
+      errors.push(`${field} must be shorter than or equal to ${max} characters`);
+    }
+  };
+  check('nombre', 2, 120);
+  check('legajo', 2, 40);
+  return errors;
+}
+
+const driverById = (id) => store.drivers.find((d) => d.id === id);
+const driverNotFound = (id) => fail('CHOFER_NO_ENCONTRADO', 404, `No existe el chofer ${id}`);
+
+// El unico cuenta TAMBIEN a los dados de baja, igual que el backend: su legajo
+// sigue identificando las rutas historicas que ejecuto.
+const legajoTaken = (legajo) => store.drivers.some((d) => d.legajo === legajo);
+const duplicateLegajo = (legajo) =>
+  fail('CHOFER_LEGAJO_DUPLICADO', 409, `Ya existe un chofer con el legajo "${legajo}"`);
+
+export function createDriver(data = {}) {
+  const errors = driverErrors(data);
+  if (errors.length) return fail('HTTP_400', 400, errors);
+  if (legajoTaken(data.legajo)) return duplicateLegajo(data.legajo);
+
+  // El id es un uuid de verdad y no un `newId`: la asignacion de rutas lo
+  // valida con @IsUUID, y un chofer creado aca tiene que poder recibir una.
+  const created = {
+    id: crypto.randomUUID(),
+    nombre: data.nombre,
+    legajo: data.legajo,
+    usuarioSub: data.usuarioSub ?? null,
+    activo: true,
+    creadoEn: now(),
+    actualizadoEn: now(),
+  };
+  store.drivers.push(created);
+  return respond(created);
+}
+
+export function updateDriver(id, changes = {}) {
+  const driver = driverById(id);
+  if (!driver) return driverNotFound(id);
+
+  const errors = driverErrors(changes, { partial: true });
+  if (errors.length) return fail('HTTP_400', 400, errors);
+  if (changes.legajo && changes.legajo !== driver.legajo && legajoTaken(changes.legajo)) {
+    return duplicateLegajo(changes.legajo);
+  }
+
+  // Lista explicita: `activo` no esta en el DTO, asi que por aca no se reactiva.
+  for (const field of ['nombre', 'legajo', 'usuarioSub']) {
+    if (changes[field] !== undefined) driver[field] = changes[field];
+  }
+  driver.actualizadoEn = now();
+  return respond(driver);
+}
+
+/**
+ * Baja logica. Es tambien la revocacion: el backend deja de encontrar al chofer
+ * por su `usuarioSub` y la credencial muere en el pedido siguiente.
+ *
+ * NO se niega si tiene una ruta viva, porque el backend tampoco. El aviso lo da
+ * la pantalla.
+ */
+export function deleteDriver(id) {
+  const driver = driverById(id);
+  if (!driver) return driverNotFound(id);
+  driver.activo = false;
+  driver.actualizadoEn = now();
+  return respond(null);
+}
+
+const randomHex = (length) =>
+  Array.from({ length }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join('');
+const base64url = (value) =>
+  btoa(JSON.stringify(value)).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
+
+/**
+ * Emite la credencial del chofer.
+ *
+ * Rotar el `usuarioSub` es lo que revoca la anterior, y el mock lo hace igual:
+ * sin eso, emitir dos veces se veria inofensivo aca y romperia recien contra el
+ * backend. El token tiene forma de JWT para que el bloque de la pantalla se vea
+ * con el largo real, pero no esta firmado: con mocks nadie lo valida.
+ */
+export function issueDriverCredential(id) {
+  const driver = driverById(id);
+  if (!driver) return driverNotFound(id);
+  if (!driver.activo) {
+    return fail('CHOFER_INACTIVO', 409, `El chofer ${driver.nombre} esta dado de baja`);
+  }
+
+  driver.usuarioSub = `chofer_${randomHex(48)}`;
+  driver.actualizadoEn = now();
+
+  const token = [
+    base64url({ alg: 'HS256', typ: 'JWT' }),
+    base64url({
+      sub: driver.usuarioSub,
+      preferred_username: driver.legajo,
+      token_use: 'chofer-interno',
+      groups: ['chofer'],
+    }),
+    randomHex(43),
+  ].join('.');
+
+  return respond({
+    choferId: driver.id,
+    nombre: driver.nombre,
+    legajo: driver.legajo,
+    token,
+    expiraEn: '30d',
+    advertencia: 'Guardala ahora: no se puede volver a consultar. Emitir otra invalida esta.',
+  });
+}
 
 /* ========================================================================
  * CU-08 / CU-09 · Rutas

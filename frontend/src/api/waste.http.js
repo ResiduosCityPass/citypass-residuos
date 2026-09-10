@@ -122,6 +122,31 @@ export const updateTruck = (id, changes) => api.patch(`/camiones/${id}`, changes
  */
 export const fetchDrivers = (filters) => api.get('/choferes', filters);
 
+/**
+ * Rol ADMINISTRADOR. `{ nombre, legajo }`. Falla con 409 CHOFER_LEGAJO_DUPLICADO,
+ * y el unico cuenta TAMBIEN a los dados de baja.
+ */
+export const createDriver = (data) => api.post('/choferes', data);
+
+/** Rol ADMINISTRADOR. Mismos campos que el alta. No hay forma de reactivar a un dado de baja. */
+export const updateDriver = (id, changes) => api.patch(`/choferes/${id}`, changes);
+
+/** Rol ADMINISTRADOR. Baja logica, 204. Es tambien la revocacion: pierde el acceso en el acto. */
+export const deleteDriver = (id) => api.delete(`/choferes/${id}`);
+
+/**
+ * Rol ADMINISTRADOR. Sin cuerpo. Devuelve `{ choferId, nombre, legajo, token,
+ * expiraEn, advertencia }` y el `token` viaja UNA SOLA VEZ, como la API key del
+ * sensor.
+ *
+ * ROTA el `usuarioSub` del chofer, y eso es lo que mata la credencial anterior.
+ * Efecto lateral en desarrollo: si se emite para Juana (`dev-chofer`), el token
+ * de `npm run token:dev -- CHOFER` deja de servir para ella.
+ *
+ * Errores: 404 CHOFER_NO_ENCONTRADO, 409 CHOFER_INACTIVO.
+ */
+export const issueDriverCredential = (id) => api.post(`/choferes/${id}/credencial`);
+
 /* --- CU-08 / CU-09 · Rutas ---------------------------------------------- */
 
 export const fetchRoutes = (filters) => api.get('/rutas', filters);
