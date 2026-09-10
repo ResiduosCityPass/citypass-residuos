@@ -28,6 +28,7 @@ const WASTE_SECTIONS = [
   { to: '/zonas', icon: 'zones', label: 'Zonas y umbrales', useCase: 'CU-02' },
   { to: '/alertas', icon: 'alerts', label: 'Alertas', useCase: 'CU-05/06' },
   { to: '/flota', icon: 'fleet', label: 'Flota', useCase: 'CU-03' },
+  { to: '/choferes', icon: 'profile', label: 'Choferes', useCase: 'CU-09' },
   { to: '/rutas', icon: 'routes', label: 'Rutas', useCase: 'CU-08/09' },
 ];
 

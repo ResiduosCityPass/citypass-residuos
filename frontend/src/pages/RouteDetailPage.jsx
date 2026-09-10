@@ -280,7 +280,8 @@ export default function RouteDetailPage() {
               {selectedDriver && !selectedDriver.usuarioSub && (
                 <Notice type="warning" title={`${selectedDriver.nombre} todavía no tiene acceso`}>
                   Se le puede asignar igual y la ruta queda a su nombre, pero no la va a ver en su
-                  pantalla hasta que alguien le emita una credencial.
+                  pantalla hasta que alguien le emita una credencial desde{' '}
+                  <Link to="/choferes">Choferes</Link>.
                 </Notice>
               )}
 

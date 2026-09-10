@@ -295,6 +295,14 @@ body.no-scroll { overflow: hidden; }
 .filter-bar select { width: auto; min-width: 165px; }
 .filter-bar-right { margin-left: auto; display: flex; gap: var(--space-2); }
 .filter-bar-note { margin-left: auto; }
+.filter-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+.filter-check input { width: auto; }
 
 /* --- Mapa --------------------------------------------------------------- */
 .map-and-panel { display: flex; gap: var(--space-3); flex: 1; min-height: 340px; }
