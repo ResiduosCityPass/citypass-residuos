@@ -12,6 +12,7 @@ describe('ChoferesController (CU-09)', () => {
       obtener: jest.fn(),
       actualizar: jest.fn(),
       darDeBaja: jest.fn(),
+      reactivar: jest.fn(),
       emitirCredencial: jest.fn().mockResolvedValue({
         choferId: 'ch-1',
         nombre: 'Juana Perez',
@@ -55,6 +56,12 @@ describe('ChoferesController (CU-09)', () => {
     // El aviso es parte del contrato: el operador tiene que saber que si cierra
     // el modal sin copiarla, la unica salida es emitir otra.
     expect(respuesta.advertencia).toMatch(/no se puede volver a consultar/i);
+  });
+
+  it('delega la reactivacion', async () => {
+    await controller.reactivar('ch-1');
+
+    expect(service.reactivar).toHaveBeenCalledWith('ch-1');
   });
 
   it('delega la baja', async () => {

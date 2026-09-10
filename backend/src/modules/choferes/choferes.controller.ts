@@ -84,7 +84,15 @@ export class ChoferesController {
   @Roles(Rol.ADMINISTRADOR)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Baja logica del chofer' })
+  @ApiResponse({ status: 409, description: 'CHOFER_CON_RUTA_ACTIVA' })
   darDeBaja(@Param('id', ParseUUIDPipe) id: string) {
     return this.choferes.darDeBaja(id);
+  }
+
+  @Patch(':id/reactivar')
+  @Roles(Rol.ADMINISTRADOR)
+  @ApiOperation({ summary: 'Deshacer la baja' })
+  reactivar(@Param('id', ParseUUIDPipe) id: string) {
+    return this.choferes.reactivar(id);
   }
 }

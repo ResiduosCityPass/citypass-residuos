@@ -9,6 +9,7 @@ import {
   payloadDeCredencialChofer,
 } from '../../../shared/auth/credencial-chofer';
 import { Chofer } from '../domain/chofer.entity';
+import { RUTA_REPOSITORY, RutaRepository } from '../../rutas/domain/ruta.repository';
 import { CHOFER_REPOSITORY, ChoferRepository } from '../domain/chofer.repository';
 import { ActualizarChoferDto } from './dto/actualizar-chofer.dto';
 import { CrearChoferDto } from './dto/crear-chofer.dto';
@@ -34,6 +35,8 @@ export class ChoferesService {
   constructor(
     @Inject(CHOFER_REPOSITORY)
     private readonly choferes: ChoferRepository,
+    @Inject(RUTA_REPOSITORY)
+    private readonly rutas: RutaRepository,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
   ) {}
@@ -151,12 +154,41 @@ export class ChoferesService {
   /**
    * Baja logica. Nunca se borra: sus rutas historicas lo referencian, y son la
    * evidencia de quien ejecuto cada recoleccion.
+   *
+   * No se puede dar de baja a alguien con una ruta activa, y no es una
+   * formalidad: la baja le saca el acceso, con lo cual deja de poder cerrar sus
+   * paradas. Como la ruta solo se cierra cuando no le queda ninguna pendiente y
+   * su camion solo se libera cuando la ruta cierra, dar de baja al chofer
+   * equivocado dejaba el camion EN_RUTA para siempre. CU-03 tampoco deja
+   * sacarlo de ese estado a mano.
    */
   async darDeBaja(id: string): Promise<void> {
     const chofer = await this.obtener(id);
+    const ruta = await this.rutas.buscarActivaDeChofer(chofer.id);
+
+    if (ruta) {
+      throw new ConflictException({
+        message:
+          `${chofer.nombre} tiene una ruta ${ruta.estado.toLowerCase()}. ` +
+          `Hay que cerrarla antes de darlo de baja`,
+        code: 'CHOFER_CON_RUTA_ACTIVA',
+      });
+    }
+
     chofer.activo = false;
 
     await this.choferes.guardar(chofer);
+  }
+
+  /**
+   * Deshace la baja. Sin esto un clic equivocado era permanente: el chofer no
+   * volvia, y como el legajo es unico tampoco se lo podia dar de alta de nuevo.
+   */
+  async reactivar(id: string): Promise<Chofer> {
+    const chofer = await this.obtener(id);
+    chofer.activo = true;
+
+    return this.choferes.guardar(chofer);
   }
 
   private async verificarLegajoLibre(legajo: string): Promise<void> {

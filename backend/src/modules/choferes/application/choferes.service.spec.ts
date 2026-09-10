@@ -1,5 +1,6 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { RutaRepository } from '../../rutas/domain/ruta.repository';
 import { JwtService } from '@nestjs/jwt';
 import { Chofer } from '../domain/chofer.entity';
 import { ChoferRepository } from '../domain/chofer.repository';
@@ -9,6 +10,7 @@ const alta = { nombre: 'Juana Perez', legajo: 'CH-014' };
 
 describe('ChoferesService (CU-09)', () => {
   let choferes: jest.Mocked<ChoferRepository>;
+  let rutas: jest.Mocked<Pick<RutaRepository, 'buscarActivaDeChofer'>>;
   let service: ChoferesService;
 
   const chofer = (parcial: Partial<Chofer> = {}): Chofer =>
@@ -23,8 +25,10 @@ describe('ChoferesService (CU-09)', () => {
       buscarActivoPorUsuarioSub: jest.fn().mockResolvedValue(null),
       listar: jest.fn().mockResolvedValue([]),
     };
+    rutas = { buscarActivaDeChofer: jest.fn().mockResolvedValue(null) };
     service = new ChoferesService(
       choferes,
+      rutas as unknown as RutaRepository,
       new JwtService({ secret: 'secreto-de-tests' }),
       new ConfigService({}),
     );
@@ -117,6 +121,19 @@ describe('ChoferesService (CU-09)', () => {
   });
 
   describe('darDeBaja', () => {
+    it('NO deja dar de baja a alguien con una ruta activa', async () => {
+      // La baja le saca el acceso, con lo cual deja de poder cerrar sus paradas.
+      // Como la ruta solo cierra cuando no le queda ninguna pendiente y el
+      // camion solo se libera cuando la ruta cierra, esto dejaba el camion
+      // EN_RUTA para siempre, y CU-03 no deja sacarlo de ahi a mano.
+      rutas.buscarActivaDeChofer.mockResolvedValue({ estado: 'ASIGNADA' } as never);
+
+      await expect(service.darDeBaja('ch-1')).rejects.toMatchObject({
+        response: { code: 'CHOFER_CON_RUTA_ACTIVA' },
+      });
+      expect(choferes.guardar).not.toHaveBeenCalled();
+    });
+
     it('es baja logica: sus rutas historicas lo siguen referenciando', async () => {
       await service.darDeBaja('ch-1');
 
@@ -167,6 +184,7 @@ describe('ChoferesService (CU-09)', () => {
     it('respeta el emisor configurado por entorno', async () => {
       const conOtroEmisor = new ChoferesService(
         choferes,
+        rutas as unknown as RutaRepository,
         new JwtService({ secret: 'secreto-de-tests' }),
         new ConfigService({ JWT_ISSUER_CHOFERES: 'otro-emisor' }),
       );
@@ -215,6 +233,24 @@ describe('ChoferesService (CU-09)', () => {
       choferes.buscarPorId.mockResolvedValue(null);
 
       await expect(service.emitirCredencial('ch-fantasma')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('reactivar', () => {
+    it('deshace la baja', async () => {
+      // Sin esto un clic equivocado era permanente: el chofer no volvia, y como
+      // el legajo es unico tampoco se lo podia dar de alta de nuevo.
+      choferes.buscarPorId.mockResolvedValue(chofer({ activo: false }));
+
+      await service.reactivar('ch-1');
+
+      expect(choferes.guardar).toHaveBeenCalledWith(expect.objectContaining({ activo: true }));
+    });
+
+    it('propaga el 404 si no existe', async () => {
+      choferes.buscarPorId.mockResolvedValue(null);
+
+      await expect(service.reactivar('ch-1')).rejects.toThrow(NotFoundException);
     });
   });
 });

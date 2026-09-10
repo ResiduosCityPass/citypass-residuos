@@ -963,13 +963,27 @@ así que una credencial que vence a mitad de turno lo deja tildado en la calle.
 
 Errores: `409 CHOFER_INACTIVO` · `404 CHOFER_NO_ENCONTRADO`.
 
-### `PATCH /choferes/:id` y `DELETE /choferes/:id`
+### `PATCH /choferes/:id`, `DELETE /choferes/:id` y `PATCH /choferes/:id/reactivar`
 
 Rol: `ADMINISTRADOR`. El `PATCH` acepta los mismos campos que el alta.
 
 La baja es **lógica**: el chofer deja de aparecer en el listado y no puede recibir rutas nuevas,
 pero sus rutas históricas lo siguen referenciando — son el registro de quién ejecutó cada
 recolección.
+
+> **No se puede dar de baja a un chofer con una ruta activa** → `409 CHOFER_CON_RUTA_ACTIVA`.
+>
+> No es una formalidad. La baja le saca el acceso, con lo cual deja de poder cerrar sus paradas;
+> la ruta solo se cierra cuando no le queda ninguna pendiente, y el camión solo se libera cuando
+> la ruta cierra. Dar de baja al chofer equivocado dejaba **el camión `EN_RUTA` para siempre**, y
+> CU-03 tampoco deja sacarlo de ese estado a mano.
+>
+> El mensaje del error dice en qué estado está la ruta, así la pantalla puede decir qué falta
+> hacer en vez de solo negarse.
+
+**`PATCH /choferes/:id/reactivar`** deshace la baja y devuelve el chofer. Sin esto un clic
+equivocado era permanente: el chofer no volvía y, como el `legajo` es único, tampoco se lo podía
+dar de alta de nuevo.
 
 ### Códigos
 
@@ -978,6 +992,7 @@ recolección.
 | `CHOFER_NO_ENCONTRADO` | 404 | El id no existe |
 | `CHOFER_INACTIVO` | 409 | Está dado de baja: no recibe rutas nuevas |
 | `CHOFER_LEGAJO_DUPLICADO` | 409 | Ya hay otro con ese legajo |
+| `CHOFER_CON_RUTA_ACTIVA` | 409 | No se puede dar de baja: primero hay que cerrar su ruta |
 
 ---
 
