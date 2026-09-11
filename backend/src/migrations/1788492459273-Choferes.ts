@@ -9,6 +9,12 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * el registro de quien ejecuto cada recoleccion. Se hace en tres pasos: se crean
  * los choferes que hoy existen como texto, se traduce cada ruta a su id, y
  * recien ahi se reemplaza la columna.
+ *
+ * Verificada sobre datos legacy, no solo sobre una base vacia: con tres rutas
+ * escritas a mano -dos de un identificador y una de otro- quedan dos choferes
+ * con sus rutas intactas, ninguna ruta pierde a quien la ejecuto, y el `down()`
+ * devuelve el texto original exacto. El CI solo ejercita el camino desde una
+ * base vacia, asi que esa parte se probo a mano.
  */
 export class Choferes1788492459273 implements MigrationInterface {
   name = 'Choferes1788492459273';
@@ -25,9 +31,21 @@ export class Choferes1788492459273 implements MigrationInterface {
     // ruta. El nombre queda igual al identificador porque es lo unico que
     // sabemos de esa persona: alguien lo tipeo en un campo de texto. Hay que
     // corregirlo a mano despues, pero la ruta no pierde a quien la ejecuto.
+    //
+    // `usuarioSub` queda NULL a proposito, y NO copiando el texto viejo. Los
+    // identificadores que emite el ABM son 48 caracteres aleatorios justamente
+    // para que tener uno no permita deducir otro; arrastrar aca un "jperez"
+    // dejaria en la tabla un identificador de sesion adivinable, que es lo
+    // contrario de lo que el resto del esquema garantiza.
+    //
+    // Un chofer sin `usuarioSub` es un caso previsto: existe en la operacion y
+    // se le pueden asignar rutas, pero no entra hasta que alguien le emita una
+    // credencial. Que es exactamente la situacion de alguien que hasta ayer era
+    // un texto en un campo. El indice unico es parcial, asi que varios NULL
+    // conviven sin chocar.
     await queryRunner.query(
-      `INSERT INTO "chofer" ("nombre", "legajo", "usuarioSub")
-       SELECT DISTINCT "choferId", "choferId", "choferId"
+      `INSERT INTO "chofer" ("nombre", "legajo")
+       SELECT DISTINCT "choferId", "choferId"
        FROM "ruta"
        WHERE "choferId" IS NOT NULL`,
     );
@@ -36,7 +54,7 @@ export class Choferes1788492459273 implements MigrationInterface {
     await queryRunner.query(
       `UPDATE "ruta" SET "choferIdNuevo" = "chofer"."id"
        FROM "chofer"
-       WHERE "chofer"."usuarioSub" = "ruta"."choferId"`,
+       WHERE "chofer"."legajo" = "ruta"."choferId"`,
     );
 
     await queryRunner.query(`DROP INDEX "public"."IDX_3845ac02d47f0dd4f9321e2727"`);
@@ -52,9 +70,9 @@ export class Choferes1788492459273 implements MigrationInterface {
   }
 
   /**
-   * Vuelve a texto libre traduciendo cada id a su `usuarioSub`. Una ruta cuyo
-   * chofer no tenga sesion asociada queda sin chofer al bajar: es informacion
-   * que el modelo viejo no sabia representar.
+   * Vuelve a texto libre traduciendo cada id a su legajo, que es el campo que
+   * sobrevive a la ida y vuelta. El `usuarioSub` no sirve para esto: es
+   * nullable, y ademas es informacion que el modelo viejo no sabia representar.
    */
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`ALTER TABLE "ruta" DROP CONSTRAINT "FK_3845ac02d47f0dd4f9321e27274"`);
@@ -62,7 +80,7 @@ export class Choferes1788492459273 implements MigrationInterface {
 
     await queryRunner.query(`ALTER TABLE "ruta" ADD "choferIdViejo" character varying(120)`);
     await queryRunner.query(
-      `UPDATE "ruta" SET "choferIdViejo" = "chofer"."usuarioSub"
+      `UPDATE "ruta" SET "choferIdViejo" = "chofer"."legajo"
        FROM "chofer"
        WHERE "chofer"."id" = "ruta"."choferId"`,
     );
