@@ -19,7 +19,7 @@ import { usingDevToken } from '../../api/client.js';
  * token equivocado y dejar el resto del modulo en 401, que es exactamente lo
  * que pasaba.
  */
-export default function TopBar({ title, subtitle, openAlerts, onTokenChange }) {
+export default function TopBar({ title, subtitle, openAlerts, onTokenChange, menuOpen, onToggleMenu }) {
   const [tokenOpen, setTokenOpen] = useState(false);
 
   // Sin backend no hay token que pegar; con token de desarrollo, tampoco.
@@ -27,6 +27,20 @@ export default function TopBar({ title, subtitle, openAlerts, onTokenChange }) {
 
   return (
     <header className="topbar">
+      {/* Solo existe en pantallas angostas, donde el sidebar es un cajon. Lo
+          esconde el CSS y no una condicion de JS a proposito: el punto de corte
+          es el mismo que mueve al sidebar, y tenerlo escrito una sola vez es lo
+          que evita que el boton aparezca cuando el menu ya esta a la vista. */}
+      <button
+        type="button"
+        className="topbar-icon shell-menu-button"
+        onClick={onToggleMenu}
+        aria-label={menuOpen ? 'Cerrar menu' : 'Abrir menu'}
+        aria-expanded={menuOpen}
+      >
+        {menuOpen ? <Icons.close /> : <Icons.menu />}
+      </button>
+
       <div className="topbar-title">
         <h1>{title}</h1>
         {subtitle && <p className="muted">{subtitle}</p>}

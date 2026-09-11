@@ -10,8 +10,8 @@ Evidencia del despliegue del modulo de Residuos en Render, usando la infraestruc
 | Proveedor cloud | Render |
 | Blueprint | `citypass-residuos` |
 | Branch desplegada | `main` |
-| Commit verificado | `9135bf8` - `ci(devops): document Render auto deploy stage` |
-| Fecha de verificacion | 2026-09-04 21:39 ART |
+| Commit verificado | `b5530e8` - `Merge pull request #15 from ResiduosCityPass/feat/token-use-chofer-interno` |
+| Fecha de verificacion | 2026-09-08 ART |
 | Responsable | Ramiro Souto |
 
 El `JWT_SECRET` esta configurado como secreto en Render y no se documenta en el repositorio.
@@ -38,12 +38,12 @@ Usar esta seccion como checklist de la parte DevOps de la demo.
 | Swagger | <https://citypass-residuos-api.onrender.com/docs> | La API expone documentacion navegable |
 | Endpoint publico | `curl -i "https://citypass-residuos-api.onrender.com/api/v1/publico/contenedores/cercanos?lat=-34.6037&lng=-58.3816&radioMetros=1500"` | API + PostgreSQL + esquema |
 | Endpoint privado | `curl -i https://citypass-residuos-api.onrender.com/api/v1/contenedores` | Los guards rechazan requests sin token |
-| CI/CD | <https://github.com/ResiduosCityPass/citypass-residuos/actions/runs/33933590708> | Backend, frontend, Docker y deploy-info en verde |
+| CI/CD | <https://github.com/ResiduosCityPass/citypass-residuos/actions/runs/34258444000> | Backend, frontend, Docker y deploy-info en verde |
 | IaC | [`render.yaml`](../../render.yaml) | La infraestructura esta declarada como codigo |
 
 ### Capturas sugeridas
 
-- GitHub Actions con el run `33933590708` en verde.
+- GitHub Actions con el run `34258444000` en verde.
 - Job `Docker — build de imagenes` mostrando backend y frontend OK.
 - Job `Deploy — Render auto deploy` mostrando el resumen de URLs.
 - Blueprint `citypass-residuos` en Render con API, frontend y DB creados.
@@ -61,11 +61,11 @@ Usar esta seccion como checklist de la parte DevOps de la demo.
 ## CI en `main`
 
 La rama `main` quedo sincronizada desde `develop` y el pipeline de CI/CD quedo verificado en el
-commit `9135bf8`.
+commit `b5530e8`.
 
 Workflow verificado:
 
-- CI run: <https://github.com/ResiduosCityPass/citypass-residuos/actions/runs/33933590708>
+- CI run: <https://github.com/ResiduosCityPass/citypass-residuos/actions/runs/34258444000>
 - Backend: lint, build, migraciones, cobertura y tests de integracion en verde.
 - Frontend: lint, build y tests con cobertura en verde.
 - Docker: build de imagen backend y frontend en verde.
@@ -116,12 +116,12 @@ Resultado observado:
 HTTP/2 200
 ```
 
-```json
-[]
-```
+El 2026-09-08 se cargo el escenario de demo con una zona, ocho contenedores y ocho sensores
+alrededor del Obelisco. El endpoint devuelve los ocho contenedores, lo que verifica API,
+PostgreSQL, esquema y datos de negocio publicados.
 
-La respuesta vacia indica que la API responde, llega a PostgreSQL y el esquema existe. Falta cargar
-datos de demo para que el endpoint devuelva contenedores.
+El mapa operativo contiene los ocho contenedores de demo en estado `NORMAL`, con niveles iniciales
+entre 10% y 40%. Las alertas abiertas quedaron resueltas para que la demo arranque limpia.
 
 ### Swagger
 
@@ -191,7 +191,6 @@ Esto verifica que los guards estan activos en el despliegue.
 
 ## Pendientes operativos para la demo
 
-- Cargar datos de demo antes de la presentacion para que el endpoint publico no responda `[]`.
 - Despertar el backend unos minutos antes de mostrar la demo, porque el plan gratuito puede dormir
   por inactividad.
 - Confirmar el mismo dia que el ultimo CI de `main` siga en verde.

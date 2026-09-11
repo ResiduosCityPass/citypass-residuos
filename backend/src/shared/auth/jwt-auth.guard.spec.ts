@@ -39,6 +39,7 @@ describe('JwtAuthGuard', () => {
     JWT_SECRET: 'test-secret',
     JWT_ALGORITHM: 'HS256',
     JWT_ISSUER: 'https://idp.citypass.local',
+    JWT_ISSUER_CHOFERES: 'citypass-residuos-choferes',
     JWT_AUDIENCE: 'citypass-residuos-api',
   };
 
@@ -138,5 +139,45 @@ describe('JwtAuthGuard', () => {
     const { context } = contextoCon({ authorization: 'Bearer token-version-vieja' });
 
     await expect(guard.canActivate(context)).rejects.toThrow(UnauthorizedException);
+  });
+
+  describe('token_use "chofer-interno" (ADR-009)', () => {
+    const claimsChofer = {
+      ...claimsValidos,
+      token_use: 'chofer-interno' as const,
+      iss: 'citypass-residuos-choferes',
+      sub: 'chofer_a1b2c3',
+    };
+
+    it('acepta un token de chofer con su propio emisor', async () => {
+      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(false);
+      jwtService.verifyAsync.mockResolvedValue(claimsChofer);
+      const { context, request } = contextoCon({ authorization: 'Bearer token-chofer' });
+
+      await expect(guard.canActivate(context)).resolves.toBe(true);
+      expect(request.usuario).toEqual({ ...claimsChofer, rol: 'CHOFER' });
+    });
+
+    it('rechaza un token "chofer-interno" firmado con el emisor humano', async () => {
+      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(false);
+      jwtService.verifyAsync.mockResolvedValue({
+        ...claimsChofer,
+        iss: 'https://idp.citypass.local',
+      });
+      const { context } = contextoCon({ authorization: 'Bearer token-emisor-cruzado' });
+
+      await expect(guard.canActivate(context)).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('rechaza un token "human" firmado con el emisor del chofer', async () => {
+      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(false);
+      jwtService.verifyAsync.mockResolvedValue({
+        ...claimsValidos,
+        iss: 'citypass-residuos-choferes',
+      });
+      const { context } = contextoCon({ authorization: 'Bearer token-emisor-cruzado-2' });
+
+      await expect(guard.canActivate(context)).rejects.toThrow(UnauthorizedException);
+    });
   });
 });
