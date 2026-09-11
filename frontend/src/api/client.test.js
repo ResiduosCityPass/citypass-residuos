@@ -96,6 +96,7 @@ describe('cliente de la API', () => {
   it('arma la URL base a partir del origen y el prefijo de Render', () => {
     expect(
       buildBaseUrl({
+        apiUrl: '',
         apiOrigin: 'https://citypass-residuos-api.onrender.com/',
         apiPrefix: '/api/v1/',
       }),
