@@ -1,6 +1,7 @@
 # ADR-005 — Seguridad e identidad federada
 
 - **Estado:** Aceptado
+- **Superseded parcialmente por:** [ADR-009](ADR-009-identidad-de-los-choferes.md) — los choferes no son usuarios del Squad 2
 - **Fecha:** 2026-08-20
 - **Decisores:** Squad 4 (Adriel Pasik, Francisco Isola)
 

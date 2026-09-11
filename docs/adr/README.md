@@ -16,3 +16,4 @@ Un ADR nunca se edita una vez aceptado: si la decisión cambia, se escribe uno n
 | [006](ADR-006-stack-frontend.md) | Stack tecnológico del frontend | Aceptado |
 | [007](ADR-007-design-system-y-mocks.md) | Design system, navegación y capa de datos falsos en el frontend | Aceptado |
 | [008](ADR-008-destino-cloud.md) | Destino cloud para despliegue | Aceptado |
+| [009](ADR-009-identidad-de-los-choferes.md) | Identidad de los choferes | Aceptado |
