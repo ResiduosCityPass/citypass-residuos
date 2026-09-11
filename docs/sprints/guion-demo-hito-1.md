@@ -84,6 +84,15 @@ cd backend && npm run token:dev -- CHOFER
 Van en `frontend/.env.local` como `VITE_DEV_TOKEN` y `VITE_DEV_TOKEN_CHOFER`. Duran 8 horas: si
 la demo es a la tarde y los generaste a la mañana, **regeneralos**.
 
+### Dejar a Juana Perez intacta
+
+El seed crea a **Juana Perez** con la sesión `dev-chofer`, que es la que resuelve el token de
+`npm run token:dev -- CHOFER`. **Es tu plan B: no le emitas una credencial.**
+
+Emitir una credencial rota el identificador de sesión del chofer, así que hacerlo sobre Juana deja
+inservible el token que preparaste. En la demo se da de alta un chofer nuevo (paso 6) y se le
+emite a ese.
+
 ### Limpiar lo que dejaron los ensayos
 
 **El halo naranja no se apaga solo.** Sale de tener una alerta de `INCENDIO` abierta, no de la
@@ -233,14 +242,39 @@ nada.
 > "La ruta nace como propuesta y el camión sigue libre. Es una propuesta, no un compromiso: recién
 > se toma cuando una persona la confirma. Eso es a propósito, por si la propuesta es absurda."
 
-Asignás la ruta a un chofer. Ahí el camión pasa a `EN_RUTA`.
+**Antes de asignar, dás de alta al chofer que la va a ejecutar.** En `/choferes`, alta con nombre
+y legajo, y **emitís su credencial**:
+
+> "El chofer no se registra ni tiene login: es una persona de la operación, no un usuario de la
+> plataforma. Se le emite una credencial desde acá, y se le muestra **una sola vez**, igual que la
+> clave de un sensor."
+
+El modal no deja cerrarse hasta confirmar que la guardaste. Copiala: la vas a pegar en el paso 7.
+
+> **Dálo de alta en vivo, no uses a Juana Perez.** Emitir una credencial **rota** el identificador
+> de sesión del chofer, así que si se la emitís a Juana, el token de `npm run token:dev -- CHOFER`
+> que dejaste preparado deja de servir para ella — y ese token es tu plan B si algo falla en vivo.
+> Con un chofer nuevo, Juana y su token quedan intactos de reserva.
+
+Ahora sí, asignás la ruta a ese chofer. Ahí el camión pasa a `EN_RUTA`.
+
+> "Y fíjense que el chofer se elige de una lista, no se escribe. Antes era un campo de texto que el
+> backend no validaba: un identificador mal tipeado asignaba la ruta igual, con éxito, y el chofer
+> no la veía nunca."
+
+Es una frase que vale decir: muestra una decisión de diseño, no una pantalla.
 
 ### 7 · El chofer (2 min) — CU-10
 
-Abrís `/chofer` — **idealmente desde el celular**, o con el navegador en modo móvil.
+Abrís `/chofer` **en otro navegador o en el celular** — no en la misma ventana donde venís
+operando. Ahí pegás la credencial que copiaste en el paso 6.
 
 > "Esta es la única pantalla que no es del operador. La ve el chofer, en la calle, desde el
-> teléfono."
+> teléfono, y entra con la credencial que le emitieron. No hay login."
+
+**Que sea otro navegador no es un detalle estético:** las dos sesiones conviven, y se ve que el
+operador y el chofer son dos personas distintas mirando el mismo sistema al mismo tiempo. En una
+sola ventana parece un cambio de pantalla.
 
 Confirmás la primera parada:
 
@@ -309,7 +343,8 @@ Todas estas se ven como "no anda" cuando en realidad el sistema está haciendo l
 
 | Trampa | Qué pasa | Cómo evitarla |
 |---|---|---|
-| **El `choferId` mal tipeado** | La pantalla del chofer queda **vacía y sin error**. Parece que la ruta no se generó | Al asignar, usar exactamente el `sub` del token del chofer (`dev-chofer`). Anotalo antes |
+| **Emitirle la credencial a Juana Perez** | El token de `token:dev -- CHOFER` deja de servir, y te quedás sin plan B | Emitir una credencial **rota** el identificador de sesión. Dar de alta un chofer nuevo en vivo y emitirle a ese |
+| **Un chofer sin credencial emitida** | Se le asigna la ruta bien, pero él no ve nada | Un chofer puede existir sin acceso configurado. La pantalla de asignación avisa antes de confirmar; si igual pasa, emitirle la credencial |
 | **Correr `saturacion` dos veces** | La segunda vez no aparece ninguna alerta nueva | Es correcto: la alerta se emite solo en la transición. Usar otro contenedor, o explicarlo como una virtud |
 | **Saturación e incendio sobre el mismo contenedor** | El remate se cae: no podés mostrar un contenedor verde prendido fuego si lo acabás de saturar | Los escenarios pegan sobre el primer contenedor salvo que les digas otro. Usar `--contenedor CT-0007` en el de incendio |
 | **El halo naranja de un ensayo queda pegado** | Aparecen contenedores con halo que no están incendiados, y el incendio "de verdad" pierde efecto porque ya había tres | El halo sale de tener una alerta de INCENDIO **ABIERTA**, no de la temperatura actual: que el sensor se enfríe no la cierra. **Resolver a mano en `/alertas` todas las alertas de los ensayos**, o resembrar |
@@ -354,6 +389,10 @@ cd backend && npm run test:e2e
 
 **Una sola persona maneja la compartida de pantalla.** Cambiar de pantalla compartida en vivo es
 la forma más rápida de perder dos minutos.
+
+**La excepción es el paso 7.** El chofer entra desde otro navegador o desde un celular, y ahí sí
+conviene que sea otra persona: se ve que el operador y el chofer son dos actores distintos usando
+el sistema a la vez. Coordinen antes quién tiene la credencial.
 
 ---
 

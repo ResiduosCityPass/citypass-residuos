@@ -1,3 +1,4 @@
+import { JwtService } from '@nestjs/jwt';
 import * as request from 'supertest';
 import { Rol, TipoResiduo } from '../src/shared/domain/enums';
 import { AppDePrueba, crearAppDePrueba } from './helpers/app-de-prueba';
@@ -125,10 +126,16 @@ describe('Seguridad (e2e)', () => {
         .send({ camionId: camion.body.id })
         .expect(201);
 
+      const chofer = await http
+        .post('/api/v1/choferes')
+        .set(auth(admin))
+        .send({ nombre: 'Juana Perez', legajo: `CH-${Date.now()}`, usuarioSub: 'test-CHOFER' })
+        .expect(201);
+
       await http
         .patch(`/api/v1/rutas/${ruta.body.id}/asignar`)
         .set(auth(admin))
-        .send({ choferId: 'U000001' })
+        .send({ choferId: chofer.body.id })
         .expect(200);
 
       return ruta.body.id;
@@ -161,14 +168,62 @@ describe('Seguridad (e2e)', () => {
 
     it('el chofer sigue viendo la suya por /rutas/mias', async () => {
       await rutaDeOtroChofer();
-      const suDueno = ctx.token(Rol.CHOFER, 'U000001');
 
       const respuesta = await http
         .get('/api/v1/rutas/mias')
-        .set('Authorization', `Bearer ${suDueno}`)
+        .set('Authorization', `Bearer ${ctx.token(Rol.CHOFER)}`)
         .expect(200);
 
-      expect(respuesta.body.choferId).toBe('U000001');
+      // La ruta llega con el chofer expandido: la pantalla muestra su nombre,
+      // no un uuid.
+      expect(respuesta.body.chofer).toMatchObject({ nombre: 'Juana Perez' });
+    });
+  });
+
+  describe('el token del chofer no se puede cruzar con el humano', () => {
+    const firmar = (claims: Record<string, unknown>, opciones: Record<string, unknown>) =>
+      ctx.app.get(JwtService).sign(claims, {
+        audience: ['citypass-residuos-api'],
+        expiresIn: '1h',
+        ...opciones,
+      });
+
+    const claimsDeChofer = {
+      sub: 'chofer_de_prueba',
+      preferred_username: 'CH-999',
+      ver: 1,
+      module: 'residuos',
+      groups: ['chofer'],
+      jti: 'test',
+    };
+
+    it('rechaza un token_use chofer-interno firmado con el emisor humano', async () => {
+      // Sin el cruce contra `iss`, quien pudiera firmar un token humano podria
+      // fabricarse uno de chofer con solo cambiar una palabra del payload.
+      const token = firmar(
+        { ...claimsDeChofer, token_use: 'chofer-interno' },
+        { issuer: 'citypass-squad2' },
+      );
+
+      await http.get('/api/v1/rutas/mias').set('Authorization', `Bearer ${token}`).expect(401);
+    });
+
+    it('rechaza un token_use human firmado con el emisor de choferes', async () => {
+      const token = firmar(
+        { ...claimsDeChofer, token_use: 'human' },
+        { issuer: 'citypass-residuos-choferes' },
+      );
+
+      await http.get('/api/v1/zonas').set('Authorization', `Bearer ${token}`).expect(401);
+    });
+
+    it('rechaza un token_use que no es ninguno de los dos', async () => {
+      const token = firmar(
+        { ...claimsDeChofer, token_use: 'service' },
+        { issuer: 'citypass-residuos-choferes' },
+      );
+
+      await http.get('/api/v1/rutas/mias').set('Authorization', `Bearer ${token}`).expect(401);
     });
   });
 

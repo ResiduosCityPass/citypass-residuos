@@ -71,15 +71,20 @@ jobs:
       - name: Tests unitarios con cobertura
         run: npm run test:cov
 
+      # Con cobertura: es la unica corrida que ejercita los repositorios y las
+      # consultas contra PostgreSQL. Sin medirla, esos archivos le figuran a
+      # Sonar como codigo sin probar.
       - name: Tests de integracion
-        run: npm run test:e2e
+        run: npm run test:cov:e2e
 
       - name: Publicar reporte de cobertura
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: coverage-backend
-          path: backend/coverage/
+          path: |
+            backend/coverage/
+            backend/coverage-e2e/
           retention-days: 14
 
   frontend:
@@ -146,7 +151,7 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           name: coverage-backend
-          path: backend/coverage
+          path: backend
 
       - name: Descargar cobertura del frontend
         uses: actions/download-artifact@v7

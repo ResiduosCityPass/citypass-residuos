@@ -15,6 +15,7 @@ import { Ruta } from '../domain/ruta.entity';
 
 const RELACIONES_COMPLETAS = {
   camion: true,
+  chofer: true,
   paradas: { contenedor: true },
 } as const;
 
@@ -52,7 +53,9 @@ export class RutaTypeormRepository extends RepositorioTypeorm<Ruta> implements R
 
     return this.repo().find({
       where,
-      relations: { camion: true },
+      // El chofer va en el listado porque la tabla del operador muestra su
+      // nombre; sin la relacion solo tendria un uuid.
+      relations: { camion: true, chofer: true },
       order: { generadaEn: 'DESC' },
     });
   }
