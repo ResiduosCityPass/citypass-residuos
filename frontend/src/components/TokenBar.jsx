@@ -12,8 +12,8 @@ import { readToken, saveToken, clearToken } from '../api/client.js';
  *
  * Por eso el texto se pasa desde afuera: mandar a un chofer parado en la calle
  * a correr un comando de npm seria absurdo. Lo que no cambia entre las dos es
- * lo unico que hace este componente, que es guardar el token en este
- * dispositivo.
+ * lo unico que hace este componente, que es mantener la credencial durante
+ * esta sesion del navegador.
  */
 export default function TokenBar({
   onChange,

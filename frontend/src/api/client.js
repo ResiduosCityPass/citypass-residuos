@@ -33,27 +33,35 @@ const BASE_URL = buildBaseUrl();
 const TOKEN_KEY = 'citypass.token';
 
 /**
- * Quien puso el token que hay guardado: `manual` si lo pego una persona,
- * `dev` si lo dejo el andamiaje de desarrollo.
+ * El token que pega una persona se mantiene solamente en memoria. Los tokens
+ * de desarrollo, en cambio, se pueden guardar para no pedirlos en cada carga.
  *
  * Existe por un solo caso, el de CU-10: el chofer pega su credencial en el
- * celular y `seedDevToken` la pisaba en el render siguiente. Sin poder
- * distinguir quien escribio el token no hay forma de respetar uno y pisar el
- * otro. En produccion no se lee nunca —`seedDevToken` no llega al bundle—, pero
- * se escribe igual: que el dato dependa del entorno seria peor.
+ * celular y `seedDevToken` la pisaba en el render siguiente. Una credencial
+ * manual tampoco debe llegar a `localStorage`: puede venir de un input y la
+ * app la tratara como dato no confiable hasta que la API la valide.
  */
 const TOKEN_SOURCE_KEY = 'citypass.token.origen';
+let manualToken = '';
 
-export const readToken = () => localStorage.getItem(TOKEN_KEY) ?? '';
-export const tokenSource = () => localStorage.getItem(TOKEN_SOURCE_KEY);
+export const readToken = () => manualToken || localStorage.getItem(TOKEN_KEY) || '';
+export const tokenSource = () => (manualToken ? 'manual' : localStorage.getItem(TOKEN_SOURCE_KEY));
 
-/** @param {'manual'|'dev'} origen - quien lo pone. Por defecto, una persona. */
-export const saveToken = (token, origen = 'manual') => {
-  localStorage.setItem(TOKEN_KEY, token.trim());
-  localStorage.setItem(TOKEN_SOURCE_KEY, origen);
+/** Guarda una credencial pegada por una persona solo mientras vive la SPA. */
+export const saveToken = (token) => {
+  manualToken = token.trim();
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(TOKEN_SOURCE_KEY);
+};
+
+function saveDevToken(token) {
+  manualToken = '';
+  localStorage.setItem(TOKEN_KEY, token);
+  localStorage.setItem(TOKEN_SOURCE_KEY, 'dev');
 };
 
 export const clearToken = () => {
+  manualToken = '';
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(TOKEN_SOURCE_KEY);
 };
@@ -108,7 +116,7 @@ export function seedDevToken(pathname = '') {
 
   if (!preset || readToken() === preset) return false;
 
-  saveToken(preset, 'dev');
+  saveDevToken(preset);
   return true;
 }
 
