@@ -109,12 +109,35 @@ puede pasar a ser una proyección de aquel en vez de la fuente. Nada del modelo 
 
 ### Acciones abiertas
 
-| Acción | Responsable |
-|---|---|
-| Aceptar `token_use: "chofer-interno"` en el guard. **Va antes que el emisor**: un `if` que acepta un valor que nadie emite todavía no rompe nada; un emisor que emite un valor que el guard rechaza rompe todos los ingresos de chofer | Adriel |
-| Emitir ese `token_use`, una vez que el guard lo acepte | Francisco |
-| Decidir si el token del chofer lleva un `iss` propio. Es el mismo argumento que el de `token_use` un campo más allá: hoy diría `citypass-squad2`, que en los tokens de desarrollo es una mentira temporal y documentada, pero en el del chofer sería permanente por diseño | Adriel / Francisco |
-| Definir cómo se le entrega el token al chofer. La propuesta sobre la mesa es el mismo patrón que la API key del sensor: se genera desde el ABM, se muestra una sola vez y se regenera si se pierde | Squad 4 |
+**Ninguna. Las cuatro se cerraron entre el 08/09 y el 11/09.**
+
+| Acción | Responsable | Cómo se cerró |
+|---|---|---|
+| Aceptar `token_use: "chofer-interno"` en el guard. **Va antes que el emisor**: un `if` que acepta un valor que nadie emite todavía no rompe nada; un emisor que emite un valor que el guard rechaza rompe todos los ingresos de chofer | Adriel | PR #15. Se respetó el orden |
+| Emitir ese `token_use`, una vez que el guard lo acepte | Francisco | PR #13, después del #15 |
+| Decidir si el token del chofer lleva un `iss` propio | Adriel / Francisco | Sí, lo lleva: `JWT_ISSUER_CHOFERES`, y el guard lo cruza contra el `token_use`. Un `iss` prestado del Squad 2 habría sido una mentira permanente por diseño, no temporal como la de los tokens de desarrollo |
+| Definir cómo se le entrega el token al chofer | Squad 4 | Como se proponía: `POST /choferes/:id/credencial`, se muestra una sola vez, se emite de nuevo si se pierde |
+
+### Lo que se aprendió emitiendo la credencial
+
+Dos cosas que no estaban en la decisión original y salieron al implementarla:
+
+**La revocación es por rotación del `usuarioSub`, y eso era lo que faltaba.** El backend no guarda
+la credencial: un JWT se valida por firma, así que no hay nada que recordar ni que hashear. Lo que
+sí guarda es `chofer.usuarioSub`, y el guard resuelve al chofer por ahí. Emitir una credencial
+nueva genera un `sub` nuevo y **mata todas las anteriores en el acto**, aunque su firma siga siendo
+válida y falte un mes para que venzan.
+
+Eso resuelve la tensión que había quedado abierta: una credencial corta deja al chofer tildado en
+la calle a mitad de turno, y una larga sin forma de revocarla es peor. Con la rotación se puede
+tener las dos cosas — dura 30 días y se corta cuando haga falta. Y quedan dos niveles distintos:
+perder el celular se arregla emitiendo otra credencial, sin sacar al chofer de circulación; que la
+persona deje de trabajar se arregla dándola de baja.
+
+**Dar de baja a un chofer con una ruta activa dejaba el camión varado.** El chofer perdía el acceso
+en el acto, así que no podía cerrar las paradas; la ruta no cerraba; el camión quedaba `EN_RUTA`
+para siempre; y CU-03 no deja cambiarle el estado a mano a un camión en ruta. La baja ahora falla
+con `409 CHOFER_CON_RUTA_ACTIVA`: primero se cierra o se reasigna la ruta.
 
 ### Queda sin efecto de ADR-005
 
