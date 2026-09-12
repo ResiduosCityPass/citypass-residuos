@@ -1,6 +1,6 @@
 # Módulo de Residuos — estado, casos de uso y pendientes
 
-Squad 4 · Actualizado al **2026-09-03**
+Squad 4 · Actualizado al **2026-09-12**
 
 Qué hace cada caso de uso, dónde vive en el código, qué reglas no se pueden pasar por alto, y qué
 falta. Es el único documento de estado del módulo.
@@ -14,8 +14,13 @@ Para el contrato de la API endpoint por endpoint, con capturas reales de cada re
 
 - **Los 12 casos de uso están implementados de punta a punta**, backend y frontend, corriendo
   contra PostgreSQL. No queda ninguna pantalla con datos falsos.
-- Lo que falta **no es código**: dos pull requests, una decisión de equipo y cuatro pedidos de
-  contrato menores.
+- **La identidad del chofer se rehízo entera** después de la decisión del Sprint 2: dejó de ser un
+  string libre sin validar y pasó a ser una entidad de este módulo, con ABM y credencial propia.
+  Está en [ADR-009](docs/adr/ADR-009-identidad-de-los-choferes.md) y es el cambio más grande desde
+  la versión anterior de este documento.
+- Lo que falta **no es código nuestro**: un pull request de frontend con conflictos, el merge de
+  `develop` a `main` para que lo desplegado sea lo que se demuestra, y tres pedidos de contrato
+  menores.
 - El ciclo completo está verificado: contenedor satura → se genera la alerta → se arma la ruta →
   se asigna al chofer → el chofer confirma → el contenedor vuelve a verde, la alerta se cierra y
   el camión queda libre.
@@ -24,6 +29,7 @@ Para el contrato de la API endpoint por endpoint, con capturas reales de cada re
 |---|---|
 | Casos de uso | 12 de 12 implementados |
 | Pantallas | 10 (8 del operador + 2 de otros actores) |
+| Desplegado | Frontend y API en Render, **corriendo `main`, que está atrás de `develop`** |
 | Tests del frontend | 177, en verde |
 | Cobertura del frontend | 81,79% de líneas · el umbral de la cátedra es 60% |
 | CI | lint, build y tests de backend **y** frontend |
@@ -89,6 +95,10 @@ build de producción.
 | `/flota` | Flota | CU-03 |
 | `/rutas` | Rutas | CU-08 |
 | `/rutas/:id` | Detalle de la ruta | CU-08 + CU-09 |
+| `/choferes` | Choferes | CU-09 |
+
+> La pantalla de `/choferes` **todavía no está en `develop`**: llega con el PR #18. El backend que
+> consume sí está mergeado, así que el endpoint responde aunque la pantalla no exista.
 
 Y dos que corren **fuera del Shell**, porque no son del operador:
 
@@ -361,8 +371,55 @@ para asignar el chofer.
 - **Al confirmar, el camión queda tomado** y pasa a `EN_RUTA`.
 - **La carga se muestra en barra** porque es el límite duro de la heurística: dice de un vistazo si
   la propuesta aprovecha el viaje o manda el camión medio vacío.
-- **El chofer se escribe a mano.** La ruta trae `choferId` pero **no un objeto `chofer`**: no
-  tenemos su nombre. Ver [la decisión pendiente](#1-el-endpoint-de-choferes--necesita-decisión-de-equipo).
+- **El chofer se elige de una lista, no se escribe.** Hasta el Sprint 2 era un campo de texto que
+  el backend no validaba contra nada: un identificador mal tipeado asignaba la ruta **con éxito** y
+  el chofer no la veía nunca —su pantalla quedaba vacía y sin ningún error—. Hoy `choferId` es el
+  UUID de un chofer nuestro y falla fuerte y temprano: `404 CHOFER_NO_ENCONTRADO`,
+  `409 CHOFER_INACTIVO`. La ruta vuelve con el objeto `chofer` expandido, así que la pantalla
+  muestra el nombre y no un identificador.
+- **Solo se ofrecen choferes activos.** Ofrecer uno inactivo es ofrecer un 409.
+
+---
+
+## CU-09 · Choferes: alta, baja y credencial
+
+**Actor:** Administrador · **Pantalla:** `/choferes` (llega con el PR #18)
+
+**Dónde vive:** [`backend/src/modules/choferes/`](backend/src/modules/choferes/)
+
+**Consume:** `GET /choferes` · `GET /choferes/:id` · `POST /choferes` ·
+`PATCH /choferes/:id` · `POST /choferes/:id/credencial` · `DELETE /choferes/:id` ·
+`PATCH /choferes/:id/reactivar`
+
+El chofer **no se registra ni tiene login**. Es personal de la operación, no un usuario de la
+plataforma: alguien lo da de alta acá y le emite una credencial. Toda la decisión y sus alternativas
+descartadas están en [ADR-009](docs/adr/ADR-009-identidad-de-los-choferes.md).
+
+**Reglas:**
+
+- **La credencial se muestra una sola vez**, igual que la API key de un sensor. El backend **no la
+  guarda en ningún lado**: un JWT se valida por firma, así que no hay nada que recordar. Si se
+  pierde, la única salida es emitir otra.
+- **Emitir es revocar.** Lo que se guarda es `chofer.usuarioSub`, opaco y aleatorio, y el guard
+  resuelve al chofer por ahí. Emitir una credencial nueva genera un `sub` nuevo, y **todas las
+  anteriores de ese chofer mueren en el acto**, aunque su firma siga siendo válida y falte un mes
+  para que venzan. El precio es simétrico: emitir dos veces por error deja al chofer afuera hasta
+  que le pasen la nueva.
+- **Eso da dos niveles de revocación**, que es lo que faltaba. Perder el celular se arregla
+  emitiendo otra credencial, sin sacar al chofer de circulación. Que la persona deje de trabajar se
+  arregla dándola de baja.
+- **No se puede dar de baja a un chofer con una ruta activa** (`409 CHOFER_CON_RUTA_ACTIVA`). Sin
+  esa regla el camión quedaba `EN_RUTA` para siempre: el chofer perdía el acceso, no podía cerrar
+  las paradas, la ruta no cerraba y el camión no se liberaba nunca — y CU-03 no deja cambiarle el
+  estado a mano a un camión en ruta.
+- **La baja es lógica, nunca se borra.** Un chofer dado de baja sigue siendo el responsable de las
+  rutas que ejecutó; borrarlo dejaría el historial sin dueño.
+- **`usuarioSub` puede ser `null`.** Un chofer dado de alta al que todavía no le emitieron
+  credencial existe y se le puede asignar una ruta, solo que no la ve.
+- **La credencial lleva `token_use: chofer-interno` y emisor propio** (`JWT_ISSUER_CHOFERES`), que
+  el guard cruza contra el `iss`. No reusa el `token_use: human` del Squad 2 a propósito: esa
+  persona no pasó por su IdP, y reusar el valor ensucia el campo que existe para trazar quién hizo
+  qué.
 
 ---
 
@@ -514,42 +571,53 @@ solo tiene sentido si las dos fuentes devuelven exactamente lo mismo.
 
 # Qué falta
 
-Nada de esto es código a medio hacer. Son trámites, una decisión de equipo y pedidos de contrato.
+Nada de esto es código a medio hacer. Son trámites, un despliegue y pedidos de contrato.
 
-## Bloqueante: los dos pull requests
+Dos detalles del proceso que siguen valiendo: **GitHub propone `main` por defecto y el destino
+tiene que ser `develop`**, y **nadie mergea su propio PR**.
 
-**Hoy el trabajo está en ramas separadas y no llegó a `develop`.**
+## 1. Lo desplegado no es lo que vamos a demostrar
 
-1. **Francisco tiene que abrir primero el PR de `feat/CU-12-prediccion` a `develop`.** Su rama
-   tiene los 12 casos de uso del backend y todavía no está en la rama común.
-2. **Después va el PR del frontend** desde `feat/CU-07-mapa-tiempo-real`. El orden importa: la rama
-   del frontend está construida sobre la del backend, así que si va primero arrastra los commits de
-   Francisco sin que nadie los haya revisado.
+Render despliega **desde `main`**, y `main` está **16 commits atrás de `develop`** — 28 archivos de
+backend. Nada de choferes está en producción: `/choferes` devuelve 404 en la URL pública.
 
-Dos detalles del proceso: **GitHub propone `main` por defecto y el destino tiene que ser
-`develop`**, y **nadie mergea su propio PR**.
+- API: `https://citypass-residuos-api.onrender.com/api/v1/health`
+- Frontend: `https://citypass-residuos-frontend.onrender.com`
 
-## 1. El endpoint de choferes — necesita decisión de equipo
+Las dos responden y el endpoint público devuelve los contenedores de la base real, así que el
+despliegue funciona. Falta **mergear `develop` a `main`**, que es de DevOps.
 
-**El problema:** para asignarle una ruta a un chofer (CU-09), hoy el operador **escribe el
-identificador a mano** en un campo de texto. No hay una lista de la que elegir.
+Dos cosas a tener en cuenta cuando eso pase:
 
-**Por qué:** los choferes son usuarios del módulo de identidad del Squad 2, no entidades de
-Residuos. Mantener acá un padrón propio significaría tener una copia de sus datos que se
-desincroniza con la fuente real.
+- **Corre la migración de choferes contra la base real**, que es la que convierte `ruta.choferId`
+  de texto a clave foránea. Conviene backup antes.
+- **El plan gratuito de Render duerme el servicio.** Medido: **22,8 segundos** para responder el
+  health en frío. Hay que despertarlo unos minutos antes de mostrar nada.
 
-**La consecuencia concreta:** el `choferId` es un string libre y **el backend no lo valida contra
-ningún padrón** — por eso tampoco existe `CHOFER_NO_ENCONTRADO`. Un identificador mal tipeado
-asigna la ruta igual, y el chofer nunca la ve. La pantalla lo avisa explícitamente, pero avisar no
-es resolver.
+## 2. Los pull requests abiertos
 
-**Hay que decidirlo con Nicolás y Adriel.** Las dos opciones son pedirle al Squad 2 un endpoint que
-liste usuarios por rol, o aceptar que el operador escriba el identificador y validarlo de otra
-forma.
+| PR | Qué es | Estado |
+|---|---|---|
+| #16 | Evidencia de despliegue | Aprobado pero bloqueado por el ruleset; hace falta una segunda aprobación |
+| #18 | Pantalla de ABM de choferes | Con conflictos, y apuntando a una rama que ya se mergeó |
 
-## 2. Cuatro pedidos de contrato al backend
+El #18 tiene que **cambiar la base a `develop`** y resolver los conflictos antes de poder
+revisarse.
 
-Ninguno bloquea la demo. Los cuatro son límites que están **visibles en la UI a propósito**, en vez
+## 3. Lo que era la decisión pendiente sobre los choferes — resuelto
+
+Este documento decía que el `choferId` era un string libre sin validar y que había que decidir con
+Nicolás y Adriel si pedirle al Squad 2 un endpoint de usuarios por rol.
+
+**Se decidió que no.** El chofer no es un usuario del Squad 2: es personal de la operación. Pasó a
+ser una entidad de este módulo, con ABM propio y una credencial que se emite desde acá. Está en
+[ADR-009](docs/adr/ADR-009-identidad-de-los-choferes.md), con las alternativas que se descartaron y
+por qué, y las reglas están arriba en
+[CU-09 · Choferes](#cu-09--choferes-alta-baja-y-credencial).
+
+## 4. Tres pedidos de contrato al backend
+
+Ninguno bloquea la demo. Los tres son límites que están **visibles en la UI a propósito**, en vez
 de disimulados.
 
 | Qué falta | Qué pasa hoy |
@@ -557,9 +625,11 @@ de disimulados.
 | **No se puede poner un contenedor en `FUERA_DE_SERVICIO`** | El estado existe en el modelo y el motor de reglas lo respeta, pero `PATCH /contenedores/:id` no acepta `estado` y no hay otro endpoint. El botón está en el detalle, deshabilitado y con el motivo en el tooltip. |
 | **`GET /contenedores` no dice si el contenedor ya tiene sensor** | No devuelve `sensor` ni un `tieneSensor`. La UI deja intentar y muestra el `409 CONTENEDOR_YA_TIENE_SENSOR` si corresponde. En el listado no se puede distinguir "sin sensor" de "sensor que nunca reportó". |
 | **`GET /rutas` no trae el avance de paradas** | El listado no incluye las paradas, así que la tabla no puede mostrar "2 de 3 vaciadas" sin una llamada por fila. Hoy muestra la carga estimada en litros, que sí viene. |
-| ~~**No hay endpoint para omitir una parada**~~ | **Resuelto.** `PATCH /paradas/:id/omitir` con `{ motivo }` está en `develop` y la pantalla del chofer ya lo usa. |
 
-## 3. Lo que depende de otros equipos
+Un cuarto pedido —el endpoint para omitir una parada— ya está resuelto: `PATCH /paradas/:id/omitir`
+con `{ motivo }` está en `develop` y la pantalla del chofer lo usa.
+
+## 5. Lo que depende de otros equipos
 
 - **El login del Squad 2 llega en el Sprint 3.** Hasta entonces los tokens se generan a mano y
   duran 8 horas. Cuando exista el login real cambia de dónde sale el token, pero el header
@@ -567,7 +637,7 @@ de disimulados.
 - **El bloqueo automático de zonas** cuando llega un incidente del módulo de Emergencias es del
   Sprint 4. Hoy se bloquea a mano.
 
-## 4. Recortes deliberados — esto NO es deuda
+## 6. Recortes deliberados — esto NO es deuda
 
 Están decididos y documentados en [ADR-004](docs/adr/ADR-004-alcance-y-recortes.md). No hay que
 "completarlos":
