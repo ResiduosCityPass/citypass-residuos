@@ -5,7 +5,9 @@ import Chip from '../components/ui/Chip.jsx';
 import FillBar from '../components/ui/FillBar.jsx';
 import Notice from '../components/ui/Notice.jsx';
 import Field from '../components/ui/Field.jsx';
-import { fetchMyRoute, confirmStop, skipStop } from '../api/waste.js';
+import TokenBar from '../components/TokenBar.jsx';
+import { USING_MOCKS, fetchMyRoute, confirmStop, skipStop } from '../api/waste.js';
+import { readToken } from '../api/client.js';
 import { fieldErrors, generalMessage } from '../domain/errors.js';
 import {
   STOP_STATE_LABEL,
@@ -82,6 +84,10 @@ export default function DriverStopsPage() {
   const [feedback, setFeedback] = useState(null); // { stopId, type, title, body }
   const [simulateGps, setSimulateGps] = useState(false);
 
+  // La credencial se pide sola cuando hace falta. Este estado es solo para el
+  // caso en que el chofer la quiere cambiar teniendo una que funciona.
+  const [changingCredential, setChangingCredential] = useState(false);
+
   // El formulario de omision se abre por parada, no como modal: el chofer ya
   // esta mirando la parada que no pudo vaciar y sacarlo de la lista para
   // preguntarle por que le hace perder cual era.
@@ -110,6 +116,21 @@ export default function DriverStopsPage() {
     // oxlint-disable-next-line react/set-state-in-effect
     load();
   }, [load]);
+
+  /**
+   * Cuando hay que pedir la credencial.
+   *
+   * `/chofer` vive fuera del Shell —columna angosta, sin sidebar, para el
+   * celular— y el Shell es quien monta la barra del token, asi que hasta ahora
+   * esta pantalla no tenia donde pegar nada: se abria desde un telefono y no
+   * habia forma de entrar. Con mocks no hace falta ninguna.
+   *
+   * El 403 cuenta igual que el 401: un token valido con otro rol tampoco sirve
+   * para entrar aca, y la salida es la misma.
+   */
+  const rejected = error?.code === 'HTTP_401' || error?.code === 'HTTP_403';
+  const askCredential =
+    !USING_MOCKS && (changingCredential || rejected || !readToken());
 
   const paradas = route?.paradas ?? [];
   const { confirmed, skipped, closed: closedStops, total } = stopsProgress(paradas);
@@ -380,9 +401,32 @@ export default function DriverStopsPage() {
           </div>
         )}
 
-        {loading && <p className="muted">Cargando tu ruta…</p>}
+        {askCredential && (
+          <div className="panel-card driver-credential">
+            <h2>Tu credencial</h2>
+            <p className="muted">
+              {rejected
+                ? 'La credencial que tenías no sirve más. Pedile al operador que te emita otra y pegala acá.'
+                : 'Pegá acá la credencial que te pasó el operador. Queda guardada en este teléfono.'}
+            </p>
+            <TokenBar
+              placeholder="Pegá acá tu credencial"
+              submitLabel="Entrar"
+              onChange={() => {
+                setChangingCredential(false);
+                load();
+              }}
+            />
+          </div>
+        )}
 
-        {error && (
+        {loading && !askCredential && <p className="muted">Cargando tu ruta…</p>}
+
+        {/* Con la credencial a la vista el 401 no se muestra: el cartel del
+            token está redactado para quien programa —dice de correr npm— y el
+            que lee esta pantalla está parado en la vereda. La caja de arriba ya
+            dice lo mismo en un idioma que le sirve. */}
+        {error && !askCredential && (
           <Notice type="error" title={`[${error.code}]`}>
             {generalMessage(error) ?? error.message}
           </Notice>
@@ -394,7 +438,7 @@ export default function DriverStopsPage() {
           </Notice>
         )}
 
-        {!loading && !error && !route && (
+        {!loading && !error && !route && !askCredential && (
           <Notice type="info" title="No tenés ninguna ruta asignada">
             Cuando el operador te asigne una, va a aparecer acá con sus paradas.
           </Notice>
@@ -544,6 +588,18 @@ export default function DriverStopsPage() {
               ))}
             </ol>
           </>
+        )}
+        {/* Al final y en letra chica a proposito: cambiar la credencial es lo
+            que se hace una vez, cuando te emiten otra. Arriba competiria con
+            los botones de confirmar, que es a lo que se entra a esta pantalla. */}
+        {!askCredential && !USING_MOCKS && (
+          <button
+            type="button"
+            className="driver-credential-link"
+            onClick={() => setChangingCredential(true)}
+          >
+            Cambiar credencial
+          </button>
         )}
       </main>
     </div>

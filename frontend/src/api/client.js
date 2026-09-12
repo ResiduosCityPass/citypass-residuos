@@ -32,9 +32,39 @@ export function buildBaseUrl({
 const BASE_URL = buildBaseUrl();
 const TOKEN_KEY = 'citypass.token';
 
-export const readToken = () => localStorage.getItem(TOKEN_KEY) ?? '';
-export const saveToken = (token) => localStorage.setItem(TOKEN_KEY, token.trim());
-export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
+/**
+ * El token que pega una persona se mantiene solamente en memoria. Los tokens
+ * de desarrollo, en cambio, se pueden guardar para no pedirlos en cada carga.
+ *
+ * Existe por un solo caso, el de CU-10: el chofer pega su credencial en el
+ * celular y `seedDevToken` la pisaba en el render siguiente. Una credencial
+ * manual tampoco debe llegar a `localStorage`: puede venir de un input y la
+ * app la tratara como dato no confiable hasta que la API la valide.
+ */
+const TOKEN_SOURCE_KEY = 'citypass.token.origen';
+let manualToken = '';
+
+export const readToken = () => manualToken || localStorage.getItem(TOKEN_KEY) || '';
+export const tokenSource = () => (manualToken ? 'manual' : localStorage.getItem(TOKEN_SOURCE_KEY));
+
+/** Guarda una credencial pegada por una persona solo mientras vive la SPA. */
+export const saveToken = (token) => {
+  manualToken = token.trim();
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(TOKEN_SOURCE_KEY);
+};
+
+function saveDevToken(token) {
+  manualToken = '';
+  localStorage.setItem(TOKEN_KEY, token);
+  localStorage.setItem(TOKEN_SOURCE_KEY, 'dev');
+};
+
+export const clearToken = () => {
+  manualToken = '';
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(TOKEN_SOURCE_KEY);
+};
 
 /**
  * Deja puesto el token de desarrollo que corresponde a la pantalla.
@@ -58,6 +88,18 @@ export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
  *  2. Que la variable este definida. No tiene valor por defecto y `.env.local`
  *     no se versiona, asi que un clon del repo no hereda el token de nadie.
  *
+ * La excepcion es /chofer con una credencial pegada a mano. Ahi el token dejo
+ * de ser andamiaje: es COMO entra el chofer, la emite el operador desde el ABM
+ * y no se puede volver a consultar. Pisarla obligaba a que se la emitieran de
+ * nuevo, y ademas hacia imposible probar el flujo real en desarrollo. En el
+ * resto del modulo se sigue pisando, que es lo que evita quedar en 401 por un
+ * token de chofer olvidado.
+ *
+ * El precio, y es chico: en desarrollo, pasar por una pantalla del operador
+ * reemplaza esa credencial por el token de admin, y al volver a /chofer se
+ * siembra de nuevo el de desarrollo. Una credencial de verdad no sobrevive esa
+ * vuelta. En produccion nada de esto existe.
+ *
  * @param {string} pathname - Ruta actual. `/chofer` usa el token de CHOFER.
  * @returns {boolean} true si dejo un token puesto.
  */
@@ -65,13 +107,16 @@ export function seedDevToken(pathname = '') {
   if (!import.meta.env.DEV) return false;
 
   const esChofer = pathname.startsWith('/chofer');
+
+  if (esChofer && readToken() && tokenSource() === 'manual') return false;
+
   const preset = esChofer
     ? import.meta.env.VITE_DEV_TOKEN_CHOFER
     : import.meta.env.VITE_DEV_TOKEN;
 
   if (!preset || readToken() === preset) return false;
 
-  saveToken(preset);
+  saveDevToken(preset);
   return true;
 }
 
