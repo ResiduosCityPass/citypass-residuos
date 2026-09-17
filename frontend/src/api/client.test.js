@@ -252,6 +252,20 @@ describe('cliente de la API', () => {
     });
 
     /**
+     * `/choferes` es el ABM del operador y empieza con `/chofer`. Con un
+     * `startsWith` a secas quedaba con el token de CHOFER y la pantalla entera
+     * de CU-09 respondia 403, con cara de problema de permisos del backend.
+     * No lo vio ningun test porque ninguno pasaba por ese pathname.
+     */
+    it('usa el token de admin en /choferes, que es el ABM del operador', () => {
+      vi.stubEnv('VITE_DEV_TOKEN', 'jwt.de.admin');
+      vi.stubEnv('VITE_DEV_TOKEN_CHOFER', 'jwt.de.chofer');
+
+      expect(seedDevToken('/choferes')).toBe(true);
+      expect(readToken()).toBe('jwt.de.admin');
+    });
+
+    /**
      * El caso que rompia la app: quedaba pegado el token de chofer y todas las
      * demas pantallas devolvian 401 hasta borrarlo a mano. En desarrollo el
      * token es andamiaje, no una eleccion del usuario, asi que se pisa.

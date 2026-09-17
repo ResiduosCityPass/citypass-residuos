@@ -6,6 +6,7 @@
  *  2. Normalizar los errores para que el resto de la app ramifique por `code`
  *     y nunca por el texto de `message` (que esta en castellano y puede cambiar).
  */
+import { matchesPath } from '../domain/paths.js';
 
 function trimRightSlash(value) {
   return String(value ?? '').replace(/\/+$/, '');
@@ -153,7 +154,9 @@ export const clearToken = () => {
 export function seedDevToken(pathname = '') {
   if (!import.meta.env.DEV) return false;
 
-  const esChofer = pathname.startsWith('/chofer');
+  // Por segmento, no por texto: `/choferes` (el ABM del operador) empieza con
+  // `/chofer` y quedaba con el token de CHOFER, o sea 403 en toda la pantalla.
+  const esChofer = matchesPath(pathname, '/chofer');
 
   if (esChofer && readToken() && tokenSource() === 'manual') return false;
 
