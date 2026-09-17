@@ -18,8 +18,9 @@ Para el contrato de la API endpoint por endpoint, con capturas reales de cada re
   string libre sin validar y pasó a ser una entidad de este módulo, con ABM y credencial propia.
   Está en [ADR-009](docs/adr/ADR-009-identidad-de-los-choferes.md) y es el cambio más grande desde
   la versión anterior de este documento.
-- **No queda ningún pull request abierto.** Lo que falta es el merge de `develop` a `main` para
-  que lo desplegado sea lo que se demuestra, y tres pedidos de contrato menores.
+- **No quedan pull requests pendientes de integrar en `develop`.** Lo que falta es el merge de
+  `develop` a `main` para que lo desplegado sea lo que se demuestra, y tres pedidos de contrato
+  menores.
 - El ciclo completo está verificado: contenedor satura → se genera la alerta → se arma la ruta →
   se asigna al chofer → el chofer confirma → el contenedor vuelve a verde, la alerta se cierra y
   el camión queda libre.
@@ -29,8 +30,8 @@ Para el contrato de la API endpoint por endpoint, con capturas reales de cada re
 | Casos de uso | 12 de 12 implementados |
 | Pantallas | 10 (8 del operador + 2 de otros actores) |
 | Desplegado | Frontend y API en Render, **corriendo `main`, que está atrás de `develop`** |
-| Tests del frontend | 177, en verde |
-| Cobertura del frontend | 81,79% de líneas · el umbral de la cátedra es 60% |
+| Tests del frontend | Se ejecutan en CI y antes de la demo |
+| Cobertura del frontend | Umbral de líneas: 60%, forzado en CI |
 | CI | lint, build y tests de backend **y** frontend |
 
 ---
@@ -96,8 +97,8 @@ build de producción.
 | `/rutas/:id` | Detalle de la ruta | CU-08 + CU-09 |
 | `/choferes` | Choferes | CU-09 |
 
-> La pantalla de `/choferes` **todavía no está en `develop`**: llega con el PR #18. El backend que
-> consume sí está mergeado, así que el endpoint responde aunque la pantalla no exista.
+> La pantalla de `/choferes` **está en `develop`**, junto con el backend que consume. Llegará a
+> Render cuando se promueva `develop` a `main`.
 
 Y dos que corren **fuera del Shell**, porque no son del operador:
 
@@ -382,7 +383,7 @@ para asignar el chofer.
 
 ## CU-09 · Choferes: alta, baja y credencial
 
-**Actor:** Administrador · **Pantalla:** `/choferes` (llega con el PR #18)
+**Actor:** Administrador · **Pantalla:** `/choferes` (en `develop`)
 
 **Dónde vive:** [`backend/src/modules/choferes/`](backend/src/modules/choferes/)
 
@@ -666,12 +667,12 @@ Están decididos y documentados en [ADR-004](docs/adr/ADR-004-alcance-y-recortes
 
 # Tests del frontend
 
-**177 tests en 25 archivos, todos en verde.** Cobertura de líneas 81,79%, contra un umbral
-configurado de 60% en `vite.config.js` (dimensión 6 de la rúbrica). El CI corre lint, build y
-cobertura de backend y frontend en cada push.
+Los tests y la cobertura se ejecutan en cada push. El umbral de cobertura de líneas es 60%, está
+configurado en `vite.config.js` y el CI lo fuerza para backend y frontend. Recontá las métricas
+antes de la demo: cambian con cada PR.
 
 ```bash
-cd frontend && npm test          # los 177
+cd frontend && npm test
 cd frontend && npm run cobertura # con reporte de cobertura
 ```
 
