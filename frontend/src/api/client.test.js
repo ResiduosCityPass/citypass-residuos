@@ -45,6 +45,26 @@ describe('cliente de la API', () => {
     expect(localStorage.getItem('citypass.token.origen')).toBeNull();
   });
 
+  /**
+   * CU-10. La credencial no se puede volver a consultar y emitir otra invalida
+   * la anterior, asi que si un refresh la perdiera, el chofer que recarga su
+   * celular obliga a emitirle una nueva. Vive en `sessionStorage`: sobrevive al
+   * refresh y muere con la pestaña.
+   */
+  it('la credencial pegada a mano sobrevive a una recarga de la pagina', async () => {
+    saveToken('credencial-de-juana');
+    expect(sessionStorage.getItem('citypass.token')).toBeTruthy();
+
+    // Lo que hace un F5: el modulo se evalua de nuevo, la variable en memoria
+    // arranca vacia y lo unico que queda es el storage.
+    vi.resetModules();
+    const recargado = await import('./client.js');
+
+    expect(recargado.readToken()).toBe('credencial-de-juana');
+    expect(recargado.tokenSource()).toBe('manual');
+    expect(localStorage.getItem('citypass.token')).toBeNull();
+  });
+
   it('no manda el header si no hay token', async () => {
     const fetchMock = respond([]);
 

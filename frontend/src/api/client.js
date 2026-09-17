@@ -33,35 +33,63 @@ const BASE_URL = buildBaseUrl();
 const TOKEN_KEY = 'citypass.token';
 
 /**
- * El token que pega una persona se mantiene solamente en memoria. Los tokens
- * de desarrollo, en cambio, se pueden guardar para no pedirlos en cada carga.
+ * La credencial que pega una persona vive en `sessionStorage`; los tokens de
+ * desarrollo, en `localStorage`.
  *
  * Existe por un solo caso, el de CU-10: el chofer pega su credencial en el
  * celular y `seedDevToken` la pisaba en el render siguiente. Una credencial
- * manual tampoco debe llegar a `localStorage`: puede venir de un input y la
- * app la tratara como dato no confiable hasta que la API la valide.
+ * manual tampoco debe quedar en `localStorage`: viene de un input y sobrevivir
+ * al navegador cerrado es exactamente lo que no queremos de ella.
+ *
+ * `sessionStorage` es el punto justo entre las dos cosas: muere con la pestaña,
+ * pero AGUANTA UN REFRESH. Con la credencial solo en memoria, que el chofer
+ * recargue la pantalla obligaba a emitirle otra —no se puede volver a consultar
+ * la que se emitio—, y emitir invalida la anterior.
+ *
+ * Puede no estar (modo privado, storage bloqueado): por eso `manualToken` sigue
+ * siendo el espejo en memoria y cada acceso va envuelto. Sin storage la app
+ * funciona igual, solo que la credencial no sobrevive al refresh.
  */
 const TOKEN_SOURCE_KEY = 'citypass.token.origen';
 let manualToken = '';
 
-export const readToken = () => manualToken || localStorage.getItem(TOKEN_KEY) || '';
-export const tokenSource = () => (manualToken ? 'manual' : localStorage.getItem(TOKEN_SOURCE_KEY));
+const readManual = () => {
+  if (manualToken) return manualToken;
+  try {
+    return sessionStorage.getItem(TOKEN_KEY) ?? '';
+  } catch {
+    return '';
+  }
+};
 
-/** Guarda una credencial pegada por una persona solo mientras vive la SPA. */
+const writeManual = (token) => {
+  manualToken = token;
+  try {
+    if (token) sessionStorage.setItem(TOKEN_KEY, token);
+    else sessionStorage.removeItem(TOKEN_KEY);
+  } catch {
+    // Sin sessionStorage queda el espejo en memoria, que es como venia andando.
+  }
+};
+
+export const readToken = () => readManual() || localStorage.getItem(TOKEN_KEY) || '';
+export const tokenSource = () => (readManual() ? 'manual' : localStorage.getItem(TOKEN_SOURCE_KEY));
+
+/** Guarda una credencial pegada por una persona mientras viva esta pestaña. */
 export const saveToken = (token) => {
-  manualToken = token.trim();
+  writeManual(token.trim());
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(TOKEN_SOURCE_KEY);
 };
 
 function saveDevToken(token) {
-  manualToken = '';
+  writeManual('');
   localStorage.setItem(TOKEN_KEY, token);
   localStorage.setItem(TOKEN_SOURCE_KEY, 'dev');
 };
 
 export const clearToken = () => {
-  manualToken = '';
+  writeManual('');
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(TOKEN_SOURCE_KEY);
 };
