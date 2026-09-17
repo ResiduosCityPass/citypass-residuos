@@ -122,6 +122,53 @@ export const updateTruck = (id, changes) => api.patch(`/camiones/${id}`, changes
  */
 export const fetchDrivers = (filters) => api.get('/choferes', filters);
 
+/**
+ * Rol ADMINISTRADOR. `{ nombre, legajo }`. Falla con 409 CHOFER_LEGAJO_DUPLICADO,
+ * y el unico cuenta TAMBIEN a los dados de baja.
+ */
+export const createDriver = (data) => api.post('/choferes', data);
+
+/** Rol ADMINISTRADOR. Mismos campos que el alta. `activo` no esta: por aca no se reactiva. */
+export const updateDriver = (id, changes) => api.patch(`/choferes/${id}`, changes);
+
+/**
+ * Rol ADMINISTRADOR. Baja logica, 204. Es tambien la revocacion: pierde el
+ * acceso en el acto.
+ *
+ * Falla con 409 CHOFER_CON_RUTA_ACTIVA si tiene una ruta ASIGNADA o EN_CURSO, y
+ * no es una formalidad: sin acceso no puede cerrar sus paradas, la ruta solo
+ * cierra cuando no le queda ninguna pendiente y el camion solo se libera cuando
+ * la ruta cierra, asi que la baja dejaba el camion EN_RUTA para siempre. El
+ * `message` dice en que estado esta la ruta, para poder decir que falta hacer.
+ */
+export const deleteDriver = (id) => api.delete(`/choferes/${id}`);
+
+/**
+ * Rol ADMINISTRADOR. Deshace la baja y devuelve el chofer.
+ *
+ * Sin esto un clic equivocado era permanente: el chofer no volvia y, como el
+ * legajo es unico y cuenta tambien a los dados de baja, tampoco se lo podia dar
+ * de alta de nuevo.
+ *
+ * La baja no toca el `usuarioSub`: lo que corta el acceso es `activo`, porque el
+ * backend busca al chofer con `{ usuarioSub, activo: true }`. Asi que reactivar
+ * le devuelve el acceso CON LA MISMA CREDENCIAL que ya tenia, sin emitir otra.
+ */
+export const reactivateDriver = (id) => api.patch(`/choferes/${id}/reactivar`);
+
+/**
+ * Rol ADMINISTRADOR. Sin cuerpo. Devuelve `{ choferId, nombre, legajo, token,
+ * expiraEn, advertencia }` y el `token` viaja UNA SOLA VEZ, como la API key del
+ * sensor.
+ *
+ * ROTA el `usuarioSub` del chofer, y eso es lo que mata la credencial anterior.
+ * Efecto lateral en desarrollo: si se emite para Juana (`dev-chofer`), el token
+ * de `npm run token:dev -- CHOFER` deja de servir para ella.
+ *
+ * Errores: 404 CHOFER_NO_ENCONTRADO, 409 CHOFER_INACTIVO.
+ */
+export const issueDriverCredential = (id) => api.post(`/choferes/${id}/credencial`);
+
 /* --- CU-08 / CU-09 · Rutas ---------------------------------------------- */
 
 export const fetchRoutes = (filters) => api.get('/rutas', filters);

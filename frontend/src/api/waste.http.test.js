@@ -5,6 +5,10 @@ import {
   fetchMapContainers,
   deleteZone,
   fetchDrivers,
+  createDriver,
+  updateDriver,
+  deleteDriver,
+  issueDriverCredential,
   assignRoute,
   fetchMyRoute,
   confirmStop,
@@ -20,7 +24,7 @@ import { saveToken } from './client.js';
  */
 describe('rutas contra la API real', () => {
   beforeEach(() => {
-    saveToken('un-jwt');
+    saveToken('un.jwt.valido');
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({}) }),
@@ -62,7 +66,7 @@ describe('rutas contra la API real', () => {
   it('manda el token en el header de autorizacion', async () => {
     await fetchMapContainers();
 
-    expect(calledOptions().headers.Authorization).toBe('Bearer un-jwt');
+    expect(calledOptions().headers.Authorization).toBe('Bearer un.jwt.valido');
   });
 
   /* --- CU-09 ------------------------------------------------------------ */
@@ -77,6 +81,39 @@ describe('rutas contra la API real', () => {
 
     expect(calledPath()).toMatch(/\/choferes$/);
     expect(calledPath()).not.toContain('incluirInactivos');
+  });
+
+  it('el alta de chofer manda nombre y legajo por POST', async () => {
+    await createDriver({ nombre: 'Ana Ruiz', legajo: 'CH-010' });
+
+    expect(calledPath()).toMatch(/\/choferes$/);
+    expect(calledOptions().method).toBe('POST');
+    expect(calledOptions().body).toBe('{"nombre":"Ana Ruiz","legajo":"CH-010"}');
+  });
+
+  it('editar un chofer usa PATCH sobre su id', async () => {
+    await updateDriver('ch-1', { nombre: 'Ana Ruiz' });
+
+    expect(calledPath()).toMatch(/\/choferes\/ch-1$/);
+    expect(calledOptions().method).toBe('PATCH');
+  });
+
+  it('la baja de chofer usa DELETE', async () => {
+    await deleteDriver('ch-1');
+
+    expect(calledPath()).toMatch(/\/choferes\/ch-1$/);
+    expect(calledOptions().method).toBe('DELETE');
+  });
+
+  /**
+   * Es un POST sin cuerpo sobre un subrecurso, no un PATCH del chofer: emitir
+   * no edita nada que se pueda mandar, genera algo que se devuelve una vez.
+   */
+  it('emitir la credencial es un POST al subrecurso del chofer', async () => {
+    await issueDriverCredential('ch-1');
+
+    expect(calledPath()).toMatch(/\/choferes\/ch-1\/credencial$/);
+    expect(calledOptions().method).toBe('POST');
   });
 
   /**

@@ -3,6 +3,7 @@ import Modal from '../ui/Modal.jsx';
 import Field from '../ui/Field.jsx';
 import Button from '../ui/Button.jsx';
 import Notice from '../ui/Notice.jsx';
+import OneTimeSecretModal from '../ui/OneTimeSecretModal.jsx';
 import { linkSensor } from '../../api/waste.js';
 import { generalMessage } from '../../domain/errors.js';
 
@@ -15,19 +16,14 @@ import { generalMessage } from '../../domain/errors.js';
  * existe en ningun lado. Si el usuario cierra este modal sin copiarla, la unica
  * salida es desvincular el sensor y volver a vincularlo.
  *
- * De ahi las tres decisiones de esta pantalla, que no son adorno:
- *   - la clave se muestra en un bloque grande y monoespaciado, no en una fila
- *     de tabla ni en un toast que se va solo;
- *   - hay un boton de copiar, porque seleccionar 48 caracteres a mano se hace
- *     mal una de cada tres veces;
- *   - el modal no se cierra hasta que la persona confirma que la guardo. Es la
- *     unica friccion deliberada de toda la aplicacion.
+ * La clave se muestra con OneTimeSecretModal, que es donde viven las tres
+ * decisiones que no son adorno: bloque monoespaciado, boton de copiar, y que no
+ * se cierre hasta confirmar que se guardo. Lo comparte con la credencial del
+ * chofer, que tiene el mismo problema.
  */
 export default function LinkSensorModal({ container, onDone, onClose }) {
   const [code, setCode] = useState('');
   const [credential, setCredential] = useState(null);
-  const [confirmedSaved, setConfirmedSaved] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [error, setError] = useState(null);
   const [sending, setSending] = useState(false);
 
@@ -44,16 +40,6 @@ export default function LinkSensorModal({ container, onDone, onClose }) {
     }
   };
 
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(credential.apiKey);
-      setCopied(true);
-    } catch {
-      // Sin permiso de portapapeles (o sin HTTPS) queda seleccionarla a mano.
-      setCopied(false);
-    }
-  };
-
   const closeForGood = () => {
     onDone();
     onClose();
@@ -62,34 +48,20 @@ export default function LinkSensorModal({ container, onDone, onClose }) {
   /* --- Paso 2: la clave, una sola vez -------------------------------------- */
   if (credential) {
     return (
-      <Modal
+      <OneTimeSecretModal
         title={`Sensor ${credential.codigo} vinculado`}
-        width={560}
-        closable={false}
-        onClose={closeForGood}
-        footer={
-          <Button
-            variant="primary"
-            onClick={closeForGood}
-            disabled={!confirmedSaved}
-            disabledReason="Confirmá que guardaste la API key antes de cerrar"
-          >
-            Ya la guardé, cerrar
-          </Button>
+        secret={credential.apiKey}
+        warningTitle="Esta clave se muestra una sola vez"
+        warning={
+          <>
+            El backend guarda únicamente su hash. Si cerrás sin copiarla, la única salida es
+            desvincular el sensor y volver a vincularlo. Tratala como una clave de AWS.
+          </>
         }
+        confirmLabel="Guardé la API key en un lugar seguro"
+        closeReason="Confirmá que guardaste la API key antes de cerrar"
+        onClose={closeForGood}
       >
-        <Notice type="warning" title="Esta clave se muestra una sola vez">
-          El backend guarda únicamente su hash. Si cerrás sin copiarla, la única salida es
-          desvincular el sensor y volver a vincularlo. Tratala como una clave de AWS.
-        </Notice>
-
-        <div className="key-box">
-          <code className="mono key-value">{credential.apiKey}</code>
-          <Button variant={copied ? 'success' : 'secondary'} onClick={copy}>
-            {copied ? '✓ Copiada' : 'Copiar'}
-          </Button>
-        </div>
-
         <dl className="data-list">
           <dt>Sensor</dt>
           <dd className="mono">{credential.codigo}</dd>
@@ -102,16 +74,7 @@ export default function LinkSensorModal({ container, onDone, onClose }) {
             dispositivo, no una persona con sesión.
           </dd>
         </dl>
-
-        <label className="confirm-check">
-          <input
-            type="checkbox"
-            checked={confirmedSaved}
-            onChange={(e) => setConfirmedSaved(e.target.checked)}
-          />
-          <span>Guardé la API key en un lugar seguro</span>
-        </label>
-      </Modal>
+      </OneTimeSecretModal>
     );
   }
 

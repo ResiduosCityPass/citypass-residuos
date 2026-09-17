@@ -47,6 +47,11 @@ export const updateTruck = (...args) => source.updateTruck(...args);
 
 /* CU-09 · Choferes */
 export const fetchDrivers = (...args) => source.fetchDrivers(...args);
+export const createDriver = (...args) => source.createDriver(...args);
+export const updateDriver = (...args) => source.updateDriver(...args);
+export const deleteDriver = (...args) => source.deleteDriver(...args);
+export const reactivateDriver = (...args) => source.reactivateDriver(...args);
+export const issueDriverCredential = (...args) => source.issueDriverCredential(...args);
 
 /* CU-08 / CU-09 · Rutas */
 export const fetchRoutes = (...args) => source.fetchRoutes(...args);

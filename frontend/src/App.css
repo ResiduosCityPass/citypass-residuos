@@ -187,8 +187,11 @@ body.no-scroll { overflow: hidden; }
 }
 
 .topbar-token { flex-basis: 100%; padding-top: var(--space-2); }
-.token-bar { display: flex; gap: var(--space-2); }
+.token-bar { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 .token-bar input { max-width: 380px; }
+.token-bar input[aria-invalid] { border-color: var(--red); }
+/* El aviso ocupa toda la fila para quedar debajo del campo y no entre botones. */
+.token-bar-error { flex: 1 1 100%; margin: 0; color: var(--red); font-size: 0.85rem; }
 .token-bar button {
   font: inherit;
   padding: 0.5rem 0.9rem;
@@ -295,6 +298,14 @@ body.no-scroll { overflow: hidden; }
 .filter-bar select { width: auto; min-width: 165px; }
 .filter-bar-right { margin-left: auto; display: flex; gap: var(--space-2); }
 .filter-bar-note { margin-left: auto; }
+.filter-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+.filter-check input { width: auto; }
 
 /* --- Mapa --------------------------------------------------------------- */
 .map-and-panel { display: flex; gap: var(--space-3); flex: 1; min-height: 340px; }

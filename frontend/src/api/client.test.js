@@ -29,20 +29,40 @@ describe('cliente de la API', () => {
 
   it('manda el token en el header Authorization cuando hay uno guardado', async () => {
     const fetchMock = respond([]);
-    saveToken('un-jwt');
+    saveToken('un.jwt.valido');
 
     await api.get('/mapa/contenedores');
 
     const [, options] = fetchMock.mock.calls[0];
-    expect(options.headers.Authorization).toBe('Bearer un-jwt');
+    expect(options.headers.Authorization).toBe('Bearer un.jwt.valido');
   });
 
   it('no persiste en el navegador una credencial pegada manualmente', () => {
-    saveToken('credencial-de-juana');
+    saveToken('jwt.de.juana');
 
-    expect(readToken()).toBe('credencial-de-juana');
+    expect(readToken()).toBe('jwt.de.juana');
     expect(localStorage.getItem('citypass.token')).toBeNull();
     expect(localStorage.getItem('citypass.token.origen')).toBeNull();
+  });
+
+  /**
+   * CU-10. La credencial no se puede volver a consultar y emitir otra invalida
+   * la anterior, asi que si un refresh la perdiera, el chofer que recarga su
+   * celular obliga a emitirle una nueva. Vive en `sessionStorage`: sobrevive al
+   * refresh y muere con la pestaña.
+   */
+  it('la credencial pegada a mano sobrevive a una recarga de la pagina', async () => {
+    saveToken('jwt.de.juana');
+    expect(sessionStorage.getItem('citypass.token')).toBeTruthy();
+
+    // Lo que hace un F5: el modulo se evalua de nuevo, la variable en memoria
+    // arranca vacia y lo unico que queda es el storage.
+    vi.resetModules();
+    const recargado = await import('./client.js');
+
+    expect(recargado.readToken()).toBe('jwt.de.juana');
+    expect(recargado.tokenSource()).toBe('manual');
+    expect(localStorage.getItem('citypass.token')).toBeNull();
   });
 
   it('no manda el header si no hay token', async () => {
@@ -125,7 +145,7 @@ describe('cliente de la API', () => {
    */
   it('apiPublic no manda Authorization aunque haya un token guardado', async () => {
     const fetchMock = respond([]);
-    saveToken('un-jwt');
+    saveToken('un.jwt.valido');
 
     await apiPublic.get('/publico/contenedores/cercanos', { lat: -34.6, lng: -58.38 });
 
@@ -161,19 +181,19 @@ describe('cliente de la API', () => {
     });
 
     it('siembra el token cuando no hay ninguno guardado', () => {
-      vi.stubEnv('VITE_DEV_TOKEN', 'jwt-admin');
+      vi.stubEnv('VITE_DEV_TOKEN', 'jwt.de.admin');
 
       expect(seedDevToken('/mapa')).toBe(true);
-      expect(readToken()).toBe('jwt-admin');
+      expect(readToken()).toBe('jwt.de.admin');
     });
 
     /** La pantalla del chofer exige rol CHOFER: el token de admin ahi da 403. */
     it('usa el token de chofer en /chofer', () => {
-      vi.stubEnv('VITE_DEV_TOKEN', 'jwt-admin');
-      vi.stubEnv('VITE_DEV_TOKEN_CHOFER', 'jwt-chofer');
+      vi.stubEnv('VITE_DEV_TOKEN', 'jwt.de.admin');
+      vi.stubEnv('VITE_DEV_TOKEN_CHOFER', 'jwt.de.chofer');
 
       expect(seedDevToken('/chofer')).toBe(true);
-      expect(readToken()).toBe('jwt-chofer');
+      expect(readToken()).toBe('jwt.de.chofer');
     });
 
     /**
@@ -182,21 +202,21 @@ describe('cliente de la API', () => {
      * token es andamiaje, no una eleccion del usuario, asi que se pisa.
      */
     it('pisa un token que no corresponde a la pantalla', () => {
-      vi.stubEnv('VITE_DEV_TOKEN', 'jwt-admin');
-      vi.stubEnv('VITE_DEV_TOKEN_CHOFER', 'jwt-chofer');
-      saveToken('jwt-chofer');
+      vi.stubEnv('VITE_DEV_TOKEN', 'jwt.de.admin');
+      vi.stubEnv('VITE_DEV_TOKEN_CHOFER', 'jwt.de.chofer');
+      saveToken('jwt.de.chofer');
 
       expect(seedDevToken('/mapa')).toBe(true);
-      expect(readToken()).toBe('jwt-admin');
+      expect(readToken()).toBe('jwt.de.admin');
     });
 
     /** Si ya es el que corresponde, no reescribe ni avisa que cambio nada. */
     it('no hace nada si el token ya es el correcto', () => {
-      vi.stubEnv('VITE_DEV_TOKEN', 'jwt-admin');
-      saveToken('jwt-admin');
+      vi.stubEnv('VITE_DEV_TOKEN', 'jwt.de.admin');
+      saveToken('jwt.de.admin');
 
       expect(seedDevToken('/mapa')).toBe(false);
-      expect(readToken()).toBe('jwt-admin');
+      expect(readToken()).toBe('jwt.de.admin');
     });
 
     /**
@@ -206,20 +226,20 @@ describe('cliente de la API', () => {
      * que pisarla obligaba a que se la emitieran de nuevo.
      */
     it('respeta en /chofer una credencial pegada a mano', () => {
-      vi.stubEnv('VITE_DEV_TOKEN_CHOFER', 'jwt-chofer');
-      saveToken('credencial-de-juana');
+      vi.stubEnv('VITE_DEV_TOKEN_CHOFER', 'jwt.de.chofer');
+      saveToken('jwt.de.juana');
 
       expect(seedDevToken('/chofer')).toBe(false);
-      expect(readToken()).toBe('credencial-de-juana');
+      expect(readToken()).toBe('jwt.de.juana');
     });
 
     /** Pero solo en /chofer: en el resto sigue siendo andamiaje que se pisa. */
     it('el resto del modulo pisa igual una credencial pegada a mano', () => {
-      vi.stubEnv('VITE_DEV_TOKEN', 'jwt-admin');
-      saveToken('credencial-de-juana');
+      vi.stubEnv('VITE_DEV_TOKEN', 'jwt.de.admin');
+      saveToken('jwt.de.juana');
 
       expect(seedDevToken('/mapa')).toBe(true);
-      expect(readToken()).toBe('jwt-admin');
+      expect(readToken()).toBe('jwt.de.admin');
     });
 
     /** Lo que siembra el andamiaje no es una credencial, y se pisa a si mismo. */
@@ -246,7 +266,7 @@ describe('cliente de la API', () => {
      */
     it('no siembra nada fuera de desarrollo', () => {
       vi.stubEnv('DEV', false);
-      vi.stubEnv('VITE_DEV_TOKEN', 'jwt-admin');
+      vi.stubEnv('VITE_DEV_TOKEN', 'jwt.de.admin');
 
       expect(seedDevToken('/mapa')).toBe(false);
       expect(readToken()).toBe('');
