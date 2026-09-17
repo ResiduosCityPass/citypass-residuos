@@ -6,7 +6,13 @@ import Notice from '../components/ui/Notice.jsx';
 import DriverFormModal from '../components/drivers/DriverFormModal.jsx';
 import DeleteDriverModal from '../components/drivers/DeleteDriverModal.jsx';
 import IssueCredentialModal from '../components/drivers/IssueCredentialModal.jsx';
-import { fetchDrivers, createDriver, updateDriver, deleteDriver } from '../api/waste.js';
+import {
+  fetchDrivers,
+  createDriver,
+  updateDriver,
+  deleteDriver,
+  reactivateDriver,
+} from '../api/waste.js';
 import { generalMessage } from '../domain/errors.js';
 
 /**
@@ -33,6 +39,7 @@ export default function DriversPage() {
   const [success, setSuccess] = useState(null);
   const [dialog, setDialog] = useState(null);
   const [showInactive, setShowInactive] = useState(false);
+  const [reactivating, setReactivating] = useState(null);
 
   const load = useCallback(() => {
     // Los dados de baja se piden a proposito y solo desde aca: el default del
@@ -55,6 +62,31 @@ export default function DriversPage() {
     load();
   };
 
+  /**
+   * Reactivar no pregunta nada: es la accion que DESHACE, y ponerle un modal de
+   * confirmacion al arrepentimiento es al reves de lo que hace falta. Como la
+   * baja no toca el `usuarioSub`, el chofer vuelve con la credencial que tenia,
+   * y por eso el mensaje distingue entre el que tiene acceso y el que no lo
+   * tuvo nunca: en el segundo caso todavia falta emitirle una.
+   */
+  const reactivate = async (driver) => {
+    setReactivating(driver.id);
+    setError(null);
+    try {
+      const back = await reactivateDriver(driver.id);
+      setSuccess(
+        back.usuarioSub
+          ? `${back.nombre} vuelve a estar activo, con la credencial que ya tenía.`
+          : `${back.nombre} vuelve a estar activo. Todavía no tiene acceso: emitile una credencial.`,
+      );
+      load();
+    } catch (e) {
+      setError(e);
+    } finally {
+      setReactivating(null);
+    }
+  };
+
   const columns = [
     { key: 'nombre', title: 'Nombre', render: (d) => <strong>{d.nombre}</strong> },
     { key: 'legajo', title: 'Legajo', render: (d) => <span className="mono">{d.legajo}</span> },
@@ -75,10 +107,11 @@ export default function DriversPage() {
     {
       key: 'acciones',
       title: '',
-      // Un dado de baja no tiene acciones: el backend rechaza emitirle una
-      // credencial y el contrato no tiene reactivacion.
+      // Un dado de baja tiene una sola accion: volver. Editarlo o emitirle una
+      // credencial no se ofrece porque el backend responde 409 CHOFER_INACTIVO,
+      // y reactivar es justamente el paso previo a las dos cosas.
       render: (d) =>
-        d.activo && (
+        d.activo ? (
           <div className="actions-cell">
             <Button variant="secondary" size="sm" onClick={() => setDialog({ type: 'credential', driver: d })}>
               Emitir credencial
@@ -88,6 +121,17 @@ export default function DriversPage() {
             </Button>
             <Button variant="secondary" size="sm" onClick={() => setDialog({ type: 'delete', driver: d })}>
               Dar de baja
+            </Button>
+          </div>
+        ) : (
+          <div className="actions-cell">
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={reactivating === d.id}
+              onClick={() => reactivate(d)}
+            >
+              {reactivating === d.id ? 'Reactivando…' : 'Reactivar'}
             </Button>
           </div>
         ),
@@ -160,7 +204,10 @@ export default function DriversPage() {
           onClose={closeDialog}
           onConfirm={async () => {
             await deleteDriver(dialog.driver.id);
-            afterSave(`${dialog.driver.nombre} dado de baja. Ya no recibe rutas ni entra a su pantalla.`);
+            afterSave(
+              `${dialog.driver.nombre} dado de baja. Ya no recibe rutas ni entra a su pantalla. ` +
+                'Si fue un error, aparece en "Mostrar dados de baja" con el botón de reactivar.',
+            );
           }}
         />
       )}

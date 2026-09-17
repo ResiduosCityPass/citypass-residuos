@@ -7,6 +7,7 @@ import {
   createDriver,
   updateDriver,
   deleteDriver,
+  reactivateDriver,
   issueDriverCredential,
   fetchRoutes,
 } from '../api/waste.js';
@@ -18,6 +19,7 @@ vi.mock('../api/waste.js', () => ({
   createDriver: vi.fn(),
   updateDriver: vi.fn(),
   deleteDriver: vi.fn(),
+  reactivateDriver: vi.fn(),
   issueDriverCredential: vi.fn(),
   fetchRoutes: vi.fn(),
 }));
@@ -72,7 +74,7 @@ describe('CU-09 · choferes', () => {
     expect(screen.queryByText('chofer_3f9a')).not.toBeInTheDocument();
   });
 
-  it('por defecto no pide los dados de baja, y tildando los pide sin ofrecerles acciones', async () => {
+  it('por defecto no pide los dados de baja, y tildando los ofrece reactivar y nada mas', async () => {
     const user = userEvent.setup();
     render(<DriversPage />);
 
@@ -88,8 +90,84 @@ describe('CU-09 · choferes', () => {
     await waitFor(() => expect(fetchDrivers).toHaveBeenLastCalledWith({ incluirInactivos: true }));
     expect(await screen.findByText('Hector Villalba')).toBeInTheDocument();
     expect(rowFor('Hector Villalba').getByText('Dado de baja')).toBeInTheDocument();
-    // El backend le rechaza la credencial y no hay reactivacion.
-    expect(rowFor('Hector Villalba').queryByRole('button')).not.toBeInTheDocument();
+    // Editar o emitirle la credencial le sacaria un 409 CHOFER_INACTIVO: la
+    // unica accion que tiene sentido ofrecerle es volver.
+    const acciones = rowFor('Hector Villalba').getAllByRole('button');
+    expect(acciones).toHaveLength(1);
+    expect(acciones[0]).toHaveAccessibleName('Reactivar');
+  });
+
+  /**
+   * Deshacer la baja. Sin esto un clic equivocado era permanente: el chofer no
+   * volvia y, como el legajo cuenta tambien a los dados de baja, tampoco se lo
+   * podia dar de alta de nuevo.
+   */
+  it('reactivar deshace la baja y avisa que vuelve con la credencial que tenia', async () => {
+    const user = userEvent.setup();
+    const hector = driver({
+      id: 'd7b3e5c1-9a24-4f60-8d19-3e0c6b8a2f55',
+      nombre: 'Hector Villalba',
+      legajo: 'CH-004',
+      usuarioSub: 'chofer_a10b',
+      activo: false,
+    });
+    fetchDrivers.mockResolvedValue([driver(), hector]);
+    reactivateDriver.mockResolvedValue({ ...hector, activo: true });
+    render(<DriversPage />);
+
+    await user.click(await screen.findByLabelText('Mostrar dados de baja'));
+    await user.click(rowFor('Hector Villalba').getByRole('button', { name: 'Reactivar' }));
+
+    await waitFor(() => expect(reactivateDriver).toHaveBeenCalledWith(hector.id));
+    expect(
+      await screen.findByText(/Hector Villalba vuelve a estar activo, con la credencial que ya tenía/),
+    ).toBeInTheDocument();
+  });
+
+  /**
+   * La baja no toca el `usuarioSub`, asi que el que nunca tuvo credencial vuelve
+   * igual de mudo que antes: recibe rutas y no las ve. Decirlo es la razon de
+   * ser de la columna Acceso.
+   */
+  it('al reactivar a alguien sin credencial avisa que todavia no tiene acceso', async () => {
+    const user = userEvent.setup();
+    const sinAcceso = driver({
+      id: 'd7b3e5c1-9a24-4f60-8d19-3e0c6b8a2f55',
+      nombre: 'Hector Villalba',
+      legajo: 'CH-004',
+      usuarioSub: null,
+      activo: false,
+    });
+    fetchDrivers.mockResolvedValue([sinAcceso]);
+    reactivateDriver.mockResolvedValue({ ...sinAcceso, activo: true });
+    render(<DriversPage />);
+
+    await user.click(await screen.findByLabelText('Mostrar dados de baja'));
+    await user.click(rowFor('Hector Villalba').getByRole('button', { name: 'Reactivar' }));
+
+    expect(await screen.findByText(/Todavía no tiene acceso: emitile una credencial/)).toBeInTheDocument();
+  });
+
+  it('si reactivar falla muestra el error y no dice que volvio', async () => {
+    const user = userEvent.setup();
+    const hector = driver({
+      id: 'd7b3e5c1-9a24-4f60-8d19-3e0c6b8a2f55',
+      nombre: 'Hector Villalba',
+      legajo: 'CH-004',
+      activo: false,
+    });
+    fetchDrivers.mockResolvedValue([hector]);
+    reactivateDriver.mockRejectedValue(
+      new ApiError({ code: 'HTTP_403', status: 403, message: 'Requiere rol ADMINISTRADOR' }),
+    );
+    render(<DriversPage />);
+
+    await user.click(await screen.findByLabelText('Mostrar dados de baja'));
+    await user.click(rowFor('Hector Villalba').getByRole('button', { name: 'Reactivar' }));
+
+    expect(await screen.findByText('[HTTP_403]')).toBeInTheDocument();
+    expect(screen.queryByText(/vuelve a estar activo/)).not.toBeInTheDocument();
+    expect(rowFor('Hector Villalba').getByRole('button', { name: 'Reactivar' })).toBeEnabled();
   });
 
   /**
@@ -170,8 +248,10 @@ describe('CU-09 · choferes', () => {
   });
 
   /**
-   * El backend no frena la baja de alguien con una ruta viva, y la baja es la
-   * revocacion: deja de verla y no puede cerrar las paradas que le quedan.
+   * El backend rechaza esta baja con 409, pero el aviso previo se queda: es la
+   * diferencia entre saber por que no se puede antes de apretar y descubrirlo
+   * con un error. Tambien dice que se puede deshacer, que es lo que la volvio
+   * una decision reversible.
    */
   it('la baja avisa si el chofer tiene una ruta sin terminar', async () => {
     const user = userEvent.setup();
@@ -179,7 +259,6 @@ describe('CU-09 · choferes', () => {
       { id: 'rt-01', choferId: JUANA_ID, estado: 'EN_CURSO', camion: { patente: 'AB123CD' } },
       { id: 'rt-02', choferId: JUANA_ID, estado: 'COMPLETADA', camion: { patente: 'AC456EF' } },
     ]);
-    deleteDriver.mockResolvedValue(null);
     render(<DriversPage />);
 
     await screen.findByText('Juana Perez');
@@ -187,12 +266,37 @@ describe('CU-09 · choferes', () => {
 
     expect(await dialog().findByText('Tiene una ruta sin terminar')).toBeInTheDocument();
     expect(dialog().getByText('AB123CD')).toBeInTheDocument();
-    expect(dialog().getByText(/no tiene vuelta/)).toBeInTheDocument();
+    expect(dialog().getByText(/se puede deshacer/)).toBeInTheDocument();
+  });
 
+  /**
+   * El 409 que cierra el agujero del camion varado: sin acceso el chofer no
+   * puede cerrar sus paradas, la ruta no cierra hasta que no le quede ninguna
+   * pendiente y el camion no se libera hasta que la ruta cierre.
+   *
+   * Reintentar no puede funcionar hasta que la ruta cierre, asi que el boton se
+   * va: dejarlo es ofrecer el mismo error de nuevo.
+   */
+  it('el 409 de ruta activa dice que hay que cerrar la ruta y saca el boton de baja', async () => {
+    const user = userEvent.setup();
+    fetchRoutes.mockResolvedValue([]);
+    deleteDriver.mockRejectedValue(
+      new ApiError({
+        code: 'CHOFER_CON_RUTA_ACTIVA',
+        status: 409,
+        message: 'Juana Perez tiene una ruta en_curso. Hay que cerrarla antes de darlo de baja',
+      }),
+    );
+    render(<DriversPage />);
+
+    await screen.findByText('Juana Perez');
+    await user.click(rowFor('Juana Perez').getByRole('button', { name: 'Dar de baja' }));
     await user.click(dialog().getByRole('button', { name: 'Dar de baja' }));
 
-    await waitFor(() => expect(deleteDriver).toHaveBeenCalledWith(JUANA_ID));
-    expect(await screen.findByText(/Juana Perez dado de baja/)).toBeInTheDocument();
+    expect(await dialog().findByText('No se puede dar de baja todavía')).toBeInTheDocument();
+    expect(dialog().getByText(/Hay que cerrarla antes de darlo de baja/)).toBeInTheDocument();
+    expect(dialog().queryByRole('button', { name: 'Dar de baja' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/dado de baja\./)).not.toBeInTheDocument();
   });
 
   it('sin ruta viva la baja no muestra el aviso', async () => {

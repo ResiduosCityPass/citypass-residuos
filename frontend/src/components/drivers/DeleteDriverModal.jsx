@@ -11,14 +11,17 @@ import { ROUTE_STATE_LABEL, isRouteLive } from '../../domain/states.js';
  *
  * La baja es la forma de REVOCAR el acceso: sin login no hay sesion que cerrar,
  * asi que el backend deja de reconocer la credencial del chofer en el pedido
- * siguiente. Eso es lo que la vuelve delicada, por dos cosas que el backend no
- * frena y que por eso se avisan aca:
+ * siguiente —lo busca con `activo: true`—.
  *
- *  - Si tiene una ruta ASIGNADA o EN_CURSO, deja de verla y no puede cerrar las
- *    paradas que le quedan. El backend no lo impide.
- *  - No tiene vuelta: el contrato no tiene reactivacion, y el legajo queda
- *    tomado —el unico cuenta a los dados de baja—, asi que tampoco se lo puede
- *    volver a dar de alta con el mismo.
+ * Las dos cosas que la volvian delicada ya las cubre el backend, y aca cambian
+ * de lugar en vez de desaparecer:
+ *
+ *  - Ruta ASIGNADA o EN_CURSO: ahora la baja se rechaza con 409
+ *    CHOFER_CON_RUTA_ACTIVA. El aviso previo se queda igual, porque avisar
+ *    antes es mejor que chocar contra el error: el operador ve por que no va a
+ *    poder y que tiene que cerrar primero, sin apretar un boton que falla.
+ *  - Ya tiene vuelta: `PATCH /choferes/:id/reactivar` la deshace, y como la baja
+ *    no toca el `usuarioSub`, el chofer vuelve con la credencial que tenia.
  */
 export default function DeleteDriverModal({ driver, onConfirm, onClose }) {
   const [error, setError] = useState(null);
@@ -31,9 +34,9 @@ export default function DeleteDriverModal({ driver, onConfirm, onClose }) {
       .then((routes) => {
         if (current) setLiveRoute(routes.find((r) => r.choferId === driver.id && isRouteLive(r)) ?? null);
       })
-      // Es un aviso, no una condicion: si el listado falla la baja se puede
-      // hacer igual —el backend no la bloquea— y el modal no tiene por que
-      // trabarse por eso.
+      // Es un aviso, no la validacion: quien decide es el backend, que responde
+      // 409 CHOFER_CON_RUTA_ACTIVA. Si el listado falla, el modal no se traba
+      // por eso; como mucho el operador se entera al confirmar.
       .catch(() => {});
     return () => {
       current = false;
@@ -51,38 +54,53 @@ export default function DeleteDriverModal({ driver, onConfirm, onClose }) {
     }
   };
 
+  // El 409 de la ruta activa no es una falla que convenga reintentar: hasta que
+  // la ruta cierre, el boton solo puede volver a fallar.
+  const blocked = error?.code === 'CHOFER_CON_RUTA_ACTIVA';
+
   return (
     <Modal
       title={`Dar de baja a ${driver.nombre}`}
       onClose={onClose}
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>Cancelar</Button>
-          <Button variant="danger" onClick={confirm} disabled={sending}>
-            {sending ? 'Dando de baja…' : 'Dar de baja'}
-          </Button>
+          <Button variant="secondary" onClick={onClose}>{blocked ? 'Entendido' : 'Cancelar'}</Button>
+          {!blocked && (
+            <Button variant="danger" onClick={confirm} disabled={sending}>
+              {sending ? 'Dando de baja…' : 'Dar de baja'}
+            </Button>
+          )}
         </>
       }
     >
-      {error && <Notice type="error" title={`[${error.code}]`}>{generalMessage(error) ?? error.message}</Notice>}
+      {blocked ? (
+        <Notice type="error" title="No se puede dar de baja todavía">
+          {error.message} Cerrá o terminá esa ruta desde Rutas y volvé a intentarlo. Si lo diéramos
+          de baja ahora, no podría cerrar sus paradas y el camión quedaría en ruta para siempre.
+        </Notice>
+      ) : (
+        error && <Notice type="error" title={`[${error.code}]`}>{generalMessage(error) ?? error.message}</Notice>
+      )}
 
       <p>
         <strong>{driver.nombre}</strong> <span className="mono">({driver.legajo})</span> deja de
         aparecer al asignar rutas y pierde el acceso a su pantalla en el acto.
       </p>
 
-      {liveRoute && (
+      {liveRoute && !blocked && (
         <Notice type="warning" title="Tiene una ruta sin terminar">
           Está a cargo de la ruta del camión{' '}
           <span className="mono">{liveRoute.camion?.patente ?? '—'}</span>, que está{' '}
-          {ROUTE_STATE_LABEL[liveRoute.estado].toLowerCase()}. Si lo das de baja ahora, deja de
-          verla y no puede cerrar las paradas que le quedan.
+          {ROUTE_STATE_LABEL[liveRoute.estado].toLowerCase()}. El backend no va a dejar darlo de
+          baja hasta que esa ruta cierre: sin acceso no puede cerrar sus paradas y el camión
+          quedaría en ruta para siempre.
         </Notice>
       )}
 
-      <Notice type="info" title="Es una baja lógica, y no tiene vuelta">
+      <Notice type="info" title="Es una baja lógica, y se puede deshacer">
         Las rutas que ya hizo lo siguen nombrando: son el registro de quién ejecutó cada
-        recolección. No se puede reactivar, y su legajo queda tomado.
+        recolección. Su legajo queda tomado, y si te equivocaste podés reactivarlo desde el
+        listado: vuelve con la misma credencial, sin emitir otra.
       </Notice>
     </Modal>
   );

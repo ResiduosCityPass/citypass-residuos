@@ -529,18 +529,50 @@ export function updateDriver(id, changes = {}) {
 }
 
 /**
- * Baja logica. Es tambien la revocacion: el backend deja de encontrar al chofer
- * por su `usuarioSub` y la credencial muere en el pedido siguiente.
+ * Baja logica. Es tambien la revocacion: el backend busca al chofer con
+ * `{ usuarioSub, activo: true }`, asi que la credencial muere en el pedido
+ * siguiente sin que haya que tocarla.
  *
- * NO se niega si tiene una ruta viva, porque el backend tampoco. El aviso lo da
- * la pantalla.
+ * Se NIEGA si tiene una ruta ASIGNADA o EN_CURSO: sin acceso no puede cerrar
+ * sus paradas, la ruta no cierra hasta que no le quede ninguna pendiente y el
+ * camion no se libera hasta que la ruta cierre. El camion quedaba EN_RUTA para
+ * siempre. El mensaje lleva el estado de la ruta, igual que el del backend.
  */
 export function deleteDriver(id) {
   const driver = driverById(id);
   if (!driver) return driverNotFound(id);
+
+  const live = store.routes.find(
+    (r) => r.choferId === driver.id && ['ASIGNADA', 'EN_CURSO'].includes(r.estado),
+  );
+  if (live) {
+    return fail(
+      'CHOFER_CON_RUTA_ACTIVA',
+      409,
+      `${driver.nombre} tiene una ruta ${live.estado.toLowerCase()}. ` +
+        'Hay que cerrarla antes de darlo de baja',
+    );
+  }
+
   driver.activo = false;
   driver.actualizadoEn = now();
   return respond(null);
+}
+
+/**
+ * Deshace la baja.
+ *
+ * No toca el `usuarioSub` —la baja tampoco lo tocaba—, asi que el chofer vuelve
+ * con la credencial que ya tenia. Es lo que hace que la baja deje de ser un
+ * clic sin vuelta.
+ */
+export function reactivateDriver(id) {
+  const driver = driverById(id);
+  if (!driver) return driverNotFound(id);
+
+  driver.activo = true;
+  driver.actualizadoEn = now();
+  return respond(driver);
 }
 
 const randomHex = (length) =>
