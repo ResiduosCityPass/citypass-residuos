@@ -1,6 +1,6 @@
 # Módulo de Residuos — estado, casos de uso y pendientes
 
-Squad 4 · Actualizado al **2026-09-12**
+Squad 4 · Actualizado al **2026-09-17**
 
 Qué hace cada caso de uso, dónde vive en el código, qué reglas no se pueden pasar por alto, y qué
 falta. Es el único documento de estado del módulo.
@@ -18,7 +18,7 @@ Para el contrato de la API endpoint por endpoint, con capturas reales de cada re
   string libre sin validar y pasó a ser una entidad de este módulo, con ABM y credencial propia.
   Está en [ADR-009](docs/adr/ADR-009-identidad-de-los-choferes.md) y es el cambio más grande desde
   la versión anterior de este documento.
-- Lo que falta **no es código nuestro**: un pull request de frontend con conflictos, el merge de
+- **No quedan pull requests pendientes de integrar en `develop`.** Lo que falta es el merge de
   `develop` a `main` para que lo desplegado sea lo que se demuestra, y tres pedidos de contrato
   menores.
 - El ciclo completo está verificado: contenedor satura → se genera la alerta → se arma la ruta →
@@ -30,8 +30,8 @@ Para el contrato de la API endpoint por endpoint, con capturas reales de cada re
 | Casos de uso | 12 de 12 implementados |
 | Pantallas | 10 (8 del operador + 2 de otros actores) |
 | Desplegado | Frontend y API en Render, **corriendo `main`, que está atrás de `develop`** |
-| Tests del frontend | 177, en verde |
-| Cobertura del frontend | 81,79% de líneas · el umbral de la cátedra es 60% |
+| Tests del frontend | Se ejecutan en CI y antes de la demo |
+| Cobertura del frontend | Umbral de líneas: 60%, forzado en CI |
 | CI | lint, build y tests de backend **y** frontend |
 
 ---
@@ -97,8 +97,8 @@ build de producción.
 | `/rutas/:id` | Detalle de la ruta | CU-08 + CU-09 |
 | `/choferes` | Choferes | CU-09 |
 
-> La pantalla de `/choferes` **todavía no está en `develop`**: llega con el PR #18. El backend que
-> consume sí está mergeado, así que el endpoint responde aunque la pantalla no exista.
+> La pantalla de `/choferes` **está en `develop`**, junto con el backend que consume. Llegará a
+> Render cuando se promueva `develop` a `main`.
 
 Y dos que corren **fuera del Shell**, porque no son del operador:
 
@@ -383,7 +383,7 @@ para asignar el chofer.
 
 ## CU-09 · Choferes: alta, baja y credencial
 
-**Actor:** Administrador · **Pantalla:** `/choferes` (llega con el PR #18)
+**Actor:** Administrador · **Pantalla:** `/choferes` (en `develop`)
 
 **Dónde vive:** [`backend/src/modules/choferes/`](backend/src/modules/choferes/)
 
@@ -414,6 +414,12 @@ descartadas están en [ADR-009](docs/adr/ADR-009-identidad-de-los-choferes.md).
   estado a mano a un camión en ruta.
 - **La baja es lógica, nunca se borra.** Un chofer dado de baja sigue siendo el responsable de las
   rutas que ejecutó; borrarlo dejaría el historial sin dueño.
+- **La baja no toca el `usuarioSub`: lo que corta el acceso es `activo`.** El guard busca al chofer
+  por `usuarioSub` **y** `activo`, así que dar de baja lo deja afuera en el acto. Pero reactivarlo
+  le devuelve el acceso **con la misma credencial**, sin emitir otra — sirve para suspender a
+  alguien unos días. El reverso importa y es el que se presta a confusión: si una credencial se
+  filtró, **dar de baja y reactivar no la mata**. Para eso hay que emitir otra, que es lo único que
+  rota el `usuarioSub`.
 - **`usuarioSub` puede ser `null`.** Un chofer dado de alta al que todavía no le emitieron
   credencial existe y se le puede asignar una ruta, solo que no la ve.
 - **La credencial lleva `token_use: chofer-interno` y emisor propio** (`JWT_ISSUER_CHOFERES`), que
@@ -578,8 +584,15 @@ tiene que ser `develop`**, y **nadie mergea su propio PR**.
 
 ## 1. Lo desplegado no es lo que vamos a demostrar
 
-Render despliega **desde `main`**, y `main` está **16 commits atrás de `develop`** — 28 archivos de
-backend. Nada de choferes está en producción: `/choferes` devuelve 404 en la URL pública.
+Render despliega **desde `main`**, y entre entrega y entrega `main` queda atrás de `develop`.
+Cuánto, en cualquier momento:
+
+```bash
+git fetch origin && git rev-list --count origin/main..origin/develop
+```
+
+Mientras eso no se mergee, nada de choferes está en producción: `/choferes` devuelve 404 en la URL
+pública.
 
 - API: `https://citypass-residuos-api.onrender.com/api/v1/health`
 - Frontend: `https://citypass-residuos-frontend.onrender.com`
@@ -594,15 +607,17 @@ Dos cosas a tener en cuenta cuando eso pase:
 - **El plan gratuito de Render duerme el servicio.** Medido: **22,8 segundos** para responder el
   health en frío. Hay que despertarlo unos minutos antes de mostrar nada.
 
-## 2. Los pull requests abiertos
+## 2. Dos cosas que nos hicieron perder tiempo con los pull requests
 
-| PR | Qué es | Estado |
-|---|---|---|
-| #16 | Evidencia de despliegue | Aprobado pero bloqueado por el ruleset; hace falta una segunda aprobación |
-| #18 | Pantalla de ABM de choferes | Con conflictos, y apuntando a una rama que ya se mergeó |
+Ninguna es código, las dos se repiten y cuestan medio día cada vez.
 
-El #18 tiene que **cambiar la base a `develop`** y resolver los conflictos antes de poder
-revisarse.
+**Cambiarle la base a un PR no dispara el CI.** El workflow escucha `opened`, `synchronize` y
+`reopened`; cambiar la base emite `edited`. El PR queda esperando checks obligatorios que no van a
+llegar nunca, y se ve igual que un PR con el CI en rojo. Se destraba cerrando y reabriendo el PR.
+
+**Un PR abierto antes de que se sumara un check obligatorio también queda trabado**, porque nunca
+lo corrió. Pasó con el de SonarQube Cloud, que se integró el 08/09. Se destraba mergeando `develop`
+adentro y pusheando.
 
 ## 3. Lo que era la decisión pendiente sobre los choferes — resuelto
 
@@ -652,12 +667,12 @@ Están decididos y documentados en [ADR-004](docs/adr/ADR-004-alcance-y-recortes
 
 # Tests del frontend
 
-**177 tests en 25 archivos, todos en verde.** Cobertura de líneas 81,79%, contra un umbral
-configurado de 60% en `vite.config.js` (dimensión 6 de la rúbrica). El CI corre lint, build y
-cobertura de backend y frontend en cada push.
+Los tests y la cobertura se ejecutan en cada push. El umbral de cobertura de líneas es 60%, está
+configurado en `vite.config.js` y el CI lo fuerza para backend y frontend. Recontá las métricas
+antes de la demo: cambian con cada PR.
 
 ```bash
-cd frontend && npm test          # los 177
+cd frontend && npm test
 cd frontend && npm run cobertura # con reporte de cobertura
 ```
 
