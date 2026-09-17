@@ -46,6 +46,61 @@ describe('cliente de la API', () => {
   });
 
   /**
+   * Lo que entra por un input no se guarda tal cual. `saveToken` es el unico
+   * lugar donde se puede atajar, porque es el unico que escribe en el storage:
+   * si algo sin forma de JWT llega a guardarse, el sintoma recien aparece en la
+   * request siguiente, como un 401 que se lee como falta de permisos y no como
+   * "te falto pegar un pedazo".
+   */
+  describe('una credencial sin forma de JWT no se guarda', () => {
+    const invalidas = [
+      ['vacia', ''],
+      ['solo espacios', '   '],
+      ['media credencial', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9'],
+      ['sin la firma', 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjaG9mZXJfYWJjIn0'],
+      ['cortada justo en el punto', 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjaG9mZXJfYWJjIn0.'],
+      ['con un espacio en el medio', 'eyJhbGciOiJI UzI1NiJ9.eyJzdWIi.c2lnbmF0dXJl'],
+      ['el comando en vez de su salida', 'npm run token:dev -- CHOFER'],
+    ];
+
+    it.each(invalidas)('rechaza %s y no deja nada en el storage', (_caso, valor) => {
+      expect(saveToken(valor)).toBe(false);
+
+      expect(readToken()).toBe('');
+      expect(sessionStorage.getItem('citypass.token')).toBeNull();
+    });
+
+    /**
+     * El caso caro, y el motivo por el que el rechazo tiene que ser lo primero
+     * que hace la funcion: el chofer ya entro y pega algo cortado encima. Si un
+     * valor rechazado pisara al anterior, se queda afuera sin forma de volver
+     * —la credencial no se puede consultar de nuevo— y hay que emitirle otra,
+     * que ademas rota el `usuarioSub` y mata cualquier copia que quedara viva.
+     */
+    it('no pisa la credencial que ya venia funcionando', () => {
+      saveToken('jwt.de.juana');
+
+      expect(saveToken('eyJhbGciOiJI')).toBe(false);
+      expect(readToken()).toBe('jwt.de.juana');
+    });
+
+    /**
+     * Una credencial de verdad: tres bloques base64url, con la firma HS256 de
+     * 43 caracteres. Copiar y pegar en un celular arrastra espacios y un salto
+     * de linea, y eso no puede contar como invalido.
+     */
+    it('acepta un JWT completo aunque venga con espacios alrededor', () => {
+      const jwt =
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.' +
+        'eyJzdWIiOiJjaG9mZXJfYWJjIiwidG9rZW5fdXNlIjoiY2hvZmVyLWludGVybm8ifQ.' +
+        'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk';
+
+      expect(saveToken(`  ${jwt}\n`)).toBe(true);
+      expect(readToken()).toBe(jwt);
+    });
+  });
+
+  /**
    * CU-10. La credencial no se puede volver a consultar y emitir otra invalida
    * la anterior, asi que si un refresh la perdiera, el chofer que recarga su
    * celular obliga a emitirle una nueva. Vive en `sessionStorage`: sobrevive al
