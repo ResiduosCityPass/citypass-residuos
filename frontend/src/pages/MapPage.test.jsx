@@ -134,7 +134,7 @@ describe('pantalla del mapa', () => {
   });
 
   it('carga las zonas para el filtro cuando hay token', async () => {
-    saveToken('un-jwt');
+    saveToken('un.jwt.valido');
     fetchMapContainers.mockResolvedValue([]);
 
     render(<MapPage tokenVersion={0} />);

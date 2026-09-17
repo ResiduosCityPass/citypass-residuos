@@ -187,8 +187,11 @@ body.no-scroll { overflow: hidden; }
 }
 
 .topbar-token { flex-basis: 100%; padding-top: var(--space-2); }
-.token-bar { display: flex; gap: var(--space-2); }
+.token-bar { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 .token-bar input { max-width: 380px; }
+.token-bar input[aria-invalid] { border-color: var(--red); }
+/* El aviso ocupa toda la fila para quedar debajo del campo y no entre botones. */
+.token-bar-error { flex: 1 1 100%; margin: 0; color: var(--red); font-size: 0.85rem; }
 .token-bar button {
   font: inherit;
   padding: 0.5rem 0.9rem;

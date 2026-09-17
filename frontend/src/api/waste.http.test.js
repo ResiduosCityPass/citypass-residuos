@@ -24,7 +24,7 @@ import { saveToken } from './client.js';
  */
 describe('rutas contra la API real', () => {
   beforeEach(() => {
-    saveToken('un-jwt');
+    saveToken('un.jwt.valido');
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({}) }),
@@ -66,7 +66,7 @@ describe('rutas contra la API real', () => {
   it('manda el token en el header de autorizacion', async () => {
     await fetchMapContainers();
 
-    expect(calledOptions().headers.Authorization).toBe('Bearer un-jwt');
+    expect(calledOptions().headers.Authorization).toBe('Bearer un.jwt.valido');
   });
 
   /* --- CU-09 ------------------------------------------------------------ */

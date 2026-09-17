@@ -61,7 +61,7 @@ beforeEach(() => {
   // El chofer entra con su credencial guardada en el telefono. Sin esto la
   // pantalla pide una antes de mostrar nada, que es lo correcto y no es lo que
   // prueban los casos de abajo.
-  saveToken('credencial-del-chofer');
+  saveToken('jwt.del.chofer');
 });
 
 afterEach(() => {
@@ -519,12 +519,30 @@ describe('CU-10 · credencial del chofer', () => {
     clearToken();
     render(<DriverStopsPage />);
 
-    await user.type(await screen.findByPlaceholderText(/Pegá acá tu credencial/), 'jwt-de-juana');
+    await user.type(await screen.findByPlaceholderText(/Pegá acá tu credencial/), 'jwt.de.juana');
     await user.click(screen.getByRole('button', { name: 'Entrar' }));
 
-    expect(readToken()).toBe('jwt-de-juana');
+    expect(readToken()).toBe('jwt.de.juana');
     await waitFor(() => expect(fetchMyRoute).toHaveBeenCalledTimes(2));
     expect(await screen.findByText('CT-0010')).toBeInTheDocument();
+  });
+
+  /**
+   * Pegar media credencial en un celular es facil, y el sintoma era un 401 que
+   * se lee como un problema de permisos. No se guarda nada que no tenga forma
+   * de JWT: lo que entra por un input no llega crudo al storage.
+   */
+  it('una credencial incompleta no se guarda y lo dice', async () => {
+    const user = userEvent.setup();
+    clearToken();
+    render(<DriverStopsPage />);
+
+    await user.type(await screen.findByPlaceholderText(/Pegá acá tu credencial/), 'eyJhbGciOiJI');
+    await user.click(screen.getByRole('button', { name: 'Entrar' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/tres bloques separados por puntos/);
+    expect(readToken()).toBe('');
+    expect(fetchMyRoute).toHaveBeenCalledTimes(1);
   });
 
   /**

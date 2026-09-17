@@ -21,17 +21,25 @@ export default function TokenBar({
   submitLabel = 'Usar token',
 }) {
   const [value, setValue] = useState(readToken());
+  const [invalid, setInvalid] = useState(false);
   const hasToken = Boolean(readToken());
 
   const save = (event) => {
     event.preventDefault();
-    saveToken(value);
+    // Lo que no tiene forma de JWT no se guarda. Decirlo aca es la diferencia
+    // entre "te falto pegar un pedazo" y un 401 que parece falta de permisos.
+    if (!saveToken(value)) {
+      setInvalid(true);
+      return;
+    }
+    setInvalid(false);
     onChange();
   };
 
   const clear = () => {
     clearToken();
     setValue('');
+    setInvalid(false);
     onChange();
   };
 
@@ -41,7 +49,11 @@ export default function TokenBar({
         type="password"
         value={value}
         placeholder={placeholder}
-        onChange={(e) => setValue(e.target.value)}
+        aria-invalid={invalid || undefined}
+        onChange={(e) => {
+          setValue(e.target.value);
+          setInvalid(false);
+        }}
         autoComplete="off"
       />
       <button type="submit" disabled={!value.trim()}>{submitLabel}</button>
@@ -49,6 +61,12 @@ export default function TokenBar({
         <button type="button" className="secondary" onClick={clear}>
           Borrar
         </button>
+      )}
+      {invalid && (
+        <p className="token-bar-error" role="alert">
+          Eso no parece una credencial completa. Son tres bloques separados por puntos: copiala
+          entera, sin espacios.
+        </p>
       )}
     </form>
   );

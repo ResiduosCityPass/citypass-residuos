@@ -575,10 +575,16 @@ export function reactivateDriver(id) {
   return respond(driver);
 }
 
+// `crypto` y no `Math.random`: aca alcanzaria cualquiera de los dos porque el
+// token es de mentira, pero el backend genera el `usuarioSub` con un generador
+// criptografico y el mock no deberia ensenar la version barata de algo que en
+// serio importa.
 const randomHex = (length) =>
-  Array.from({ length }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join('');
+  Array.from(crypto.getRandomValues(new Uint8Array(length)), (byte) =>
+    (byte % 16).toString(16),
+  ).join('');
 const base64url = (value) =>
-  btoa(JSON.stringify(value)).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
+  btoa(JSON.stringify(value)).replaceAll('=', '').replaceAll('+', '-').replaceAll('/', '_');
 
 /**
  * Emite la credencial del chofer.

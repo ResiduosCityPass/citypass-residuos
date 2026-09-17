@@ -75,11 +75,30 @@ const writeManual = (token) => {
 export const readToken = () => readManual() || localStorage.getItem(TOKEN_KEY) || '';
 export const tokenSource = () => (readManual() ? 'manual' : localStorage.getItem(TOKEN_SOURCE_KEY));
 
-/** Guarda una credencial pegada por una persona mientras viva esta pestaña. */
+/**
+ * Un JWT y nada mas: tres bloques base64url separados por puntos.
+ *
+ * Lo que entra por un input no se guarda tal cual. Ademas de ser lo unico que
+ * el backend va a aceptar, ataja el error humano que en /chofer es facil de
+ * cometer y dificil de ver: pegar media credencial, o pegar el comando en vez
+ * de su salida. Sin esto el sintoma es un 401 que parece un problema de
+ * permisos.
+ */
+const JWT = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
+
+/**
+ * Guarda una credencial pegada por una persona mientras viva esta pestaña.
+ *
+ * @returns {boolean} false si no tiene forma de JWT, y entonces NO guarda nada.
+ */
 export const saveToken = (token) => {
-  writeManual(token.trim());
+  const value = String(token ?? '').trim();
+  if (!JWT.test(value)) return false;
+
+  writeManual(value);
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(TOKEN_SOURCE_KEY);
+  return true;
 };
 
 function saveDevToken(token) {
