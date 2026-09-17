@@ -28,14 +28,20 @@ export default function OneTimeSecretModal({
   children,
 }) {
   const [confirmedSaved, setConfirmedSaved] = useState(false);
-  const [copied, setCopied] = useState(false);
+  // null = todavia no intento copiar; true = copiado; false = fallo.
+  const [copied, setCopied] = useState(null);
 
+  /**
+   * El fallo se AVISA, no se traga. Sin permiso de portapapeles el boton se
+   * quedaba diciendo "Copiar" y no pasaba nada visible: quien copia cree que
+   * copio, cierra el modal —que no se puede reabrir— y el secreto se perdio.
+   * Pasa en el navegador integrado y en cualquier origen que no sea seguro.
+   */
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(secret);
       setCopied(true);
     } catch {
-      // Sin permiso de portapapeles (o sin HTTPS) queda seleccionarlo a mano.
       setCopied(false);
     }
   };
@@ -65,6 +71,13 @@ export default function OneTimeSecretModal({
           {copied ? '✓ Copiada' : 'Copiar'}
         </Button>
       </div>
+
+      {copied === false && (
+        <Notice type="warning" title="No se pudo copiar al portapapeles">
+          El navegador no dio permiso. Seleccioná el texto de arriba y copialo a mano
+          antes de cerrar.
+        </Notice>
+      )}
 
       {children}
 
