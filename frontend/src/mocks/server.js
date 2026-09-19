@@ -1,5 +1,5 @@
 import { ApiError } from '../api/client.js';
-import { ZONES, CONTAINERS, SENSORS, ALERTS, TRUCKS, ROUTES, STOPS } from './data.js';
+import { ZONES, CONTAINERS, SENSORS, ALERTS, TRUCKS, DRIVERS, ROUTES, STOPS } from './data.js';
 import { DEPOT, distanceKm, distanceMeters } from '../domain/geo.js';
 
 /**
@@ -27,6 +27,7 @@ const store = {
   sensors: SENSORS.map((s) => ({ ...s })),
   alerts: ALERTS.map((a) => ({ ...a })),
   trucks: TRUCKS.map((t) => ({ ...t })),
+  drivers: DRIVERS.map((d) => ({ ...d })),
   routes: ROUTES.map((r) => ({ ...r })),
   stops: STOPS.map((s) => ({ ...s })),
 };
@@ -51,6 +52,9 @@ const fail = (code, status, message) =>
       LATENCY_MS,
     ),
   );
+
+/** Lo que valida `@IsUUID()` en el backend. Se replica para producir el mismo 400. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const now = () => new Date().toISOString();
 const newId = (prefix) => `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
@@ -176,6 +180,31 @@ export function deleteContainer(id) {
   return respond(null);
 }
 
+/** Margen de ADVERTENCIA bajo el umbral critico. Es el default del evaluador del backend. */
+const WARNING_MARGIN_PCT = 10;
+
+export function setContainerOutOfService(id, out) {
+  const container = store.containers.find((c) => c.id === id);
+  if (!container) return fail('CONTENEDOR_NO_ENCONTRADO', 404, `No existe el contenedor ${id}`);
+
+  // Idempotente, igual que el backend: pedir dos veces lo mismo no cambia nada.
+  const isOut = container.estado === 'FUERA_DE_SERVICIO';
+  if (Boolean(out) === isOut) return respond(container);
+
+  if (out) {
+    container.estado = 'FUERA_DE_SERVICIO';
+  } else {
+    // Se reevalua contra el umbral de la zona: uno lleno vuelve CRITICO.
+    const threshold = zoneOf(container.zonaId).umbralCriticoPct;
+    const level = container.nivelLlenadoPct;
+    if (level >= threshold) container.estado = 'CRITICO';
+    else if (level >= threshold - WARNING_MARGIN_PCT) container.estado = 'ADVERTENCIA';
+    else container.estado = 'NORMAL';
+  }
+  container.actualizadoEn = now();
+  return respond(container);
+}
+
 export function linkSensor(containerId, data = {}) {
   const container = store.containers.find((c) => c.id === containerId);
   if (!container) return fail('CONTENEDOR_NO_ENCONTRADO', 404, `No existe el contenedor ${containerId}`);
@@ -205,7 +234,7 @@ export function linkSensor(containerId, data = {}) {
     sensorId: created.id,
     codigo: created.codigo,
     contenedorId: containerId,
-    apiKey: Array.from({ length: 48 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join(''),
+    apiKey: randomHex(48),
     advertencia: 'Guardala ahora: no se puede volver a consultar.',
   });
 }
@@ -440,6 +469,188 @@ export function updateTruck(id, changes) {
 }
 
 /* ========================================================================
+ * CU-09 · Choferes
+ * ====================================================================== */
+
+/**
+ * El listado que llena el <select> de la pantalla de asignacion.
+ *
+ * Por defecto trae SOLO los activos, que son los unicos a los que se les puede
+ * asignar una ruta: un selector que ofrece opciones que el backend va a
+ * rechazar con 409 no es un selector, es una trampa. `incluirInactivos` existe
+ * para una pantalla de administracion, no para elegir a quien mandar.
+ */
+export function fetchDrivers({ incluirInactivos = false } = {}) {
+  const drivers = incluirInactivos ? store.drivers : store.drivers.filter((d) => d.activo);
+  return respond(drivers);
+}
+
+/**
+ * Lo que valida CrearChoferDto con @Length. Un mensaje por regla incumplida,
+ * con el campo adelante, que es de donde `fieldErrors` saca el campo. En el
+ * PATCH los campos son opcionales: se valida solo lo que vino.
+ */
+function driverErrors(data, { partial = false } = {}) {
+  const errors = [];
+  const check = (field, min, max) => {
+    const value = data[field];
+    if (partial && value === undefined) return;
+    if (typeof value !== 'string' || value.length < min) {
+      errors.push(`${field} must be longer than or equal to ${min} characters`);
+    } else if (value.length > max) {
+      errors.push(`${field} must be shorter than or equal to ${max} characters`);
+    }
+  };
+  check('nombre', 2, 120);
+  check('legajo', 2, 40);
+  return errors;
+}
+
+const driverById = (id) => store.drivers.find((d) => d.id === id);
+const driverNotFound = (id) => fail('CHOFER_NO_ENCONTRADO', 404, `No existe el chofer ${id}`);
+
+// El unico cuenta TAMBIEN a los dados de baja, igual que el backend: su legajo
+// sigue identificando las rutas historicas que ejecuto.
+const legajoTaken = (legajo) => store.drivers.some((d) => d.legajo === legajo);
+const duplicateLegajo = (legajo) =>
+  fail('CHOFER_LEGAJO_DUPLICADO', 409, `Ya existe un chofer con el legajo "${legajo}"`);
+
+export function createDriver(data = {}) {
+  const errors = driverErrors(data);
+  if (errors.length) return fail('HTTP_400', 400, errors);
+  if (legajoTaken(data.legajo)) return duplicateLegajo(data.legajo);
+
+  // El id es un uuid de verdad y no un `newId`: la asignacion de rutas lo
+  // valida con @IsUUID, y un chofer creado aca tiene que poder recibir una.
+  const created = {
+    id: crypto.randomUUID(),
+    nombre: data.nombre,
+    legajo: data.legajo,
+    usuarioSub: data.usuarioSub ?? null,
+    activo: true,
+    creadoEn: now(),
+    actualizadoEn: now(),
+  };
+  store.drivers.push(created);
+  return respond(created);
+}
+
+export function updateDriver(id, changes = {}) {
+  const driver = driverById(id);
+  if (!driver) return driverNotFound(id);
+
+  const errors = driverErrors(changes, { partial: true });
+  if (errors.length) return fail('HTTP_400', 400, errors);
+  if (changes.legajo && changes.legajo !== driver.legajo && legajoTaken(changes.legajo)) {
+    return duplicateLegajo(changes.legajo);
+  }
+
+  // Lista explicita: `activo` no esta en el DTO, asi que por aca no se reactiva.
+  for (const field of ['nombre', 'legajo', 'usuarioSub']) {
+    if (changes[field] !== undefined) driver[field] = changes[field];
+  }
+  driver.actualizadoEn = now();
+  return respond(driver);
+}
+
+/**
+ * Baja logica. Es tambien la revocacion: el backend busca al chofer con
+ * `{ usuarioSub, activo: true }`, asi que la credencial muere en el pedido
+ * siguiente sin que haya que tocarla.
+ *
+ * Se NIEGA si tiene una ruta ASIGNADA o EN_CURSO: sin acceso no puede cerrar
+ * sus paradas, la ruta no cierra hasta que no le quede ninguna pendiente y el
+ * camion no se libera hasta que la ruta cierre. El camion quedaba EN_RUTA para
+ * siempre. El mensaje lleva el estado de la ruta, igual que el del backend.
+ */
+export function deleteDriver(id) {
+  const driver = driverById(id);
+  if (!driver) return driverNotFound(id);
+
+  const live = store.routes.find(
+    (r) => r.choferId === driver.id && ['ASIGNADA', 'EN_CURSO'].includes(r.estado),
+  );
+  if (live) {
+    return fail(
+      'CHOFER_CON_RUTA_ACTIVA',
+      409,
+      `${driver.nombre} tiene una ruta ${live.estado.toLowerCase()}. ` +
+        'Hay que cerrarla antes de darlo de baja',
+    );
+  }
+
+  driver.activo = false;
+  driver.actualizadoEn = now();
+  return respond(null);
+}
+
+/**
+ * Deshace la baja.
+ *
+ * No toca el `usuarioSub` —la baja tampoco lo tocaba—, asi que el chofer vuelve
+ * con la credencial que ya tenia. Es lo que hace que la baja deje de ser un
+ * clic sin vuelta.
+ */
+export function reactivateDriver(id) {
+  const driver = driverById(id);
+  if (!driver) return driverNotFound(id);
+
+  driver.activo = true;
+  driver.actualizadoEn = now();
+  return respond(driver);
+}
+
+// `crypto` y no `Math.random`: aca alcanzaria cualquiera de los dos porque el
+// token es de mentira, pero el backend genera el `usuarioSub` con un generador
+// criptografico y el mock no deberia ensenar la version barata de algo que en
+// serio importa.
+const randomHex = (length) =>
+  Array.from(crypto.getRandomValues(new Uint8Array(length)), (byte) =>
+    (byte % 16).toString(16),
+  ).join('');
+const base64url = (value) =>
+  btoa(JSON.stringify(value)).replaceAll('=', '').replaceAll('+', '-').replaceAll('/', '_');
+
+/**
+ * Emite la credencial del chofer.
+ *
+ * Rotar el `usuarioSub` es lo que revoca la anterior, y el mock lo hace igual:
+ * sin eso, emitir dos veces se veria inofensivo aca y romperia recien contra el
+ * backend. El token tiene forma de JWT para que el bloque de la pantalla se vea
+ * con el largo real, pero no esta firmado: con mocks nadie lo valida.
+ */
+export function issueDriverCredential(id) {
+  const driver = driverById(id);
+  if (!driver) return driverNotFound(id);
+  if (!driver.activo) {
+    return fail('CHOFER_INACTIVO', 409, `El chofer ${driver.nombre} esta dado de baja`);
+  }
+
+  driver.usuarioSub = `chofer_${randomHex(48)}`;
+  driver.actualizadoEn = now();
+
+  const token = [
+    base64url({ alg: 'HS256', typ: 'JWT' }),
+    base64url({
+      sub: driver.usuarioSub,
+      preferred_username: driver.legajo,
+      token_use: 'chofer-interno',
+      groups: ['chofer'],
+    }),
+    randomHex(43),
+  ].join('.');
+
+  return respond({
+    choferId: driver.id,
+    nombre: driver.nombre,
+    legajo: driver.legajo,
+    token,
+    expiraEn: '30d',
+    advertencia: 'Guardala ahora: no se puede volver a consultar. Emitir otra invalida esta.',
+  });
+}
+
+/* ========================================================================
  * CU-08 / CU-09 · Rutas
  * ====================================================================== */
 
@@ -449,20 +660,45 @@ const litersIn = (container) => (container.capacidadLitros * container.nivelLlen
 const routeStops = (routeId) =>
   store.stops.filter((s) => s.rutaId === routeId).sort((a, b) => a.orden - b.orden);
 
+const driverOf = (route) => store.drivers.find((d) => d.id === route.choferId) ?? null;
+
 /**
- * Una ruta con camion y paradas (con su contenedor) anidados.
+ * Una ruta con camion, chofer y paradas (con su contenedor) anidados.
  *
- * NO hay objeto `chofer`, solo `choferId`: los choferes son usuarios del
- * directorio del Squad 2 y este modulo no guarda una copia de sus datos.
+ * El `chofer` viaja expandido —nombre y legajo— porque ahora es una entidad de
+ * este modulo. Un chofer dado de baja SIGUE apareciendo aca: sus rutas
+ * historicas son el registro de quien ejecuto cada recoleccion, y borrarlo del
+ * detalle seria perder ese dato. Lo que la baja impide es recibir rutas nuevas.
  */
 function expandRoute(route) {
   return {
     ...route,
     camion: store.trucks.find((t) => t.id === route.camionId) ?? null,
+    chofer: driverOf(route),
     paradas: routeStops(route.id).map((stop) => ({
       ...stop,
       contenedor: store.containers.find((c) => c.id === stop.contenedorId) ?? null,
     })),
+  };
+}
+
+/**
+ * El avance del listado: cuantas paradas se cerraron y como.
+ *
+ * Viene SIEMPRE, aunque la ruta no tenga paradas —ahi los cuatro valores son
+ * 0—, para que la pantalla pueda leer `ruta.avance.confirmadas` sin preguntar.
+ * Del lado del backend es una sola consulta agrupada para todo el listado, no
+ * una por fila; el detalle no lo trae porque ahi estan las paradas enteras.
+ */
+function routeProgress(routeId) {
+  const stops = routeStops(routeId);
+  const confirmadas = stops.filter((s) => s.estado === 'CONFIRMADA').length;
+  const omitidas = stops.filter((s) => s.estado === 'OMITIDA').length;
+  return {
+    total: stops.length,
+    confirmadas,
+    omitidas,
+    pendientes: stops.length - confirmadas - omitidas,
   };
 }
 
@@ -476,6 +712,8 @@ function expandRoute(route) {
 const listRoute = (route) => ({
   ...route,
   camion: store.trucks.find((t) => t.id === route.camionId) ?? null,
+  chofer: driverOf(route),
+  avance: routeProgress(route.id),
 });
 
 export const fetchRoutes = (filters = {}) =>
@@ -600,10 +838,19 @@ export function assignRoute(id, data = {}) {
   }
   if (!data.choferId) return fail('HTTP_400', 400, ['choferId should not be empty']);
 
-  // `choferId` es un string libre: el `sub` del JWT del chofer. El backend NO
-  // lo valida contra ningun padron —no tiene contra cual—, asi que aca tampoco.
-  // Por eso CHOFER_NO_ENCONTRADO no existe del lado del servidor.
-  route.choferId = data.choferId;
+  // Las tres fallas del chofer, en el mismo orden que el backend. Antes no
+  // habia ninguna: `choferId` era texto libre y cualquier cosa asignaba la ruta
+  // con exito. Que el mock las replique es lo unico que hace que las pantallas
+  // de error se puedan disenar sin levantar el backend.
+  if (!UUID.test(data.choferId)) return fail('HTTP_400', 400, ['choferId must be a UUID']);
+
+  const driver = store.drivers.find((d) => d.id === data.choferId);
+  if (!driver) return fail('CHOFER_NO_ENCONTRADO', 404, `No existe el chofer ${data.choferId}`);
+  if (!driver.activo) {
+    return fail('CHOFER_INACTIVO', 409, `${driver.nombre} esta dado de baja y no recibe rutas nuevas`);
+  }
+
+  route.choferId = driver.id;
   route.estado = 'ASIGNADA';
   route.asignadaEn = now();
 

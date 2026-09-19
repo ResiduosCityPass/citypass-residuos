@@ -17,7 +17,7 @@ describe('RutasController (CU-08, CU-09)', () => {
       listar: jest.fn(),
       obtener: jest.fn(),
       asignar: jest.fn(),
-      rutaActivaDe: jest.fn(),
+      rutaActivaDeSesion: jest.fn(),
     } as unknown as jest.Mocked<RutasService>;
     controller = new RutasController(service);
   });
@@ -41,9 +41,9 @@ describe('RutasController (CU-08, CU-09)', () => {
   });
 
   it('delega la asignacion', async () => {
-    await controller.asignar('rt-1', { choferId: 'U000042' });
+    await controller.asignar('rt-1', { choferId: 'ch-1' });
 
-    expect(service.asignar).toHaveBeenCalledWith('rt-1', { choferId: 'U000042' });
+    expect(service.asignar).toHaveBeenCalledWith('rt-1', { choferId: 'ch-1' });
   });
 
   describe('ruta propia del chofer', () => {
@@ -52,13 +52,13 @@ describe('RutasController (CU-08, CU-09)', () => {
       // ruta de otro cambiando un valor.
       await controller.rutaPropia(requestDe('U000042'));
 
-      expect(service.rutaActivaDe).toHaveBeenCalledWith('U000042');
+      expect(service.rutaActivaDeSesion).toHaveBeenCalledWith('U000042');
     });
 
     it('cada chofer recibe la suya', async () => {
       await controller.rutaPropia(requestDe('user:otro'));
 
-      expect(service.rutaActivaDe).toHaveBeenCalledWith('user:otro');
+      expect(service.rutaActivaDeSesion).toHaveBeenCalledWith('user:otro');
     });
   });
 });

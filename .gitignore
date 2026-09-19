@@ -7,6 +7,7 @@ node_modules/
 dist/
 build/
 coverage/
+coverage-e2e/
 *.tsbuildinfo
 
 # Entornos
@@ -42,3 +43,6 @@ infra/data/
 
 # Notas personales
 ADRIEL-notas.md
+
+# Notas locales de herramientas de edicion. No son del proyecto.
+AGENTS.md

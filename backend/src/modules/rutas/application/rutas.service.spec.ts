@@ -11,6 +11,8 @@ import { InMemoryEventPublisher } from '../../../shared/events/in-memory.event-p
 import { ContextoTransaccional } from '../../../shared/persistence/contexto-transaccional';
 import { Contenedor } from '../../contenedores/domain/contenedor.entity';
 import { ContenedorRepository } from '../../contenedores/domain/contenedor.repository';
+import { ChoferesService } from '../../choferes/application/choferes.service';
+import { Chofer } from '../../choferes/domain/chofer.entity';
 import { Camion } from '../../flota/domain/camion.entity';
 import { FlotaService } from '../../flota/application/flota.service';
 import { ZonasService } from '../../zonas/application/zonas.service';
@@ -29,6 +31,8 @@ const CAMION = {
 } as Camion;
 
 const ZONA = { id: 'z-1', nombre: 'Centro', bloqueada: false } as Zona;
+
+const CHOFER = { id: 'ch-1', nombre: 'Juana Perez', legajo: 'CH-014', activo: true } as Chofer;
 
 const contenedor = (id: string, gradosAlSur: number, nivel = 90): Contenedor =>
   ({
@@ -49,6 +53,7 @@ describe('RutasService (CU-08, CU-09)', () => {
   let contenedores: jest.Mocked<ContenedorRepository>;
   let eventos: InMemoryEventPublisher;
   let flota: jest.Mocked<Pick<FlotaService, 'obtener' | 'guardarEstado'>>;
+  let choferes: jest.Mocked<Pick<ChoferesService, 'obtenerActivo' | 'buscarActivoPorUsuarioSub'>>;
   let zonas: jest.Mocked<Pick<ZonasService, 'listar'>>;
   let service: RutasService;
 
@@ -95,6 +100,10 @@ describe('RutasService (CU-08, CU-09)', () => {
       obtener: jest.fn().mockResolvedValue({ ...CAMION }),
       guardarEstado: jest.fn().mockImplementation(async (c) => c),
     };
+    choferes = {
+      obtenerActivo: jest.fn().mockResolvedValue(CHOFER),
+      buscarActivoPorUsuarioSub: jest.fn().mockResolvedValue(CHOFER),
+    };
     zonas = { listar: jest.fn().mockResolvedValue([ZONA]) };
 
     service = new RutasService(
@@ -103,6 +112,7 @@ describe('RutasService (CU-08, CU-09)', () => {
       contenedores,
       eventos,
       flota as unknown as FlotaService,
+      choferes as unknown as ChoferesService,
       zonas as unknown as ZonasService,
       { ejecutar: <T>(b: () => Promise<T>) => b() } as unknown as ContextoTransaccional,
       new ConfigService({}),
@@ -198,15 +208,34 @@ describe('RutasService (CU-08, CU-09)', () => {
       const ruta = rutaCreada();
       rutas.buscarPorId.mockResolvedValue(ruta);
 
-      await service.asignar('rt-1', { choferId: 'U000042' });
+      await service.asignar('rt-1', { choferId: 'ch-1' });
 
       expect(ruta.estado).toBe(EstadoRuta.ASIGNADA);
-      expect(ruta.choferId).toBe('U000042');
+      expect(ruta.choferId).toBe('ch-1');
       expect(ruta.asignadaEn).toBeInstanceOf(Date);
     });
 
+    it('valida que el chofer exista y este activo antes de asignar', async () => {
+      // Sin esta validacion, un id equivocado asignaba la ruta con exito y el
+      // chofer no la veia nunca: la falla era silenciosa.
+      await service.asignar('rt-1', { choferId: 'ch-1' });
+
+      expect(choferes.obtenerActivo).toHaveBeenCalledWith('ch-1');
+    });
+
+    it('no asigna si el chofer no existe', async () => {
+      choferes.obtenerActivo.mockRejectedValue(
+        new NotFoundException({ code: 'CHOFER_NO_ENCONTRADO' }),
+      );
+
+      await expect(service.asignar('rt-1', { choferId: 'ch-fantasma' })).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(flota.guardarEstado).not.toHaveBeenCalled();
+    });
+
     it('recien ahi toma el camion', async () => {
-      await service.asignar('rt-1', { choferId: 'U000042' });
+      await service.asignar('rt-1', { choferId: 'ch-1' });
 
       expect(flota.guardarEstado).toHaveBeenCalledWith(
         expect.objectContaining({ estado: EstadoCamion.EN_RUTA }),
@@ -214,7 +243,7 @@ describe('RutasService (CU-08, CU-09)', () => {
     });
 
     it('publica residuos.ruta.asignada', async () => {
-      await service.asignar('rt-1', { choferId: 'U000042' });
+      await service.asignar('rt-1', { choferId: 'ch-1' });
 
       expect(eventos.getPublished(EventTypes.RUTA_ASIGNADA)).toHaveLength(1);
     });
@@ -222,7 +251,7 @@ describe('RutasService (CU-08, CU-09)', () => {
     it('solo se asigna desde PROPUESTA', async () => {
       rutas.buscarPorId.mockResolvedValue(rutaCreada({ estado: EstadoRuta.ASIGNADA }));
 
-      await expect(service.asignar('rt-1', { choferId: 'x' })).rejects.toMatchObject({
+      await expect(service.asignar('rt-1', { choferId: 'ch-1' })).rejects.toMatchObject({
         response: { code: 'RUTA_NO_PROPUESTA' },
       });
     });
@@ -230,7 +259,7 @@ describe('RutasService (CU-08, CU-09)', () => {
     it('falla con 404 si la ruta no existe', async () => {
       rutas.buscarPorId.mockResolvedValue(null);
 
-      await expect(service.asignar('rt-fantasma', { choferId: 'x' })).rejects.toThrow(
+      await expect(service.asignar('rt-fantasma', { choferId: 'ch-1' })).rejects.toThrow(
         NotFoundException,
       );
     });
@@ -274,15 +303,27 @@ describe('RutasService (CU-08, CU-09)', () => {
     });
   });
 
-  describe('rutaActivaDe', () => {
-    it('devuelve null si el chofer no tiene ruta activa', async () => {
-      await expect(service.rutaActivaDe('U000042')).resolves.toBeNull();
+  describe('rutaActivaDeSesion', () => {
+    it('resuelve el chofer desde la sesion y busca por su id', async () => {
+      // La identidad entra como `sub` del token, no como id de chofer: quien
+      // llama no elige de quien es la ruta que pide.
+      await service.rutaActivaDeSesion('dev-chofer');
+
+      expect(choferes.buscarActivoPorUsuarioSub).toHaveBeenCalledWith('dev-chofer');
+      expect(rutas.buscarActivaDeChofer).toHaveBeenCalledWith('ch-1');
     });
 
-    it('pide la ruta del chofer indicado', async () => {
-      await service.rutaActivaDe('U000042');
+    it('devuelve null si el chofer no tiene ruta activa', async () => {
+      await expect(service.rutaActivaDeSesion('dev-chofer')).resolves.toBeNull();
+    });
 
-      expect(rutas.buscarActivaDeChofer).toHaveBeenCalledWith('U000042');
+    it('devuelve null si la sesion no es de ningun chofer, sin consultar rutas', async () => {
+      // Distinguir "no sos chofer" de "no tenes ruta" solo le diria a quien
+      // pregunta si ese identificador existe.
+      choferes.buscarActivoPorUsuarioSub.mockResolvedValue(null);
+
+      await expect(service.rutaActivaDeSesion('alguien-mas')).resolves.toBeNull();
+      expect(rutas.buscarActivaDeChofer).not.toHaveBeenCalled();
     });
   });
 });

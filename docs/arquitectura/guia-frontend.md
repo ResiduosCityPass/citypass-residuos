@@ -875,6 +875,127 @@ Reglas de la heurística, todas verificadas:
 Errores: `409 CAMION_NO_DISPONIBLE` · `409 RUTA_SIN_CONTENEDORES` (también cuando hay críticos pero
 ninguno entra en la capacidad) · `404 CAMION_NO_ENCONTRADO`.
 
+## 8e. CU-09 · Choferes
+
+**Implementado.** ABM chico. Existe para que el operador **elija de una lista** en vez de escribir
+un identificador a mano.
+
+### `GET /choferes`
+
+Roles: `ADMINISTRADOR`, `OPERADOR`. Es el que llena tu `<select>`.
+
+Por defecto **solo trae los activos**, que son los únicos a los que se les puede asignar una ruta.
+Con `?incluirInactivos=true` vienen todos — sirve para una pantalla de administración, no para el
+selector.
+
+```json
+[
+  {
+    "id": "8f2c...",
+    "nombre": "Juana Perez",
+    "legajo": "CH-001",
+    "usuarioSub": "dev-chofer",
+    "activo": true,
+    "creadoEn": "...",
+    "actualizadoEn": "..."
+  }
+]
+```
+
+### `POST /choferes`
+
+Rol: `ADMINISTRADOR`. Cuerpo: `{ nombre, legajo, usuarioSub? }`.
+
+| Campo | Reglas |
+|---|---|
+| `nombre` | 2 a 120 caracteres |
+| `legajo` | 2 a 40, **único**. Es lo que distingue a dos choferes que se llaman igual |
+| `usuarioSub` | Opcional. Ver abajo |
+
+Errores: `409 CHOFER_LEGAJO_DUPLICADO`.
+
+> **`usuarioSub` es la parte que confunde.** Es el identificador de la sesión con la que ese chofer
+> entra a la pantalla de CU-10, y es **lo único que une a la persona con su sesión**:
+> `GET /rutas/mias` resuelve el chofer buscando por ahí.
+>
+> Es opcional a propósito: un chofer puede estar dado de alta en la operación antes de que alguien
+> le configure el acceso, y en ese caso **se le pueden asignar rutas igual, pero no ve la suya**.
+> Si en la demo la pantalla del chofer aparece vacía, es casi seguro esto.
+>
+> En desarrollo el valor es `dev-chofer`, que es el `sub` que genera
+> `npm run token:dev -- CHOFER`. El seed ya crea a Juana Perez con ese valor.
+>
+> **Ojo en la demo:** emitir una credencial le rota el `usuarioSub`, así que a partir de ahí el
+> token de `npm run token:dev -- CHOFER` deja de servir para ese chofer. Usá uno o el otro, no los
+> dos.
+
+### `POST /choferes/:id/credencial`
+
+Rol: `ADMINISTRADOR`. Sin cuerpo. Es **cómo entra el chofer a `/chofer`**: no hay login, así que
+alguien le tiene que emitir la credencial desde el ABM.
+
+```json
+{
+  "choferId": "8f2c...",
+  "nombre": "Juana Perez",
+  "legajo": "CH-001",
+  "token": "eyJhbGciOiJIUzI1NiIs...",
+  "expiraEn": "30d",
+  "advertencia": "Guardala ahora: no se puede volver a consultar. Emitir otra invalida esta."
+}
+```
+
+**Tratala igual que la API key del sensor**, porque es el mismo trato: se muestra una sola vez y no
+se puede volver a consultar. Mismo modal, misma fricción — bloque monoespaciado, botón de copiar, y
+que no se cierre hasta confirmar que la guardó.
+
+El chofer la pega en su celular y queda en `localStorage`, que es lo que ya hace tu `TokenBar`.
+
+> **Emitir una credencial nueva mata la anterior**, y eso es a propósito: es lo que resuelve un
+> celular perdido sin tener que dar de baja a la persona. La credencial vieja deja de funcionar en
+> el acto, aunque su firma siga siendo válida y le falte un mes para vencer.
+>
+> El precio: si el operador la emite dos veces por error, el chofer queda afuera hasta que le pasen
+> la nueva. Conviene que el modal lo diga.
+
+**Dura 30 días.** Es larga a propósito: sin login el chofer no puede volver a entrar por su cuenta,
+así que una credencial que vence a mitad de turno lo deja tildado en la calle.
+
+Errores: `409 CHOFER_INACTIVO` · `404 CHOFER_NO_ENCONTRADO`.
+
+### `PATCH /choferes/:id`, `DELETE /choferes/:id` y `PATCH /choferes/:id/reactivar`
+
+Rol: `ADMINISTRADOR`. El `PATCH` acepta los mismos campos que el alta.
+
+La baja es **lógica**: el chofer deja de aparecer en el listado y no puede recibir rutas nuevas,
+pero sus rutas históricas lo siguen referenciando — son el registro de quién ejecutó cada
+recolección.
+
+> **No se puede dar de baja a un chofer con una ruta activa** → `409 CHOFER_CON_RUTA_ACTIVA`.
+>
+> No es una formalidad. La baja le saca el acceso, con lo cual deja de poder cerrar sus paradas;
+> la ruta solo se cierra cuando no le queda ninguna pendiente, y el camión solo se libera cuando
+> la ruta cierra. Dar de baja al chofer equivocado dejaba **el camión `EN_RUTA` para siempre**, y
+> CU-03 tampoco deja sacarlo de ese estado a mano.
+>
+> El mensaje del error dice en qué estado está la ruta, así la pantalla puede decir qué falta
+> hacer en vez de solo negarse.
+
+**`PATCH /choferes/:id/reactivar`** deshace la baja y devuelve el chofer. Sin esto un clic
+equivocado era permanente: el chofer no volvía y, como el `legajo` es único, tampoco se lo podía
+dar de alta de nuevo.
+
+### Códigos
+
+| `code` | HTTP | Cuándo |
+|---|---|---|
+| `CHOFER_NO_ENCONTRADO` | 404 | El id no existe |
+| `CHOFER_INACTIVO` | 409 | Está dado de baja: no recibe rutas nuevas |
+| `CHOFER_LEGAJO_DUPLICADO` | 409 | Ya hay otro con ese legajo |
+| `CHOFER_CON_RUTA_ACTIVA` | 409 | No se puede dar de baja: primero hay que cerrar su ruta |
+
+---
+
 ### `GET /rutas` — listado
 
 Roles: `ADMINISTRADOR`, `OPERADOR`. Query params: `estado`, `camionId`.
@@ -887,7 +1008,8 @@ mostrar "2 de 3 vaciadas" sin una llamada por fila:
   "id": "...",
   "camionId": "...",
   "camion": { "patente": "AB123CD", "...": "..." },
-  "choferId": "U000042",
+  "choferId": "8f2c...",
+  "chofer": { "id": "8f2c...", "nombre": "Juana Perez", "legajo": "CH-001", "...": "..." },
   "estado": "EN_CURSO",
   "distanciaEstimadaKm": 4.2,
   "litrosEstimados": 2904,
@@ -905,28 +1027,34 @@ trivial.
 
 ### `PATCH /rutas/:id/asignar` — CU-09
 
-Roles: `ADMINISTRADOR`, `OPERADOR`. Cuerpo: `{ choferId }`.
+Roles: `ADMINISTRADOR`, `OPERADOR`. Cuerpo: `{ choferId }`, el **uuid** de un chofer de
+`GET /choferes`.
 
-Pasa la ruta a `ASIGNADA`, sella `asignadaEn` y **recién ahí el camión pasa a `EN_RUTA`**.
+Pasa la ruta a `ASIGNADA`, sella `asignadaEn` y **recién ahí el camión pasa a `EN_RUTA`**. Devuelve
+la ruta con el `chofer` expandido.
 
-Errores: `409 RUTA_NO_PROPUESTA` · `404 RUTA_NO_ENCONTRADA`.
+Errores: `409 RUTA_NO_PROPUESTA` · `404 RUTA_NO_ENCONTRADA` · `404 CHOFER_NO_ENCONTRADO` ·
+`409 CHOFER_INACTIVO` · `400` si no es un uuid.
 
-> ### Sobre `choferId` — y por qué no existe `GET /choferes`
+> ### `choferId` cambió: ahora es el id de un chofer nuestro
 >
-> **No implementé ese endpoint, y no creo que deba implementarlo yo.** Los choferes son usuarios del
-> módulo de identidad del Squad 2, no entidades de Residuos. Inventar acá un padrón de choferes
-> significaría mantener una copia de sus datos y que se desincronice.
+> **Esto rompe tu pantalla de asignación si mandabas texto libre.** Antes `choferId` era un string
+> cualquiera y el backend no lo validaba. Ahora es el **uuid de un chofer** de los que devuelve
+> `GET /choferes`, y se valida.
 >
-> `choferId` es un string libre: el `sub` del JWT del chofer. El backend **no lo valida contra
-> ningún padrón**, así que no vas a recibir `CHOFER_NO_ENCONTRADO` — ese código de tu mock no
-> existe del lado del servidor.
+> El motivo del cambio: los choferes son entidades de este módulo. Durante los primeros sprints
+> asumimos que eran usuarios del Squad 2 y que mantener una copia acá solo se desincronizaría; ese
+> supuesto ya no aplica. Con texto libre, un identificador mal tipeado asignaba la ruta **con
+> éxito** y el chofer no la veía nunca: su pantalla quedaba vacía y sin ningún error.
 >
-> Por la misma razón la ruta trae `choferId` pero **no un objeto `chofer`**: no tenemos su nombre.
+> Lo que ganás:
 >
-> Hay que decidirlo en equipo con Nicolás y Adriel. Las opciones que veo: pedirle al Squad 2 un
-> endpoint de usuarios por rol, o que el operador escriba el identificador a mano. Mientras tanto
-> tu `<select>` puede seguir con datos falsos, y la pantalla ya aclara que es una limitación
-> conocida.
+> - **`CHOFER_NO_ENCONTRADO` (404) ya existe.** El código que tenías en el mock ahora es real.
+> - **`CHOFER_INACTIVO` (409)** si el chofer está dado de baja.
+> - **Un `400`** si mandás algo que no es un uuid.
+> - **La ruta trae `chofer` expandido**, con su nombre y legajo, en el detalle *y* en el listado.
+>   Ya podés mostrar "Juana Perez" en vez de un uuid.
+> - Tu `<select>` deja de tener datos falsos: se llena con `GET /choferes`.
 
 ### `GET /rutas/:id` — detalle
 
@@ -943,6 +1071,11 @@ No trae `avance`: acá tenés las paradas enteras y contarlas es trivial.
 
 Rol: `CHOFER`. **Sin parámetros:** la identidad sale del `sub` del token. Si viajara por query
 string, cualquier chofer podría leer la ruta de otro.
+
+El backend resuelve **qué chofer es esa sesión** buscando un chofer cuyo `usuarioSub` coincida con
+el `sub` del token. Devuelve cuerpo vacío en los **dos** casos en que no hay nada que mostrar: la
+sesión no corresponde a ningún chofer, o el chofer no tiene ruta activa. No se distinguen a
+propósito — hacerlo le diría a quien pregunta si ese identificador existe.
 
 Devuelve la ruta expandida, o **cuerpo vacío con `200`** si no tiene ninguna activa. Tu
 `client.js` hace `response.json().catch(() => null)`, así que te llega `null` — que es exactamente

@@ -1,9 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   setZoneBlocked,
+  setContainerOutOfService,
   linkSensor,
   fetchMapContainers,
   deleteZone,
+  fetchDrivers,
+  createDriver,
+  updateDriver,
+  deleteDriver,
+  issueDriverCredential,
+  assignRoute,
   fetchMyRoute,
   confirmStop,
   skipStop,
@@ -18,7 +25,7 @@ import { saveToken } from './client.js';
  */
 describe('rutas contra la API real', () => {
   beforeEach(() => {
-    saveToken('un-jwt');
+    saveToken('un.jwt.valido');
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({}) }),
@@ -33,6 +40,19 @@ describe('rutas contra la API real', () => {
 
     expect(calledPath()).toMatch(/\/zonas\/zn-1\/bloqueo\?bloqueada=true$/);
     expect(calledOptions().method).toBe('PATCH');
+  });
+
+  it('fuera de servicio manda el valor por query, no en el cuerpo', async () => {
+    await setContainerOutOfService('ct-3', true);
+
+    expect(calledPath()).toMatch(/\/contenedores\/ct-3\/servicio\?fuera=true$/);
+    expect(calledOptions().method).toBe('PATCH');
+  });
+
+  it('reintegrar manda fuera=false', async () => {
+    await setContainerOutOfService('ct-3', false);
+
+    expect(calledPath()).toMatch(/\/contenedores\/ct-3\/servicio\?fuera=false$/);
   });
 
   it('vincular sensor sin codigo manda un objeto vacio, no null', async () => {
@@ -60,7 +80,68 @@ describe('rutas contra la API real', () => {
   it('manda el token en el header de autorizacion', async () => {
     await fetchMapContainers();
 
-    expect(calledOptions().headers.Authorization).toBe('Bearer un-jwt');
+    expect(calledOptions().headers.Authorization).toBe('Bearer un.jwt.valido');
+  });
+
+  /* --- CU-09 ------------------------------------------------------------ */
+
+  /**
+   * El selector se llena con los ACTIVOS, que es el default del endpoint: son
+   * los unicos a los que se les puede asignar una ruta. Pedir los inactivos es
+   * una decision explicita de una pantalla de administracion, no del selector.
+   */
+  it('el listado de choferes no pide los inactivos', async () => {
+    await fetchDrivers();
+
+    expect(calledPath()).toMatch(/\/choferes$/);
+    expect(calledPath()).not.toContain('incluirInactivos');
+  });
+
+  it('el alta de chofer manda nombre y legajo por POST', async () => {
+    await createDriver({ nombre: 'Ana Ruiz', legajo: 'CH-010' });
+
+    expect(calledPath()).toMatch(/\/choferes$/);
+    expect(calledOptions().method).toBe('POST');
+    expect(calledOptions().body).toBe('{"nombre":"Ana Ruiz","legajo":"CH-010"}');
+  });
+
+  it('editar un chofer usa PATCH sobre su id', async () => {
+    await updateDriver('ch-1', { nombre: 'Ana Ruiz' });
+
+    expect(calledPath()).toMatch(/\/choferes\/ch-1$/);
+    expect(calledOptions().method).toBe('PATCH');
+  });
+
+  it('la baja de chofer usa DELETE', async () => {
+    await deleteDriver('ch-1');
+
+    expect(calledPath()).toMatch(/\/choferes\/ch-1$/);
+    expect(calledOptions().method).toBe('DELETE');
+  });
+
+  /**
+   * Es un POST sin cuerpo sobre un subrecurso, no un PATCH del chofer: emitir
+   * no edita nada que se pueda mandar, genera algo que se devuelve una vez.
+   */
+  it('emitir la credencial es un POST al subrecurso del chofer', async () => {
+    await issueDriverCredential('ch-1');
+
+    expect(calledPath()).toMatch(/\/choferes\/ch-1\/credencial$/);
+    expect(calledOptions().method).toBe('POST');
+  });
+
+  /**
+   * Lo que cambio en el Sprint 3 (ADR-009): `choferId` era un string libre que
+   * el backend no validaba contra nada, y un identificador mal tipeado asignaba
+   * la ruta CON EXITO dejando al chofer sin verla nunca. Ahora es el uuid de un
+   * chofer de `GET /choferes`. El test fija que viaja tal cual, sin envolver.
+   */
+  it('asignar manda el uuid del chofer en el cuerpo', async () => {
+    await assignRoute('rt-1', { choferId: '8f2c1d4e-6b3a-4f21-9c07-5d2e1a9b4c33' });
+
+    expect(calledPath()).toMatch(/\/rutas\/rt-1\/asignar$/);
+    expect(calledOptions().method).toBe('PATCH');
+    expect(calledOptions().body).toBe('{"choferId":"8f2c1d4e-6b3a-4f21-9c07-5d2e1a9b4c33"}');
   });
 
   /* --- CU-10 ------------------------------------------------------------ */

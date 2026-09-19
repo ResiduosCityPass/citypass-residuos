@@ -11,6 +11,8 @@ import {
 import { InMemoryEventPublisher } from '../../../shared/events/in-memory.event-publisher';
 import { ContextoTransaccional } from '../../../shared/persistence/contexto-transaccional';
 import { AlertasService } from '../../alertas/application/alertas.service';
+import { ChoferesService } from '../../choferes/application/choferes.service';
+import { Chofer } from '../../choferes/domain/chofer.entity';
 import { Contenedor } from '../../contenedores/domain/contenedor.entity';
 import { ContenedorRepository } from '../../contenedores/domain/contenedor.repository';
 import { Camion } from '../../flota/domain/camion.entity';
@@ -21,7 +23,9 @@ import { Ruta } from '../domain/ruta.entity';
 import { RutaRepository } from '../domain/ruta.repository';
 import { ParadasService } from './paradas.service';
 
-const CHOFER = 'U000042';
+/** `sub` de la sesion del chofer: es lo que viaja en el token. */
+const SESION = 'dev-chofer';
+const CHOFER = { id: 'ch-1', nombre: 'Juana Perez', legajo: 'CH-014', activo: true } as Chofer;
 const EN_EL_CONTENEDOR = { lat: -34.6037, lng: -58.3816 };
 const A_CINCO_KM = { lat: -34.65, lng: -58.3816 };
 
@@ -31,6 +35,7 @@ describe('ParadasService (CU-10)', () => {
   let contenedores: jest.Mocked<ContenedorRepository>;
   let eventos: InMemoryEventPublisher;
   let alertas: jest.Mocked<Pick<AlertasService, 'resolverAbiertasPorTipo'>>;
+  let choferes: jest.Mocked<Pick<ChoferesService, 'buscarActivoPorUsuarioSub'>>;
   let flota: jest.Mocked<Pick<FlotaService, 'obtener' | 'guardarEstado'>>;
   let service: ParadasService;
 
@@ -62,7 +67,8 @@ describe('ParadasService (CU-10)', () => {
     ruta = {
       id: 'rt-1',
       camionId: 'cm-1',
-      choferId: CHOFER,
+      choferId: CHOFER.id,
+      chofer: CHOFER,
       estado: EstadoRuta.ASIGNADA,
       camion: { patente: 'AB123CD' } as Camion,
     } as Ruta;
@@ -93,6 +99,14 @@ describe('ParadasService (CU-10)', () => {
     };
     eventos = new InMemoryEventPublisher();
     alertas = { resolverAbiertasPorTipo: jest.fn().mockResolvedValue(1) };
+    // Resuelve SOLO la sesion del dueno. Un doble que devuelva el mismo chofer
+    // para cualquier `sub` deja pasar los tests de "no podes tocar lo de otro"
+    // sin probar nada.
+    choferes = {
+      buscarActivoPorUsuarioSub: jest
+        .fn()
+        .mockImplementation(async (sub) => (sub === SESION ? CHOFER : null)),
+    };
     flota = {
       obtener: jest.fn().mockResolvedValue({ id: 'cm-1', estado: EstadoCamion.EN_RUTA } as Camion),
       guardarEstado: jest.fn().mockImplementation(async (c) => c),
@@ -104,6 +118,7 @@ describe('ParadasService (CU-10)', () => {
       contenedores,
       eventos,
       alertas as unknown as AlertasService,
+      choferes as unknown as ChoferesService,
       flota as unknown as FlotaService,
       { ejecutar: <T>(b: () => Promise<T>) => b() } as unknown as ContextoTransaccional,
       new ConfigService({}),
@@ -112,35 +127,35 @@ describe('ParadasService (CU-10)', () => {
 
   describe('cierre del ciclo', () => {
     it('marca la parada como confirmada', async () => {
-      const resultado = await service.confirmar('pd-1', CHOFER, EN_EL_CONTENEDOR);
+      const resultado = await service.confirmar('pd-1', SESION, EN_EL_CONTENEDOR);
 
       expect(resultado.estado).toBe(EstadoParada.CONFIRMADA);
       expect(parada.confirmadaEn).toBeInstanceOf(Date);
     });
 
     it('devuelve el contenedor a NORMAL y a 0%', async () => {
-      await service.confirmar('pd-1', CHOFER, EN_EL_CONTENEDOR);
+      await service.confirmar('pd-1', SESION, EN_EL_CONTENEDOR);
 
       expect(contenedor.nivelLlenadoPct).toBe(0);
       expect(contenedor.estado).toBe(EstadoContenedor.NORMAL);
     });
 
     it('cierra las alertas de saturacion abiertas', async () => {
-      const resultado = await service.confirmar('pd-1', CHOFER, EN_EL_CONTENEDOR);
+      const resultado = await service.confirmar('pd-1', SESION, EN_EL_CONTENEDOR);
 
       expect(alertas.resolverAbiertasPorTipo).toHaveBeenCalledWith('c-1', TipoAlerta.SATURACION);
       expect(resultado.alertasCerradas).toBe(1);
     });
 
     it('publica residuos.contenedor.vaciado con el nivel previo', async () => {
-      await service.confirmar('pd-1', CHOFER, EN_EL_CONTENEDOR);
+      await service.confirmar('pd-1', SESION, EN_EL_CONTENEDOR);
 
       const publicados = eventos.getPublished(EventTypes.CONTENEDOR_VACIADO);
       expect(publicados).toHaveLength(1);
       expect(publicados[0].payload).toMatchObject({
         contenedorId: 'CT-0421',
         nivelPrevio: 94,
-        choferId: CHOFER,
+        choferId: CHOFER.legajo,
       });
     });
 
@@ -148,7 +163,7 @@ describe('ParadasService (CU-10)', () => {
       // Lo que tiene roto es el sensor o la tapa, no el nivel.
       contenedor.estado = EstadoContenedor.FUERA_DE_SERVICIO;
 
-      await service.confirmar('pd-1', CHOFER, EN_EL_CONTENEDOR);
+      await service.confirmar('pd-1', SESION, EN_EL_CONTENEDOR);
 
       expect(contenedor.estado).toBe(EstadoContenedor.FUERA_DE_SERVICIO);
       expect(contenedor.nivelLlenadoPct).toBe(0);
@@ -157,19 +172,19 @@ describe('ParadasService (CU-10)', () => {
 
   describe('validacion por GPS', () => {
     it('rechaza confirmar desde lejos', async () => {
-      await expect(service.confirmar('pd-1', CHOFER, A_CINCO_KM)).rejects.toMatchObject({
+      await expect(service.confirmar('pd-1', SESION, A_CINCO_KM)).rejects.toMatchObject({
         response: { code: 'PARADA_FUERA_DE_RADIO' },
       });
     });
 
     it('el mensaje dice a cuantos metros esta, no solo que no se puede', async () => {
-      await expect(service.confirmar('pd-1', CHOFER, A_CINCO_KM)).rejects.toMatchObject({
+      await expect(service.confirmar('pd-1', SESION, A_CINCO_KM)).rejects.toMatchObject({
         response: { message: expect.stringMatching(/\d+ m del contenedor CT-0421/) },
       });
     });
 
     it('no toca nada si esta fuera de radio', async () => {
-      await expect(service.confirmar('pd-1', CHOFER, A_CINCO_KM)).rejects.toThrow(
+      await expect(service.confirmar('pd-1', SESION, A_CINCO_KM)).rejects.toThrow(
         ForbiddenException,
       );
 
@@ -178,7 +193,7 @@ describe('ParadasService (CU-10)', () => {
     });
 
     it('devuelve la distancia medida, para que la pantalla pueda mostrarla', async () => {
-      const resultado = await service.confirmar('pd-1', CHOFER, EN_EL_CONTENEDOR);
+      const resultado = await service.confirmar('pd-1', SESION, EN_EL_CONTENEDOR);
 
       expect(resultado.distanciaMetros).toBe(0);
     });
@@ -190,18 +205,21 @@ describe('ParadasService (CU-10)', () => {
         contenedores,
         eventos,
         alertas as unknown as AlertasService,
+        choferes as unknown as ChoferesService,
         flota as unknown as FlotaService,
         { ejecutar: <T>(b: () => Promise<T>) => b() } as unknown as ContextoTransaccional,
         new ConfigService({ RADIO_CONFIRMACION_VACIADO_METROS: 20_000 }),
       );
 
-      await expect(conRadioGrande.confirmar('pd-1', CHOFER, A_CINCO_KM)).resolves.toBeDefined();
+      await expect(conRadioGrande.confirmar('pd-1', SESION, A_CINCO_KM)).resolves.toBeDefined();
     });
   });
 
   describe('quien puede confirmar', () => {
     it('un chofer no puede confirmar la parada de otro', async () => {
-      await expect(service.confirmar('pd-1', 'user:otro', EN_EL_CONTENEDOR)).rejects.toMatchObject({
+      await expect(
+        service.confirmar('pd-1', 'otra-sesion', EN_EL_CONTENEDOR),
+      ).rejects.toMatchObject({
         response: { code: 'PARADA_DE_OTRA_RUTA' },
       });
     });
@@ -209,7 +227,7 @@ describe('ParadasService (CU-10)', () => {
     it('falla con 404 si la parada no existe', async () => {
       paradas.buscarPorId.mockResolvedValue(null);
 
-      await expect(service.confirmar('pd-x', CHOFER, EN_EL_CONTENEDOR)).rejects.toThrow(
+      await expect(service.confirmar('pd-x', SESION, EN_EL_CONTENEDOR)).rejects.toThrow(
         NotFoundException,
       );
     });
@@ -217,7 +235,7 @@ describe('ParadasService (CU-10)', () => {
     it('no se puede confirmar dos veces', async () => {
       parada.estado = EstadoParada.CONFIRMADA;
 
-      await expect(service.confirmar('pd-1', CHOFER, EN_EL_CONTENEDOR)).rejects.toMatchObject({
+      await expect(service.confirmar('pd-1', SESION, EN_EL_CONTENEDOR)).rejects.toMatchObject({
         response: { code: 'PARADA_YA_CONFIRMADA' },
       });
     });
@@ -228,7 +246,7 @@ describe('ParadasService (CU-10)', () => {
       const otra = { ...parada, id: 'pd-2', estado: EstadoParada.PENDIENTE } as Parada;
       paradas.listarDeRuta.mockResolvedValue([parada, otra]);
 
-      const resultado = await service.confirmar('pd-1', CHOFER, EN_EL_CONTENEDOR);
+      const resultado = await service.confirmar('pd-1', SESION, EN_EL_CONTENEDOR);
 
       expect(resultado.rutaEstado).toBe(EstadoRuta.EN_CURSO);
       expect(flota.guardarEstado).not.toHaveBeenCalled();
@@ -237,7 +255,7 @@ describe('ParadasService (CU-10)', () => {
     it('la ultima la cierra y libera el camion', async () => {
       // Sin esto el camion quedaria EN_RUTA para siempre y no se podria volver
       // a usar: CU-03 bloquea justamente ese cambio a mano.
-      const resultado = await service.confirmar('pd-1', CHOFER, EN_EL_CONTENEDOR);
+      const resultado = await service.confirmar('pd-1', SESION, EN_EL_CONTENEDOR);
 
       expect(resultado.rutaEstado).toBe(EstadoRuta.COMPLETADA);
       expect(ruta.completadaEn).toBeInstanceOf(Date);
@@ -251,7 +269,7 @@ describe('ParadasService (CU-10)', () => {
     const MOTIVO = { motivo: 'Auto mal estacionado tapando el contenedor' };
 
     it('deja la parada OMITIDA con su motivo y la fecha', async () => {
-      const resultado = await service.omitir('pd-1', CHOFER, MOTIVO);
+      const resultado = await service.omitir('pd-1', SESION, MOTIVO);
 
       expect(parada.estado).toBe(EstadoParada.OMITIDA);
       expect(parada.motivo).toBe(MOTIVO.motivo);
@@ -262,7 +280,7 @@ describe('ParadasService (CU-10)', () => {
     it('NO toca el contenedor: sigue lleno y en CRITICO', async () => {
       // Es toda la diferencia con confirmar. Vaciar el contenedor porque el
       // chofer no pudo llegar seria mentirle al mapa.
-      const resultado = await service.omitir('pd-1', CHOFER, MOTIVO);
+      const resultado = await service.omitir('pd-1', SESION, MOTIVO);
 
       expect(contenedores.guardar).not.toHaveBeenCalled();
       expect(contenedor.nivelLlenadoPct).toBe(94);
@@ -271,7 +289,7 @@ describe('ParadasService (CU-10)', () => {
     });
 
     it('NO cierra las alertas del contenedor', async () => {
-      await service.omitir('pd-1', CHOFER, MOTIVO);
+      await service.omitir('pd-1', SESION, MOTIVO);
 
       expect(alertas.resolverAbiertasPorTipo).not.toHaveBeenCalled();
     });
@@ -279,11 +297,11 @@ describe('ParadasService (CU-10)', () => {
     it('no exige estar dentro del radio: el caso tipico es no poder acercarse', async () => {
       // Una calle cortada deja al camion a cuadras del contenedor. Pedirle
       // estar a 100 m para declarar que no pudo llegar seria una contradiccion.
-      await expect(service.omitir('pd-1', CHOFER, MOTIVO)).resolves.toBeDefined();
+      await expect(service.omitir('pd-1', SESION, MOTIVO)).resolves.toBeDefined();
     });
 
     it('publica el evento con el motivo y el nivel en que quedo', async () => {
-      await service.omitir('pd-1', CHOFER, MOTIVO);
+      await service.omitir('pd-1', SESION, MOTIVO);
 
       const [evento] = eventos.getPublished(EventTypes.PARADA_OMITIDA);
 
@@ -293,7 +311,7 @@ describe('ParadasService (CU-10)', () => {
           contenedorId: 'CT-0421',
           motivo: MOTIVO.motivo,
           nivelLlenadoPct: 94,
-          choferId: CHOFER,
+          choferId: CHOFER.legajo,
         }),
       );
     });
@@ -301,7 +319,7 @@ describe('ParadasService (CU-10)', () => {
     it('una parada omitida cierra la ruta y libera el camion como una confirmada', async () => {
       // Sin esto una calle cortada dejaba la ruta trabada en EN_CURSO para
       // siempre, y al camion tomado sin forma de recuperarlo.
-      const resultado = await service.omitir('pd-1', CHOFER, MOTIVO);
+      const resultado = await service.omitir('pd-1', SESION, MOTIVO);
 
       expect(resultado.rutaEstado).toBe(EstadoRuta.COMPLETADA);
       expect(flota.guardarEstado).toHaveBeenCalledWith(
@@ -310,25 +328,27 @@ describe('ParadasService (CU-10)', () => {
     });
 
     it('rechaza omitir una parada de otro chofer', async () => {
-      await expect(service.omitir('pd-1', 'user:otro', MOTIVO)).rejects.toThrow(ForbiddenException);
+      await expect(service.omitir('pd-1', 'otra-sesion', MOTIVO)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('rechaza omitir una parada que no existe', async () => {
       paradas.buscarPorId.mockResolvedValue(null);
 
-      await expect(service.omitir('pd-1', CHOFER, MOTIVO)).rejects.toThrow(NotFoundException);
+      await expect(service.omitir('pd-1', SESION, MOTIVO)).rejects.toThrow(NotFoundException);
     });
 
     it('rechaza omitir una parada ya confirmada', async () => {
       parada.estado = EstadoParada.CONFIRMADA;
 
-      await expect(service.omitir('pd-1', CHOFER, MOTIVO)).rejects.toThrow(ConflictException);
+      await expect(service.omitir('pd-1', SESION, MOTIVO)).rejects.toThrow(ConflictException);
     });
 
     it('una parada omitida es final: no se vuelve a omitir', async () => {
       parada.estado = EstadoParada.OMITIDA;
 
-      await expect(service.omitir('pd-1', CHOFER, MOTIVO)).rejects.toThrow(ConflictException);
+      await expect(service.omitir('pd-1', SESION, MOTIVO)).rejects.toThrow(ConflictException);
     });
 
     it('una parada omitida tampoco se puede confirmar despues', async () => {
@@ -337,7 +357,7 @@ describe('ParadasService (CU-10)', () => {
       // una ruta nueva.
       parada.estado = EstadoParada.OMITIDA;
 
-      await expect(service.confirmar('pd-1', CHOFER, EN_EL_CONTENEDOR)).rejects.toThrow(
+      await expect(service.confirmar('pd-1', SESION, EN_EL_CONTENEDOR)).rejects.toThrow(
         ConflictException,
       );
     });

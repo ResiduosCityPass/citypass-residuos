@@ -7,12 +7,14 @@ import ContainerDetailPage from './pages/ContainerDetailPage.jsx';
 import ZonesPage from './pages/ZonesPage.jsx';
 import AlertsPage from './pages/AlertsPage.jsx';
 import FleetPage from './pages/FleetPage.jsx';
+import DriversPage from './pages/DriversPage.jsx';
 import RoutesPage from './pages/RoutesPage.jsx';
 import RouteDetailPage from './pages/RouteDetailPage.jsx';
 import NearbyContainersPage from './pages/NearbyContainersPage.jsx';
 import DriverStopsPage from './pages/DriverStopsPage.jsx';
 import { fetchAlerts } from './api/waste.js';
 import { seedDevToken } from './api/client.js';
+import { matchesAnyPath } from './domain/paths.js';
 import './App.css';
 
 /**
@@ -28,6 +30,7 @@ const TITLES = {
   '/zonas': ['Zonas y umbrales', 'CU-02 · a partir de que nivel un contenedor es critico'],
   '/alertas': ['Alertas', 'CU-05 / CU-06 · saturacion e incendio'],
   '/flota': ['Flota', 'CU-03 · camiones, capacidad y disponibilidad'],
+  '/choferes': ['Choferes', 'CU-09 · a quién se le asigna una ruta y cómo entra a verla'],
   '/rutas': ['Rutas', 'CU-08 / CU-09 · generacion y asignacion'],
 };
 
@@ -45,9 +48,12 @@ function titleFor(pathname) {
  * Se enumeran las publicas en vez de derivarlas de las otras porque el
  * catch-all `*` tambien vive adentro del Shell: la polaridad correcta es
  * listar las excepciones.
+ *
+ * La comparacion va por segmento (`matchesPath`) y no con `startsWith` a secas:
+ * `/choferes` es del operador, vive adentro del Shell y empieza con `/chofer`.
  */
 const PUBLIC_PATHS = ['/cerca', '/chofer'];
-const isPublicPath = (pathname) => PUBLIC_PATHS.some((path) => pathname.startsWith(path));
+const isPublicPath = (pathname) => matchesAnyPath(pathname, PUBLIC_PATHS);
 
 /** Layout de las pantallas del operador. Solo monta en las rutas del Shell. */
 function ShellLayout({ openAlerts, onTokenChange }) {
@@ -110,6 +116,7 @@ function Application() {
         <Route path="/zonas" element={<ZonesPage />} />
         <Route path="/alertas" element={<AlertsPage onAlertsChanged={countAlerts} />} />
         <Route path="/flota" element={<FleetPage />} />
+        <Route path="/choferes" element={<DriversPage />} />
         <Route path="/rutas" element={<RoutesPage />} />
         <Route path="/rutas/:id" element={<RouteDetailPage />} />
         <Route path="*" element={<Navigate to="/mapa" replace />} />

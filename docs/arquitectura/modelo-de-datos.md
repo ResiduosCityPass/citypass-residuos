@@ -64,10 +64,18 @@ erDiagram
         enum tipoResiduoHabilitado
         enum estado
     }
+    CHOFER {
+        uuid id PK
+        string nombre
+        string legajo UK
+        string usuarioSub UK
+        boolean activo
+    }
+
     RUTA {
         uuid id PK
         uuid camionId FK
-        string choferId
+        uuid choferId FK
         enum estado
         decimal distanciaEstimadaKm
         int litrosEstimados
@@ -132,9 +140,17 @@ distinto tipo (saturado y con batería baja a la vez) y necesitamos su ciclo de 
 se rompe, se reemplaza, se recalibra. Además guarda su `apiKeyHash`, que es una credencial y no
 debe convivir con datos de ubicación pública ([ADR-005](../adr/ADR-005-seguridad-identidad.md)).
 
-**`RUTA.choferId` es un string, no una clave foránea.** Los choferes son usuarios del módulo de
-identidad del Squad 2, no entidades nuestras: se guarda el `sub` de su JWT. Mantener una copia de
-sus datos acá solo garantizaría que se desincronice.
+**`RUTA.choferId` es una clave foránea a `CHOFER`.** Durante los primeros sprints fue texto libre,
+bajo el supuesto de que los choferes eran usuarios del módulo de identidad del Squad 2 y que
+mantener una copia acá solo se desincronizaría. Ese supuesto cambió: los choferes son entidades de
+este módulo, no se registran ni inician sesión contra el Squad 2.
+
+El costo de que fuera texto libre era concreto: nadie validaba nada, así que un identificador mal
+tipeado asignaba la ruta **con éxito** y el chofer no la veía nunca.
+
+`CHOFER.usuarioSub` es lo único que une a la persona con su sesión: `GET /rutas/mias` resuelve por
+ahí. Es nullable porque un chofer puede existir en la operación antes de que alguien le configure
+el acceso.
 
 **Preparado para los alcances completos.** `ZONA` puede recibir una columna `geometry` (PostGIS)
 sin migrar datos si algún día se implementa CU-02 completo, y `PARADA.confirmadaEn` ya contempla

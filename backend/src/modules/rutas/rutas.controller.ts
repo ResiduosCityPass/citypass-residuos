@@ -55,7 +55,7 @@ export class RutasController {
   rutaPropia(@Req() request: Request) {
     // La identidad sale del token. Si viajara por query string, cualquier
     // chofer podria leer la ruta de otro cambiando un valor.
-    return this.rutas.rutaActivaDe(request.usuario!.sub);
+    return this.rutas.rutaActivaDeSesion(request.usuario!.sub);
   }
 
   /**

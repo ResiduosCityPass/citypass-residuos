@@ -28,6 +28,7 @@ const WASTE_SECTIONS = [
   { to: '/zonas', icon: 'zones', label: 'Zonas y umbrales', useCase: 'CU-02' },
   { to: '/alertas', icon: 'alerts', label: 'Alertas', useCase: 'CU-05/06' },
   { to: '/flota', icon: 'fleet', label: 'Flota', useCase: 'CU-03' },
+  { to: '/choferes', icon: 'profile', label: 'Choferes', useCase: 'CU-09' },
   { to: '/rutas', icon: 'routes', label: 'Rutas', useCase: 'CU-08/09' },
 ];
 
@@ -42,12 +43,19 @@ const OTHER_ACTOR_VIEWS = [
   { to: '/chofer', icon: 'routes', label: 'Mi ruta (chofer)', useCase: 'CU-10' },
 ];
 
-export default function Sidebar({ openAlerts = 0 }) {
+export default function Sidebar({ openAlerts = 0, open = false, onNavigate }) {
   return (
-    <nav className="sidebar" aria-label="Modulos de CityPass+">
+    <nav
+      className={`sidebar ${open ? 'open' : ''}`}
+      aria-label="Modulos de CityPass+"
+    >
       <div className="sidebar-brand">
         <img src="/citypass-logo.png" alt="" className="sidebar-logo" />
         <span>CityPass<strong>+</strong></span>
+        {/* Solo se ve en el cajon: en escritorio no hay nada que cerrar. */}
+        <button type="button" className="sidebar-close" onClick={onNavigate} aria-label="Cerrar el menu">
+          <Icons.close />
+        </button>
       </div>
 
       <p className="sidebar-heading">Modulo activo</p>
@@ -56,7 +64,11 @@ export default function Sidebar({ openAlerts = 0 }) {
           const Icon = Icons[section.icon];
           return (
             <li key={section.to}>
-              <NavLink to={section.to} className={({ isActive }) => `sidebar-item ${isActive ? 'active' : ''}`}>
+              <NavLink
+                to={section.to}
+                onClick={onNavigate}
+                className={({ isActive }) => `sidebar-item ${isActive ? 'active' : ''}`}
+              >
                 <Icon />
                 <span>{section.label}</span>
                 {section.icon === 'alerts' && openAlerts > 0 && (
@@ -75,7 +87,11 @@ export default function Sidebar({ openAlerts = 0 }) {
           const Icon = Icons[view.icon];
           return (
             <li key={view.to}>
-              <NavLink to={view.to} className={({ isActive }) => `sidebar-item ${isActive ? 'active' : ''}`}>
+              <NavLink
+                to={view.to}
+                onClick={onNavigate}
+                className={({ isActive }) => `sidebar-item ${isActive ? 'active' : ''}`}
+              >
                 <Icon />
                 <span>{view.label}</span>
                 <span className="sidebar-cu">{view.useCase}</span>

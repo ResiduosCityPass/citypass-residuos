@@ -6,6 +6,7 @@
  *  2. Normalizar los errores para que el resto de la app ramifique por `code`
  *     y nunca por el texto de `message` (que esta en castellano y puede cambiar).
  */
+import { matchesPath } from '../domain/paths.js';
 
 function trimRightSlash(value) {
   return String(value ?? '').replace(/\/+$/, '');
@@ -32,9 +33,86 @@ export function buildBaseUrl({
 const BASE_URL = buildBaseUrl();
 const TOKEN_KEY = 'citypass.token';
 
-export const readToken = () => localStorage.getItem(TOKEN_KEY) ?? '';
-export const saveToken = (token) => localStorage.setItem(TOKEN_KEY, token.trim());
-export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
+/**
+ * La credencial que pega una persona vive en `sessionStorage`; los tokens de
+ * desarrollo, en `localStorage`.
+ *
+ * Existe por un solo caso, el de CU-10: el chofer pega su credencial en el
+ * celular y `seedDevToken` la pisaba en el render siguiente. Una credencial
+ * manual tampoco debe quedar en `localStorage`: viene de un input y sobrevivir
+ * al navegador cerrado es exactamente lo que no queremos de ella.
+ *
+ * `sessionStorage` es el punto justo entre las dos cosas: muere con la pestaña,
+ * pero AGUANTA UN REFRESH. Con la credencial solo en memoria, que el chofer
+ * recargue la pantalla obligaba a emitirle otra —no se puede volver a consultar
+ * la que se emitio—, y emitir invalida la anterior.
+ *
+ * Puede no estar (modo privado, storage bloqueado): por eso `manualToken` sigue
+ * siendo el espejo en memoria y cada acceso va envuelto. Sin storage la app
+ * funciona igual, solo que la credencial no sobrevive al refresh.
+ */
+const TOKEN_SOURCE_KEY = 'citypass.token.origen';
+let manualToken = '';
+
+const readManual = () => {
+  if (manualToken) return manualToken;
+  try {
+    return sessionStorage.getItem(TOKEN_KEY) ?? '';
+  } catch {
+    return '';
+  }
+};
+
+const writeManual = (token) => {
+  manualToken = token;
+  try {
+    if (token) sessionStorage.setItem(TOKEN_KEY, token);
+    else sessionStorage.removeItem(TOKEN_KEY);
+  } catch {
+    // Sin sessionStorage queda el espejo en memoria, que es como venia andando.
+  }
+};
+
+export const readToken = () => readManual() || localStorage.getItem(TOKEN_KEY) || '';
+export const tokenSource = () => (readManual() ? 'manual' : localStorage.getItem(TOKEN_SOURCE_KEY));
+
+/**
+ * Un JWT y nada mas: tres bloques base64url separados por puntos.
+ *
+ * Lo que entra por un input no se guarda tal cual. Ademas de ser lo unico que
+ * el backend va a aceptar, ataja el error humano que en /chofer es facil de
+ * cometer y dificil de ver: pegar media credencial, o pegar el comando en vez
+ * de su salida. Sin esto el sintoma es un 401 que parece un problema de
+ * permisos.
+ */
+const JWT = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
+
+/**
+ * Guarda una credencial pegada por una persona mientras viva esta pestaña.
+ *
+ * @returns {boolean} false si no tiene forma de JWT, y entonces NO guarda nada.
+ */
+export const saveToken = (token) => {
+  const value = String(token ?? '').trim();
+  if (!JWT.test(value)) return false;
+
+  writeManual(value);
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(TOKEN_SOURCE_KEY);
+  return true;
+};
+
+function saveDevToken(token) {
+  writeManual('');
+  localStorage.setItem(TOKEN_KEY, token);
+  localStorage.setItem(TOKEN_SOURCE_KEY, 'dev');
+};
+
+export const clearToken = () => {
+  writeManual('');
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(TOKEN_SOURCE_KEY);
+};
 
 /**
  * Deja puesto el token de desarrollo que corresponde a la pantalla.
@@ -58,20 +136,37 @@ export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
  *  2. Que la variable este definida. No tiene valor por defecto y `.env.local`
  *     no se versiona, asi que un clon del repo no hereda el token de nadie.
  *
+ * La excepcion es /chofer con una credencial pegada a mano. Ahi el token dejo
+ * de ser andamiaje: es COMO entra el chofer, la emite el operador desde el ABM
+ * y no se puede volver a consultar. Pisarla obligaba a que se la emitieran de
+ * nuevo, y ademas hacia imposible probar el flujo real en desarrollo. En el
+ * resto del modulo se sigue pisando, que es lo que evita quedar en 401 por un
+ * token de chofer olvidado.
+ *
+ * El precio, y es chico: en desarrollo, pasar por una pantalla del operador
+ * reemplaza esa credencial por el token de admin, y al volver a /chofer se
+ * siembra de nuevo el de desarrollo. Una credencial de verdad no sobrevive esa
+ * vuelta. En produccion nada de esto existe.
+ *
  * @param {string} pathname - Ruta actual. `/chofer` usa el token de CHOFER.
  * @returns {boolean} true si dejo un token puesto.
  */
 export function seedDevToken(pathname = '') {
   if (!import.meta.env.DEV) return false;
 
-  const esChofer = pathname.startsWith('/chofer');
+  // Por segmento, no por texto: `/choferes` (el ABM del operador) empieza con
+  // `/chofer` y quedaba con el token de CHOFER, o sea 403 en toda la pantalla.
+  const esChofer = matchesPath(pathname, '/chofer');
+
+  if (esChofer && readToken() && tokenSource() === 'manual') return false;
+
   const preset = esChofer
     ? import.meta.env.VITE_DEV_TOKEN_CHOFER
     : import.meta.env.VITE_DEV_TOKEN;
 
   if (!preset || readToken() === preset) return false;
 
-  saveToken(preset);
+  saveDevToken(preset);
   return true;
 }
 

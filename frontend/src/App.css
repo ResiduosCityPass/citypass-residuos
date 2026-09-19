@@ -117,6 +117,22 @@
 
 .sidebar-footer .muted { color: inherit; opacity: 0.6; font-size: inherit; }
 
+/* El boton hamburguesa y la X del cajon solo existen cuando el sidebar deja de
+   ser una columna. En escritorio el menu esta permanentemente a la vista y un
+   boton para abrir lo que ya esta abierto es ruido. */
+/* Se escribe con las dos clases y no solo con `.shell-menu-button` porque el
+   boton tambien es `.topbar-icon`, que declara `display: grid` mas abajo: a
+   igual especificidad gana el que viene despues, y el menu terminaba visible en
+   escritorio. Con `.topbar-icon.shell-menu-button` el punto de corte manda sin
+   depender del orden del archivo. */
+.topbar-icon.shell-menu-button { display: none; }
+.sidebar-close { display: none; }
+
+/* Mientras el cajon esta abierto la pantalla de atras no scrollea: sin esto,
+   arrastrar el dedo sobre el menu mueve el contenido y al cerrar aparece en
+   otro lugar del que estaba. */
+body.no-scroll { overflow: hidden; }
+
 /* --- Barra superior ----------------------------------------------------- */
 .topbar {
   display: flex;
@@ -130,8 +146,9 @@
   border-bottom: 1px solid var(--border);
 }
 
+.topbar-title { margin-right: auto; }
 .topbar-title h1 { line-height: 1.2; }
-.topbar-actions { display: flex; align-items: center; gap: var(--space-3); }
+.topbar-actions { display: flex; align-items: center; gap: var(--space-3); margin-left: auto; }
 
 .topbar-icon {
   position: relative;
@@ -170,8 +187,11 @@
 }
 
 .topbar-token { flex-basis: 100%; padding-top: var(--space-2); }
-.token-bar { display: flex; gap: var(--space-2); }
+.token-bar { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 .token-bar input { max-width: 380px; }
+.token-bar input[aria-invalid] { border-color: var(--red); }
+/* El aviso ocupa toda la fila para quedar debajo del campo y no entre botones. */
+.token-bar-error { flex: 1 1 100%; margin: 0; color: var(--red); font-size: 0.85rem; }
 .token-bar button {
   font: inherit;
   padding: 0.5rem 0.9rem;
@@ -278,6 +298,14 @@
 .filter-bar select { width: auto; min-width: 165px; }
 .filter-bar-right { margin-left: auto; display: flex; gap: var(--space-2); }
 .filter-bar-note { margin-left: auto; }
+.filter-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+.filter-check input { width: auto; }
 
 /* --- Mapa --------------------------------------------------------------- */
 .map-and-panel { display: flex; gap: var(--space-3); flex: 1; min-height: 340px; }
@@ -471,23 +499,101 @@
 .confirm-check input { width: auto; }
 
 /* --- Responsive --------------------------------------------------------- */
+
+/* 900px es el punto en que el detalle de dos columnas deja de entrar. Se usa el
+   mismo para el sidebar a proposito: si la pantalla ya no da para dos columnas
+   de contenido, tampoco da para gastar 232px en un menu permanente. */
 @media (max-width: 900px) {
   .detail { grid-template-columns: 1fr; }
   .map-and-panel { flex-direction: column; }
   .panel { width: auto; }
   .screen-map { height: auto; }
+  .two-col { grid-template-columns: 1fr; }
+
+  .topbar-icon.shell-menu-button { display: grid; }
+
+  .sidebar-close {
+    display: grid;
+    place-items: center;
+    margin-left: auto;
+    width: 34px;
+    height: 34px;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+  .sidebar-close:hover { background: rgb(255 255 255 / 0.1); }
+
+  /* El sidebar deja de ocupar una columna y pasa a ser un cajon sobre el
+     contenido. Antes se apilaba ARRIBA: quince items de navegacion mas el pie
+     empujaban la pantalla real fuera de vista y habia que scrollear todo el
+     menu para llegar al mapa. */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 901;
+    width: min(84vw, 300px);
+    flex: none;
+    /* dvh y no vh: en un celular la barra del navegador se retrae al scrollear
+       y con vh el pie del menu queda debajo del borde. */
+    height: 100dvh;
+    box-shadow: var(--shadow-lg);
+    /* `visibility` ademas de `transform`, y las dos en la transicion: con solo
+       correrlo fuera de la pantalla los quince enlaces siguen en el orden de
+       tabulacion y se puede navegar a ciegas hacia un menu que no se ve.
+       `visibility: hidden` los saca del tab y del lector de pantalla, y hacerlo
+       en CSS es lo que evita repetir el punto de corte en JS. */
+    visibility: hidden;
+    transform: translateX(-100%);
+    transition: transform 0.22s ease, visibility 0.22s;
+  }
+
+  .sidebar.open {
+    visibility: visible;
+    transform: none;
+  }
+
+  /* Debajo del cajon y por encima de todo lo demas, pero debajo del overlay de
+     los modales (z-index 1000): un modal abierto sigue siendo lo de arriba. */
+  .sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 900;
+    background: rgb(20 36 48 / 0.45);
+  }
+
+  .shell-content { padding: var(--space-4); }
+  .topbar { padding: var(--space-3) var(--space-4); }
 }
 
-@media (max-width: 700px) {
-  .sidebar {
-    position: static;
-    height: auto;
-    width: 100%;
-    flex: 1 1 100%;
+/* Celular. Lo que sobra a este ancho es cromo, no contenido. */
+@media (max-width: 560px) {
+  .shell-content { padding: var(--space-3); }
+  .topbar { padding: var(--space-3); gap: var(--space-2); }
+
+  /* El icono de perfil se queda, la palabra "Operador" no: ocupa el lugar del
+     titulo de la pantalla, que es lo que dice donde esta parado uno. */
+  .topbar-profile {
+    padding-left: var(--space-2);
+    border-left: none;
   }
-  .shell { flex-direction: column; }
-  .shell-content { padding: var(--space-4); }
-  .two-col { grid-template-columns: 1fr; }
+  .topbar-profile span { display: none; }
+
+  /* El input del token no entra al lado de sus botones a este ancho. */
+  .token-bar { flex-wrap: wrap; }
+  .token-bar input { max-width: none; flex: 1 1 100%; }
+
+  /* Las tarjetas de resumen bajan a dos por fila en vez de estirarse a una:
+     cinco tarjetas de ancho completo son cinco pantallas de scroll. */
+  .card { flex-basis: calc(50% - var(--space-3)); }
+
+  /* El pie de una accion queda pegado al borde y los botones se reparten el
+     ancho, que a un pulgar le importa mas que la simetria. */
+  .modal-footer { flex-wrap: wrap; }
+  .modal-footer .btn { flex: 1 1 auto; }
 }
 
 /* --- CU-12 · Prediccion de saturacion ----------------------------------- */
@@ -771,6 +877,30 @@
 /* 44px tambien aca: el select y el input los toca la misma mano con guantes. */
 .stop-skip-form select,
 .stop-skip-form input[type="text"] { min-height: 44px; }
+
+/* La credencial del chofer. Es una caja y no una barra escondida como en el
+   panel del operador: aca no es andamiaje, es la puerta — si el chofer no la
+   pega no ve nada, asi que tiene que ser lo primero que encuentra. */
+.driver-credential { display: grid; gap: var(--space-2); }
+.driver-credential h2 { font-size: var(--font-size-lg); }
+.driver-credential .token-bar { flex-wrap: wrap; margin-top: var(--space-1); }
+.driver-credential .token-bar input { max-width: none; flex: 1 1 100%; }
+.driver-credential .token-bar button { flex: 1 1 auto; min-height: 44px; }
+
+/* Al final de la pantalla y sin peso visual: cambiar la credencial se hace una
+   vez, cuando te emiten otra. */
+.driver-credential-link {
+  align-self: center;
+  margin-top: var(--space-4);
+  padding: var(--space-2);
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  text-decoration: underline;
+  cursor: pointer;
+}
 
 .stop-skip-hint {
   margin: 0;

@@ -1,6 +1,6 @@
 # Módulo de Residuos — estado, casos de uso y pendientes
 
-Squad 4 · Actualizado al **2026-09-03**
+Squad 4 · Actualizado al **2026-09-17**
 
 Qué hace cada caso de uso, dónde vive en el código, qué reglas no se pueden pasar por alto, y qué
 falta. Es el único documento de estado del módulo.
@@ -14,8 +14,13 @@ Para el contrato de la API endpoint por endpoint, con capturas reales de cada re
 
 - **Los 12 casos de uso están implementados de punta a punta**, backend y frontend, corriendo
   contra PostgreSQL. No queda ninguna pantalla con datos falsos.
-- Lo que falta **no es código**: dos pull requests, una decisión de equipo y cuatro pedidos de
-  contrato menores.
+- **La identidad del chofer se rehízo entera** después de la decisión del Sprint 2: dejó de ser un
+  string libre sin validar y pasó a ser una entidad de este módulo, con ABM y credencial propia.
+  Está en [ADR-009](docs/adr/ADR-009-identidad-de-los-choferes.md) y es el cambio más grande desde
+  la versión anterior de este documento.
+- **No quedan pull requests pendientes de integrar en `develop`.** Lo que falta es el merge de
+  `develop` a `main` para que lo desplegado sea lo que se demuestra, y conectar en el frontend un
+  endpoint que el backend ya expone.
 - El ciclo completo está verificado: contenedor satura → se genera la alerta → se arma la ruta →
   se asigna al chofer → el chofer confirma → el contenedor vuelve a verde, la alerta se cierra y
   el camión queda libre.
@@ -23,9 +28,10 @@ Para el contrato de la API endpoint por endpoint, con capturas reales de cada re
 | | |
 |---|---|
 | Casos de uso | 12 de 12 implementados |
-| Pantallas | 10 (8 del operador + 2 de otros actores) |
-| Tests del frontend | 177, en verde |
-| Cobertura del frontend | 81,79% de líneas · el umbral de la cátedra es 60% |
+| Pantallas | 11 (9 del operador + 2 de otros actores) |
+| Desplegado | Frontend y API en Render, **corriendo `main`, que está atrás de `develop`** |
+| Tests del frontend | Se ejecutan en CI y antes de la demo |
+| Cobertura del frontend | Umbral de líneas: 60%, forzado en CI |
 | CI | lint, build y tests de backend **y** frontend |
 
 ---
@@ -89,6 +95,10 @@ build de producción.
 | `/flota` | Flota | CU-03 |
 | `/rutas` | Rutas | CU-08 |
 | `/rutas/:id` | Detalle de la ruta | CU-08 + CU-09 |
+| `/choferes` | Choferes | CU-09 |
+
+> La pantalla de `/choferes` **está en `develop`**, junto con el backend que consume. Llegará a
+> Render cuando se promueva `develop` a `main`.
 
 Y dos que corren **fuera del Shell**, porque no son del operador:
 
@@ -170,7 +180,8 @@ vistas, no una.
 **Reglas:**
 
 - **La API key se muestra una única vez.** El backend guarda solo su hash. Si el usuario cierra el
-  modal sin copiarla, la única salida es desvincular el sensor y volver a vincularlo. Por eso el
+  modal sin copiarla, **hoy no hay salida**: no existe un endpoint para desvincular el sensor, y
+  volver a vincular falla con `409 CONTENEDOR_YA_TIENE_SENSOR`. Por eso el
   modal no tiene ×, muestra la clave en un bloque grande y monoespaciado, tiene botón de copiar, y
   **no deja cerrar hasta que se confirma que fue guardada**. Es la única fricción deliberada de
   toda la aplicación.
@@ -333,8 +344,9 @@ depósito.
   del todo: se dice cuántos quedaron afuera y por qué, porque *"no aparece mi camión"* es la
   pregunta que sigue.
 - **Las zonas bloqueadas no se ofrecen** en el filtro.
-- **El listado no trae las paradas** — eso lo expande solo el detalle. Por eso la tabla muestra la
-  carga estimada en litros, que sí viene, y el avance por paradas está en el detalle de la ruta.
+- **El listado no trae las paradas, pero sí el avance**: cuántas hay, cuántas se confirmaron y
+  cuántas se omitieron. Sale de una sola consulta agrupada del lado del backend, no de una llamada
+  por fila, y la tabla lo muestra en la columna "Avance". Las paradas en sí las expande el detalle.
 
 ---
 
@@ -361,8 +373,61 @@ para asignar el chofer.
 - **Al confirmar, el camión queda tomado** y pasa a `EN_RUTA`.
 - **La carga se muestra en barra** porque es el límite duro de la heurística: dice de un vistazo si
   la propuesta aprovecha el viaje o manda el camión medio vacío.
-- **El chofer se escribe a mano.** La ruta trae `choferId` pero **no un objeto `chofer`**: no
-  tenemos su nombre. Ver [la decisión pendiente](#1-el-endpoint-de-choferes--necesita-decisión-de-equipo).
+- **El chofer se elige de una lista, no se escribe.** Hasta el Sprint 2 era un campo de texto que
+  el backend no validaba contra nada: un identificador mal tipeado asignaba la ruta **con éxito** y
+  el chofer no la veía nunca —su pantalla quedaba vacía y sin ningún error—. Hoy `choferId` es el
+  UUID de un chofer nuestro y falla fuerte y temprano: `404 CHOFER_NO_ENCONTRADO`,
+  `409 CHOFER_INACTIVO`. La ruta vuelve con el objeto `chofer` expandido, así que la pantalla
+  muestra el nombre y no un identificador.
+- **Solo se ofrecen choferes activos.** Ofrecer uno inactivo es ofrecer un 409.
+
+---
+
+## CU-09 · Choferes: alta, baja y credencial
+
+**Actor:** Administrador · **Pantalla:** `/choferes` (en `develop`)
+
+**Dónde vive:** [`backend/src/modules/choferes/`](backend/src/modules/choferes/)
+
+**Consume:** `GET /choferes` · `GET /choferes/:id` · `POST /choferes` ·
+`PATCH /choferes/:id` · `POST /choferes/:id/credencial` · `DELETE /choferes/:id` ·
+`PATCH /choferes/:id/reactivar`
+
+El chofer **no se registra ni tiene login**. Es personal de la operación, no un usuario de la
+plataforma: alguien lo da de alta acá y le emite una credencial. Toda la decisión y sus alternativas
+descartadas están en [ADR-009](docs/adr/ADR-009-identidad-de-los-choferes.md).
+
+**Reglas:**
+
+- **La credencial se muestra una sola vez**, igual que la API key de un sensor. El backend **no la
+  guarda en ningún lado**: un JWT se valida por firma, así que no hay nada que recordar. Si se
+  pierde, la única salida es emitir otra.
+- **Emitir es revocar.** Lo que se guarda es `chofer.usuarioSub`, opaco y aleatorio, y el guard
+  resuelve al chofer por ahí. Emitir una credencial nueva genera un `sub` nuevo, y **todas las
+  anteriores de ese chofer mueren en el acto**, aunque su firma siga siendo válida y falte un mes
+  para que venzan. El precio es simétrico: emitir dos veces por error deja al chofer afuera hasta
+  que le pasen la nueva.
+- **Eso da dos niveles de revocación**, que es lo que faltaba. Perder el celular se arregla
+  emitiendo otra credencial, sin sacar al chofer de circulación. Que la persona deje de trabajar se
+  arregla dándola de baja.
+- **No se puede dar de baja a un chofer con una ruta activa** (`409 CHOFER_CON_RUTA_ACTIVA`). Sin
+  esa regla el camión quedaba `EN_RUTA` para siempre: el chofer perdía el acceso, no podía cerrar
+  las paradas, la ruta no cerraba y el camión no se liberaba nunca — y CU-03 no deja cambiarle el
+  estado a mano a un camión en ruta.
+- **La baja es lógica, nunca se borra.** Un chofer dado de baja sigue siendo el responsable de las
+  rutas que ejecutó; borrarlo dejaría el historial sin dueño.
+- **La baja no toca el `usuarioSub`: lo que corta el acceso es `activo`.** El guard busca al chofer
+  por `usuarioSub` **y** `activo`, así que dar de baja lo deja afuera en el acto. Pero reactivarlo
+  le devuelve el acceso **con la misma credencial**, sin emitir otra — sirve para suspender a
+  alguien unos días. El reverso importa y es el que se presta a confusión: si una credencial se
+  filtró, **dar de baja y reactivar no la mata**. Para eso hay que emitir otra, que es lo único que
+  rota el `usuarioSub`.
+- **`usuarioSub` puede ser `null`.** Un chofer dado de alta al que todavía no le emitieron
+  credencial existe y se le puede asignar una ruta, solo que no la ve.
+- **La credencial lleva `token_use: chofer-interno` y emisor propio** (`JWT_ISSUER_CHOFERES`), que
+  el guard cruza contra el `iss`. No reusa el `token_use: human` del Squad 2 a propósito: esa
+  persona no pasó por su IdP, y reusar el valor ensucia el campo que existe para trazar quién hizo
+  qué.
 
 ---
 
@@ -514,52 +579,76 @@ solo tiene sentido si las dos fuentes devuelven exactamente lo mismo.
 
 # Qué falta
 
-Nada de esto es código a medio hacer. Son trámites, una decisión de equipo y pedidos de contrato.
+Nada de esto es código a medio hacer del backend. Son trámites, un despliegue y una pantalla que
+todavía no usa lo que el backend ya expone.
 
-## Bloqueante: los dos pull requests
+Dos detalles del proceso que siguen valiendo: **GitHub propone `main` por defecto y el destino
+tiene que ser `develop`**, y **nadie mergea su propio PR**.
 
-**Hoy el trabajo está en ramas separadas y no llegó a `develop`.**
+## 1. Lo desplegado no es lo que vamos a demostrar
 
-1. **Francisco tiene que abrir primero el PR de `feat/CU-12-prediccion` a `develop`.** Su rama
-   tiene los 12 casos de uso del backend y todavía no está en la rama común.
-2. **Después va el PR del frontend** desde `feat/CU-07-mapa-tiempo-real`. El orden importa: la rama
-   del frontend está construida sobre la del backend, así que si va primero arrastra los commits de
-   Francisco sin que nadie los haya revisado.
+Render despliega **desde `main`**, y entre entrega y entrega `main` queda atrás de `develop`.
+Cuánto, en cualquier momento:
 
-Dos detalles del proceso: **GitHub propone `main` por defecto y el destino tiene que ser
-`develop`**, y **nadie mergea su propio PR**.
+```bash
+git fetch origin && git rev-list --count origin/main..origin/develop
+```
 
-## 1. El endpoint de choferes — necesita decisión de equipo
+Mientras eso no se mergee, nada de choferes está en producción: `/choferes` devuelve 404 en la URL
+pública.
 
-**El problema:** para asignarle una ruta a un chofer (CU-09), hoy el operador **escribe el
-identificador a mano** en un campo de texto. No hay una lista de la que elegir.
+- API: `https://citypass-residuos-api.onrender.com/api/v1/health`
+- Frontend: `https://citypass-residuos-frontend.onrender.com`
 
-**Por qué:** los choferes son usuarios del módulo de identidad del Squad 2, no entidades de
-Residuos. Mantener acá un padrón propio significaría tener una copia de sus datos que se
-desincroniza con la fuente real.
+Las dos responden y el endpoint público devuelve los contenedores de la base real, así que el
+despliegue funciona. Falta **mergear `develop` a `main`**, que es de DevOps.
 
-**La consecuencia concreta:** el `choferId` es un string libre y **el backend no lo valida contra
-ningún padrón** — por eso tampoco existe `CHOFER_NO_ENCONTRADO`. Un identificador mal tipeado
-asigna la ruta igual, y el chofer nunca la ve. La pantalla lo avisa explícitamente, pero avisar no
-es resolver.
+Dos cosas a tener en cuenta cuando eso pase:
 
-**Hay que decidirlo con Nicolás y Adriel.** Las dos opciones son pedirle al Squad 2 un endpoint que
-liste usuarios por rol, o aceptar que el operador escriba el identificador y validarlo de otra
-forma.
+- **Corre la migración de choferes contra la base real**, que es la que convierte `ruta.choferId`
+  de texto a clave foránea. Conviene backup antes.
+- **El plan gratuito de Render duerme el servicio.** Medido: **22,8 segundos** para responder el
+  health en frío. Hay que despertarlo unos minutos antes de mostrar nada.
 
-## 2. Cuatro pedidos de contrato al backend
+## 2. Dos cosas que nos hicieron perder tiempo con los pull requests
 
-Ninguno bloquea la demo. Los cuatro son límites que están **visibles en la UI a propósito**, en vez
-de disimulados.
+Ninguna es código, las dos se repiten y cuestan medio día cada vez.
 
-| Qué falta | Qué pasa hoy |
-|---|---|
-| **No se puede poner un contenedor en `FUERA_DE_SERVICIO`** | El estado existe en el modelo y el motor de reglas lo respeta, pero `PATCH /contenedores/:id` no acepta `estado` y no hay otro endpoint. El botón está en el detalle, deshabilitado y con el motivo en el tooltip. |
-| **`GET /contenedores` no dice si el contenedor ya tiene sensor** | No devuelve `sensor` ni un `tieneSensor`. La UI deja intentar y muestra el `409 CONTENEDOR_YA_TIENE_SENSOR` si corresponde. En el listado no se puede distinguir "sin sensor" de "sensor que nunca reportó". |
-| **`GET /rutas` no trae el avance de paradas** | El listado no incluye las paradas, así que la tabla no puede mostrar "2 de 3 vaciadas" sin una llamada por fila. Hoy muestra la carga estimada en litros, que sí viene. |
-| ~~**No hay endpoint para omitir una parada**~~ | **Resuelto.** `PATCH /paradas/:id/omitir` con `{ motivo }` está en `develop` y la pantalla del chofer ya lo usa. |
+**Cambiarle la base a un PR no dispara el CI.** El workflow escucha `opened`, `synchronize` y
+`reopened`; cambiar la base emite `edited`. El PR queda esperando checks obligatorios que no van a
+llegar nunca, y se ve igual que un PR con el CI en rojo. Se destraba cerrando y reabriendo el PR.
 
-## 3. Lo que depende de otros equipos
+**Un PR abierto antes de que se sumara un check obligatorio también queda trabado**, porque nunca
+lo corrió. Pasó con el de SonarQube Cloud, que se integró el 08/09. Se destraba mergeando `develop`
+adentro y pusheando.
+
+## 3. Lo que era la decisión pendiente sobre los choferes — resuelto
+
+Este documento decía que el `choferId` era un string libre sin validar y que había que decidir con
+Nicolás y Adriel si pedirle al Squad 2 un endpoint de usuarios por rol.
+
+**Se decidió que no.** El chofer no es un usuario del Squad 2: es personal de la operación. Pasó a
+ser una entidad de este módulo, con ABM propio y una credencial que se emite desde acá. Está en
+[ADR-009](docs/adr/ADR-009-identidad-de-los-choferes.md), con las alternativas que se descartaron y
+por qué, y las reglas están arriba en
+[CU-09 · Choferes](#cu-09--choferes-alta-baja-y-credencial).
+
+## 4. Lo que el backend ya expone y el frontend todavía no usa
+
+Este documento listaba cuatro "pedidos de contrato al backend". **Los cuatro están resueltos en el
+backend desde el 03/09** (`3685192` y el de omitir parada); la tabla había quedado vieja. Lo que
+queda es del frontend:
+
+| Qué | Backend | Frontend |
+|---|---|---|
+| **Poner un contenedor fuera de servicio** | `PATCH /contenedores/:id/servicio?fuera=true` para sacarlo, `?fuera=false` para reintegrarlo. Va por query, sin cuerpo. No viaja en el `PATCH` general a propósito: es un acto operativo, no la edición de un campo. Al reintegrarlo no vuelve a `NORMAL` a ciegas, se reevalúa contra el umbral de la zona | Hecho. El botón del detalle alterna entre sacarlo y reintegrarlo, y al reintegrar avisa en qué estado quedó |
+| **Saber si el contenedor ya tiene sensor** | `GET /contenedores` trae `sensor` en cada fila. La `apiKeyHash` no viaja: está declarada `select: false` | **Falta.** El listado deja intentar vincular y espera el `409` |
+| **Avance de paradas en el listado de rutas** | `GET /rutas` trae `avance` con `total`, `confirmadas`, `omitidas` y `pendientes` | Hecho |
+| **Omitir una parada** | `PATCH /paradas/:id/omitir` con `{ motivo }` | Hecho |
+
+El que falta no bloquea la demo.
+
+## 5. Lo que depende de otros equipos
 
 - **El login del Squad 2 llega en el Sprint 3.** Hasta entonces los tokens se generan a mano y
   duran 8 horas. Cuando exista el login real cambia de dónde sale el token, pero el header
@@ -567,7 +656,7 @@ de disimulados.
 - **El bloqueo automático de zonas** cuando llega un incidente del módulo de Emergencias es del
   Sprint 4. Hoy se bloquea a mano.
 
-## 4. Recortes deliberados — esto NO es deuda
+## 6. Recortes deliberados — esto NO es deuda
 
 Están decididos y documentados en [ADR-004](docs/adr/ADR-004-alcance-y-recortes.md). No hay que
 "completarlos":
@@ -582,12 +671,12 @@ Están decididos y documentados en [ADR-004](docs/adr/ADR-004-alcance-y-recortes
 
 # Tests del frontend
 
-**177 tests en 25 archivos, todos en verde.** Cobertura de líneas 81,79%, contra un umbral
-configurado de 60% en `vite.config.js` (dimensión 6 de la rúbrica). El CI corre lint, build y
-cobertura de backend y frontend en cada push.
+Los tests y la cobertura se ejecutan en cada push. El umbral de cobertura de líneas es 60%, está
+configurado en `vite.config.js` y el CI lo fuerza para backend y frontend. Recontá las métricas
+antes de la demo: cambian con cada PR.
 
 ```bash
-cd frontend && npm test          # los 177
+cd frontend && npm test
 cd frontend && npm run cobertura # con reporte de cobertura
 ```
 

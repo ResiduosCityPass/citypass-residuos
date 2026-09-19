@@ -20,19 +20,29 @@ const truck = (id, plate, extras = {}) => ({
 });
 
 /**
- * Captura de `GET /rutas`. Trae `camion` expandido pero NO `paradas` ni un
- * objeto `chofer`: eso lo devuelve solo el detalle de una ruta. El fixture
- * anterior incluia los dos y por eso los tests pasaban mientras la pantalla
- * reventaba contra el backend real leyendo `r.paradas.length`.
+ * Captura de `GET /rutas`. Trae `camion` y `chofer` expandidos y `avance`, pero
+ * NO `paradas`: esas las devuelve solo el detalle. El fixture anterior incluia
+ * las paradas y por eso los tests pasaban mientras la pantalla reventaba contra
+ * el backend real leyendo `r.paradas.length`.
+ *
+ * `avance` viaja siempre, con los cuatro valores en 0 si la ruta no tiene
+ * paradas. Es lo que permite mostrar "2 de 3" sin una llamada por fila.
  */
+const JUANA = {
+  id: '8f2c1d4e-6b3a-4f21-9c07-5d2e1a9b4c33',
+  nombre: 'Juana Perez', legajo: 'CH-001', usuarioSub: 'dev-chofer', activo: true,
+};
+
 const route = (extras = {}) => ({
   id: 'rt-1',
   camionId: 'cm-1',
   camion: { id: 'cm-1', patente: 'AB123CD', capacidadLitros: 12000 },
-  choferId: 'dev-chofer',
+  choferId: JUANA.id,
+  chofer: JUANA,
   estado: 'ASIGNADA',
   distanciaEstimadaKm: 7.4,
   litrosEstimados: 3300,
+  avance: { total: 3, confirmadas: 2, omitidas: 0, pendientes: 1 },
   generadaEn: new Date().toISOString(),
   asignadaEn: new Date().toISOString(),
   completadaEn: null,
@@ -55,20 +65,50 @@ describe('CU-08 · rutas', () => {
   });
 
   /**
-   * El listado no trae `paradas` ni `chofer`. La pantalla tiene que dibujarse
-   * igual con la respuesta tal cual viene, sin inventarse campos: leerlos era
-   * lo que la tiraba abajo con una pantalla en blanco.
+   * El listado no trae `paradas`. La pantalla tiene que dibujarse con la
+   * respuesta tal cual viene, sin inventarse campos: leer `paradas` era lo que
+   * la tiraba abajo con una pantalla en blanco.
    */
-  it('se dibuja con la respuesta real del listado, sin paradas ni chofer', async () => {
+  it('se dibuja con la respuesta real del listado, sin paradas', async () => {
     mount();
 
     expect(await screen.findByText('AB123CD')).toBeInTheDocument();
-    // El identificador del chofer es todo lo que hay: no tenemos su nombre.
-    expect(screen.getByText('dev-chofer')).toBeInTheDocument();
+    // El nombre del chofer, no su uuid.
+    expect(screen.getByText('Juana Perez')).toBeInTheDocument();
+    expect(screen.getByText('CH-001')).toBeInTheDocument();
+    expect(screen.queryByText(JUANA.id)).not.toBeInTheDocument();
+  });
+
+  /**
+   * El avance sale de `avance`, que resuelve una sola consulta agrupada del
+   * lado del backend. Antes esta columna no existia porque mostrarla habria
+   * costado una llamada por fila.
+   */
+  it('muestra el avance de la ruta sin pedir las paradas', async () => {
+    mount();
+
+    expect(await screen.findByText('2 de 3')).toBeInTheDocument();
+  });
+
+  /**
+   * Una parada omitida CIERRA y avanza la ruta, pero el contenedor sigue lleno.
+   * Se cuentan aparte de las vaciadas: sumarlas al "2 de 3" diria que se
+   * recolecto algo que nadie recolecto.
+   */
+  it('las omitidas se cuentan aparte de las vaciadas', async () => {
+    fetchRoutes.mockResolvedValue([
+      route({ avance: { total: 3, confirmadas: 2, omitidas: 1, pendientes: 0 } }),
+    ]);
+    mount();
+
+    expect(await screen.findByText('2 de 3')).toBeInTheDocument();
+    expect(screen.getByText(/1 omitida/)).toBeInTheDocument();
   });
 
   it('una ruta sin chofer lo dice en vez de romperse', async () => {
-    fetchRoutes.mockResolvedValue([route({ estado: 'PROPUESTA', choferId: null })]);
+    fetchRoutes.mockResolvedValue([
+      route({ estado: 'PROPUESTA', choferId: null, chofer: null }),
+    ]);
     mount();
 
     expect(await screen.findByText('sin asignar')).toBeInTheDocument();

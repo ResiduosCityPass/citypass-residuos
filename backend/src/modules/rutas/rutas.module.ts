@@ -1,5 +1,6 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ChoferesModule } from '../choferes/choferes.module';
 import { AlertasModule } from '../alertas/alertas.module';
 import { ContenedoresModule } from '../contenedores/contenedores.module';
 import { FlotaModule } from '../flota/flota.module';
@@ -17,6 +18,7 @@ import { RutasController } from './rutas.controller';
 
 @Module({
   imports: [
+    forwardRef(() => ChoferesModule),
     TypeOrmModule.forFeature([Ruta, Parada]),
     ContenedoresModule,
     FlotaModule,
@@ -30,6 +32,6 @@ import { RutasController } from './rutas.controller';
     { provide: RUTA_REPOSITORY, useClass: RutaTypeormRepository },
     { provide: PARADA_REPOSITORY, useClass: ParadaTypeormRepository },
   ],
-  exports: [RutasService, ParadasService],
+  exports: [RutasService, ParadasService, RUTA_REPOSITORY],
 })
 export class RutasModule {}

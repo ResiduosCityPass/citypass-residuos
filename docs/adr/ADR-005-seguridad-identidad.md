@@ -1,6 +1,7 @@
 # ADR-005 — Seguridad e identidad federada
 
 - **Estado:** Aceptado
+- **Superseded parcialmente por:** [ADR-009](ADR-009-identidad-de-los-choferes.md) — los choferes no son usuarios del Squad 2
 - **Fecha:** 2026-08-20
 - **Decisores:** Squad 4 (Adriel Pasik, Francisco Isola)
 
@@ -50,6 +51,8 @@ puede atravesar un flujo de login interactivo.
 | Lecturas — alta | — | — | — | — | Sí |
 | Alertas | Sí | Sí | — | — | — |
 | Rutas — generar y asignar | Sí | Sí | — | — | — |
+| Choferes — ABM | Sí | — | — | — | — |
+| Choferes — lectura | Sí | Sí | — | — | — |
 | Rutas — ver el detalle por id | Sí | Sí | — | — | — |
 | Rutas — ver la propia (`/rutas/mias`) | — | — | Sí | — | — |
 | Confirmar vaciado | — | — | Sí | — | — |

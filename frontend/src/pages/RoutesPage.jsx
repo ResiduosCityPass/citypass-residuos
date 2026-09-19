@@ -54,20 +54,43 @@ export default function RoutesPage() {
     {
       key: 'chofer',
       title: 'Chofer',
-      // Solo el identificador: los choferes son usuarios del directorio del
-      // Squad 2 y este modulo no tiene sus nombres.
+      // El listado trae el chofer expandido, asi que la fila dice un nombre y
+      // no un uuid. Un chofer dado de baja sigue apareciendo en sus rutas
+      // viejas: son el registro de quien ejecuto cada recoleccion.
       render: (r) =>
-        r.choferId
-          ? <span className="mono">{r.choferId}</span>
+        r.chofer
+          ? <span>{r.chofer.nombre} <span className="muted mono">{r.chofer.legajo}</span></span>
           : <span className="muted">sin asignar</span>,
+    },
+    {
+      key: 'avance',
+      title: 'Avance',
+      // `avance` viene SIEMPRE, con los cuatro valores en 0 si la ruta no tiene
+      // paradas, asi que se lee sin preguntar. Lo resuelve una sola consulta
+      // agrupada del lado del backend: no es una llamada por fila, que era la
+      // razon por la que esta columna no existia.
+      render: (r) => {
+        const { total = 0, confirmadas = 0, omitidas = 0 } = r.avance ?? {};
+        if (total === 0) return <span className="muted">—</span>;
+        return (
+          <span>
+            <span className="mono">{confirmadas} de {total}</span>
+            {/* Las omitidas se cuentan aparte de las vaciadas a proposito: una
+                parada omitida cierra y avanza la ruta, pero el contenedor sigue
+                lleno. Sumarlas al "2 de 3" diria que se recolecto algo que
+                nadie recolecto. */}
+            {omitidas > 0 && (
+              <span className="muted"> · {omitidas} {omitidas === 1 ? 'omitida' : 'omitidas'}</span>
+            )}
+          </span>
+        );
+      },
     },
     {
       key: 'carga',
       title: 'Carga estimada',
-      // `GET /rutas` no trae las paradas —solo el detalle las expande—, asi que
-      // el avance "2 de 3" no se puede mostrar aca sin una llamada por fila.
-      // `litrosEstimados` si viene y dice lo mismo que importa de un vistazo:
-      // cuanto levanta el viaje. El avance esta en la pantalla de la ruta.
+      // Cuanto levanta el viaje. Es otra cosa que el avance: esto dice si la
+      // heuristica aprovecho el camion, el avance dice cuanto se ejecuto.
       render: (r) => (
         <span className="mono">{(r.litrosEstimados ?? 0).toLocaleString('es-AR')} L</span>
       ),

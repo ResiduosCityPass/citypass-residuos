@@ -58,6 +58,15 @@ export const deleteContainer = (id) => api.delete(`/contenedores/${id}`);
 /** Rol ADMINISTRADOR. Devuelve la apiKey UNA SOLA VEZ: el backend guarda solo su hash. */
 export const linkSensor = (id, data) => api.post(`/contenedores/${id}/sensor`, data);
 
+/**
+ * Sacar de servicio (`true`) o reintegrar (`false`). Va por query y sin cuerpo,
+ * como el bloqueo de zonas: es un acto operativo, no la edicion de un campo.
+ * Al reintegrarlo el backend no lo vuelve a NORMAL a ciegas, lo reevalua contra
+ * el umbral de su zona: si estaba lleno, vuelve CRITICO. Es idempotente.
+ */
+export const setContainerOutOfService = (id, out) =>
+  api.patch(`/contenedores/${id}/servicio?fuera=${out}`);
+
 /* --- CU-02 · Zonas ------------------------------------------------------ */
 
 export const fetchZones = () => api.get('/zonas');
@@ -106,6 +115,69 @@ export const fetchTrucks = (filters) => api.get('/camiones', filters);
 export const createTruck = (data) => api.post('/camiones', data);
 export const updateTruck = (id, changes) => api.patch(`/camiones/${id}`, changes);
 
+/* --- CU-09 · Choferes ---------------------------------------------------- */
+
+/**
+ * Los choferes con los que se llena el <select> de la pantalla de asignacion.
+ *
+ * Devuelve SOLO los activos salvo que se pida lo contrario, y son justo los
+ * unicos a los que se les puede asignar una ruta: ofrecer un inactivo es
+ * ofrecer un 409 CHOFER_INACTIVO. `incluirInactivos` es para una pantalla de
+ * administracion, no para el selector.
+ *
+ * Cada chofer trae `usuarioSub`, que es lo unico que lo une a su sesion. Puede
+ * ser null: la persona esta dada de alta en la operacion pero todavia no tiene
+ * acceso configurado. Se le puede asignar una ruta igual, pero no la ve.
+ */
+export const fetchDrivers = (filters) => api.get('/choferes', filters);
+
+/**
+ * Rol ADMINISTRADOR. `{ nombre, legajo }`. Falla con 409 CHOFER_LEGAJO_DUPLICADO,
+ * y el unico cuenta TAMBIEN a los dados de baja.
+ */
+export const createDriver = (data) => api.post('/choferes', data);
+
+/** Rol ADMINISTRADOR. Mismos campos que el alta. `activo` no esta: por aca no se reactiva. */
+export const updateDriver = (id, changes) => api.patch(`/choferes/${id}`, changes);
+
+/**
+ * Rol ADMINISTRADOR. Baja logica, 204. Es tambien la revocacion: pierde el
+ * acceso en el acto.
+ *
+ * Falla con 409 CHOFER_CON_RUTA_ACTIVA si tiene una ruta ASIGNADA o EN_CURSO, y
+ * no es una formalidad: sin acceso no puede cerrar sus paradas, la ruta solo
+ * cierra cuando no le queda ninguna pendiente y el camion solo se libera cuando
+ * la ruta cierra, asi que la baja dejaba el camion EN_RUTA para siempre. El
+ * `message` dice en que estado esta la ruta, para poder decir que falta hacer.
+ */
+export const deleteDriver = (id) => api.delete(`/choferes/${id}`);
+
+/**
+ * Rol ADMINISTRADOR. Deshace la baja y devuelve el chofer.
+ *
+ * Sin esto un clic equivocado era permanente: el chofer no volvia y, como el
+ * legajo es unico y cuenta tambien a los dados de baja, tampoco se lo podia dar
+ * de alta de nuevo.
+ *
+ * La baja no toca el `usuarioSub`: lo que corta el acceso es `activo`, porque el
+ * backend busca al chofer con `{ usuarioSub, activo: true }`. Asi que reactivar
+ * le devuelve el acceso CON LA MISMA CREDENCIAL que ya tenia, sin emitir otra.
+ */
+export const reactivateDriver = (id) => api.patch(`/choferes/${id}/reactivar`);
+
+/**
+ * Rol ADMINISTRADOR. Sin cuerpo. Devuelve `{ choferId, nombre, legajo, token,
+ * expiraEn, advertencia }` y el `token` viaja UNA SOLA VEZ, como la API key del
+ * sensor.
+ *
+ * ROTA el `usuarioSub` del chofer, y eso es lo que mata la credencial anterior.
+ * Efecto lateral en desarrollo: si se emite para Juana (`dev-chofer`), el token
+ * de `npm run token:dev -- CHOFER` deja de servir para ella.
+ *
+ * Errores: 404 CHOFER_NO_ENCONTRADO, 409 CHOFER_INACTIVO.
+ */
+export const issueDriverCredential = (id) => api.post(`/choferes/${id}/credencial`);
+
 /* --- CU-08 / CU-09 · Rutas ---------------------------------------------- */
 
 export const fetchRoutes = (filters) => api.get('/rutas', filters);
@@ -121,13 +193,16 @@ export const generateRoute = (data) => api.post('/rutas/generar', data);
 /**
  * CU-09. Confirma la propuesta, asigna chofer y pasa la ruta a ASIGNADA.
  *
- * `choferId` es un string libre: el `sub` del JWT de un usuario con rol CHOFER
- * del directorio del Squad 2 (ADR-005). El backend NO lo valida contra ningun
- * padron, asi que no existe CHOFER_NO_ENCONTRADO y un id mal tipeado asigna la
- * ruta igual. Tampoco hay `GET /choferes` para llenar un <select>: por eso la
- * pantalla lo pide escrito a mano. Pedido de contrato pendiente.
+ * `choferId` es el UUID de un chofer de `GET /choferes` (ADR-009). Hasta el
+ * Sprint 3 era un string libre que el backend no validaba contra nada, y esa
+ * era la falla: un identificador mal tipeado asignaba la ruta CON EXITO y el
+ * chofer no la veia nunca —su pantalla quedaba vacia y sin ningun error—.
+ * Ahora falla fuerte y temprano.
  *
- * Errores: 409 RUTA_NO_PROPUESTA, 404 RUTA_NO_ENCONTRADA.
+ * Devuelve la ruta con el `chofer` expandido.
+ *
+ * Errores: 400 si no es un uuid, 404 CHOFER_NO_ENCONTRADO, 409 CHOFER_INACTIVO,
+ * 409 RUTA_NO_PROPUESTA, 404 RUTA_NO_ENCONTRADA.
  */
 export const assignRoute = (id, data) => api.patch(`/rutas/${id}/asignar`, data);
 

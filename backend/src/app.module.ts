@@ -8,6 +8,7 @@ import { EventsModule } from './shared/events/events.module';
 import { HealthModule } from './modules/health/health.module';
 import { ZonasModule } from './modules/zonas/zonas.module';
 import { ContenedoresModule } from './modules/contenedores/contenedores.module';
+import { ChoferesModule } from './modules/choferes/choferes.module';
 import { AlertasModule } from './modules/alertas/alertas.module';
 import { LecturasModule } from './modules/lecturas/lecturas.module';
 import { MapaModule } from './modules/mapa/mapa.module';
@@ -37,6 +38,7 @@ import { RutasModule } from './modules/rutas/rutas.module';
     PrediccionModule,
     PublicoModule,
     FlotaModule,
+    ChoferesModule,
     RutasModule,
     // Sprint 4: FlotaModule (CU-03), RutasModule (CU-08..CU-10), PublicoModule (CU-11)
   ],

@@ -6,7 +6,7 @@ import Field from '../components/ui/Field.jsx';
 import Notice from '../components/ui/Notice.jsx';
 import FillBar from '../components/ui/FillBar.jsx';
 import RouteMap from '../components/routes/RouteMap.jsx';
-import { fetchRoute, assignRoute } from '../api/waste.js';
+import { fetchRoute, fetchDrivers, assignRoute } from '../api/waste.js';
 import { fieldErrors, generalMessage } from '../domain/errors.js';
 import {
   ROUTE_STATE_LABEL,
@@ -36,9 +36,18 @@ export default function RouteDetailPage() {
   const [assignError, setAssignError] = useState(null);
   const [assigning, setAssigning] = useState(false);
 
-  // Solo la ruta. Antes tambien pedia el listado de choferes en el mismo
-  // Promise.all, y como ese endpoint no existe en el backend, el 404 hacia
-  // fallar los dos y la pantalla no cargaba ni la ruta.
+  const [drivers, setDrivers] = useState([]);
+  const [driversError, setDriversError] = useState(null);
+  // Arranca en true y no se prende dentro del efecto: el selector solo se
+  // dibuja cuando la ruta se puede asignar, y para entonces el pedido ya salio.
+  // Prenderlo adentro del efecto es un render de mas por nada.
+  const [loadingDrivers, setLoadingDrivers] = useState(true);
+
+  // La ruta se pide SOLA, aparte de los choferes. Antes los dos viajaban en el
+  // mismo Promise.all y el listado de choferes ni siquiera existia: su 404
+  // hacia fallar la promesa entera y la pantalla no mostraba ni la ruta. Ahora
+  // el endpoint existe, pero la separacion se queda igual — mirar el recorrido
+  // no tiene por que depender de que se pueda listar a quien asignarselo.
   const load = useCallback(() => {
     fetchRoute(id)
       .then((itsRoute) => {
@@ -50,6 +59,21 @@ export default function RouteDetailPage() {
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Solo si esta ruta se puede asignar: en una ruta ya asignada el listado no
+  // llena nada y seria una llamada por pantalla sin nadie que la lea.
+  const assignable = Boolean(route) && canAssign(route);
+
+  useEffect(() => {
+    if (!assignable) return;
+    fetchDrivers()
+      .then((itsDrivers) => {
+        setDrivers(itsDrivers);
+        setDriversError(null);
+      })
+      .catch(setDriversError)
+      .finally(() => setLoadingDrivers(false));
+  }, [assignable]);
 
   const confirm = async () => {
     setAssigning(true);
@@ -84,6 +108,8 @@ export default function RouteDetailPage() {
     0,
   );
   const usedPct = camion ? Math.round((liters / camion.capacidadLitros) * 100) : 0;
+
+  const selectedDriver = drivers.find((driver) => driver.id === driverId) ?? null;
 
   return (
     <div className="screen">
@@ -177,13 +203,23 @@ export default function RouteDetailPage() {
           )}
 
           <h3 className="spaced">Chofer</h3>
-          {/* La ruta trae `choferId` y nada mas. No hay objeto `chofer` porque
-              los choferes son usuarios del directorio del Squad 2 y este modulo
-              no guarda una copia de sus datos: mostrar el identificador es todo
-              lo que se puede decir con la verdad. */}
           {route.choferId ? (
             <dl className="data-list">
-              <dt>Identificador</dt><dd className="mono">{route.choferId}</dd>
+              {/* La ruta trae el chofer expandido. El legajo va ADEMAS del
+                  nombre y no en su lugar: es lo unico que distingue a dos
+                  personas que se llaman igual, y el operador que revisa una
+                  ruta de ayer necesita saber a cual de las dos le tocó.
+
+                  El `??` es defensa, no un caso esperado: el backend expande
+                  siempre. Si algun dia llegara un `choferId` sin su chofer,
+                  mostrar el uuid es mejor que un renglon vacio. */}
+              <dt>Nombre</dt>
+              <dd>{route.chofer?.nombre ?? <span className="mono">{route.choferId}</span>}</dd>
+              {route.chofer && (
+                <>
+                  <dt>Legajo</dt><dd className="mono">{route.chofer.legajo}</dd>
+                </>
+              )}
               <dt>Asignada</dt><dd>{route.asignadaEn ? timeAgo(route.asignadaEn) : '—'}</dd>
             </dl>
           ) : canAssign(route) ? (
@@ -194,32 +230,64 @@ export default function RouteDetailPage() {
                 </Notice>
               )}
 
+              {/* Que el listado falle no rompe la pantalla —la ruta ya se ve—,
+                  pero sí deja el selector vacío, y un <select> vacío sin
+                  explicación se lee como "no hay choferes". */}
+              {driversError && (
+                <Notice type="error" title={`[${driversError.code}]`}>
+                  No se pudo traer la lista de choferes.{' '}
+                  {generalMessage(driversError) ?? driversError.message}
+                </Notice>
+              )}
+
+              {!driversError && !loadingDrivers && drivers.length === 0 && (
+                <Notice type="warning" title="No hay ningún chofer activo">
+                  Esta ruta no se puede asignar hasta que se dé de alta uno. Los choferes dados de
+                  baja no aparecen acá: no reciben rutas nuevas.
+                </Notice>
+              )}
+
               <Field label="Asignar a" htmlFor="choferId" required
                      error={fieldErrors(assignError).choferId}
                      hint="Al confirmar, la ruta pasa a ASIGNADA y el camión queda tomado.">
-                <input
+                {/* Antes era un input de texto libre y el backend no validaba
+                    nada: un identificador mal tipeado asignaba la ruta CON
+                    EXITO y el chofer no la veia nunca. La lista trae solo los
+                    activos, que son los unicos que pueden recibir una ruta. */}
+                <select
                   id="choferId"
-                  className="mono"
                   value={driverId}
                   onChange={(e) => setDriverId(e.target.value)}
-                  placeholder="identificador del chofer"
-                />
+                  disabled={loadingDrivers || drivers.length === 0}
+                >
+                  <option value="">
+                    {loadingDrivers ? 'Cargando choferes…' : 'Elegí un chofer…'}
+                  </option>
+                  {drivers.map((driver) => (
+                    <option key={driver.id} value={driver.id}>
+                      {driver.nombre} · {driver.legajo}
+                    </option>
+                  ))}
+                </select>
               </Field>
+
+              {/* La trampa que reemplaza a la del identificador mal tipeado, y
+                  la unica que queda sin error visible: `usuarioSub` es lo que
+                  une a la persona con su sesion, es opcional, y sin el la
+                  asignacion funciona pero la pantalla del chofer queda vacia.
+                  Se avisa ANTES de confirmar, que es el unico momento en que
+                  alguien puede elegir a otro. */}
+              {selectedDriver && !selectedDriver.usuarioSub && (
+                <Notice type="warning" title={`${selectedDriver.nombre} todavía no tiene acceso`}>
+                  Se le puede asignar igual y la ruta queda a su nombre, pero no la va a ver en su
+                  pantalla hasta que alguien le emita una credencial desde{' '}
+                  <Link to="/choferes">Choferes</Link>.
+                </Notice>
+              )}
 
               <Button variant="success" onClick={confirm} disabled={assigning || !driverId}>
                 {assigning ? 'Asignando…' : 'Confirmar y asignar'}
               </Button>
-
-              {/* Se escribe a mano porque no hay de donde sacar una lista.
-                  `choferId` es el `sub` del JWT del chofer y el backend no lo
-                  valida contra ningun padron: un identificador mal tipeado
-                  asigna la ruta igual, y el chofer no la ve nunca. */}
-              <Notice type="warning" title="El identificador se escribe a mano">
-                No hay endpoint para listar los usuarios con rol CHOFER: son del directorio del
-                Squad 2, no de este módulo. El backend acepta el identificador sin validarlo, así
-                que revisá que esté bien antes de confirmar. Pedido de contrato pendiente con
-                Nicolás y Adriel.
-              </Notice>
             </>
           ) : (
             <p className="muted">Sin chofer asignado.</p>
