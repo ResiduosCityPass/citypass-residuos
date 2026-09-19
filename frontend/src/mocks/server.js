@@ -180,6 +180,31 @@ export function deleteContainer(id) {
   return respond(null);
 }
 
+/** Margen de ADVERTENCIA bajo el umbral critico. Es el default del evaluador del backend. */
+const WARNING_MARGIN_PCT = 10;
+
+export function setContainerOutOfService(id, out) {
+  const container = store.containers.find((c) => c.id === id);
+  if (!container) return fail('CONTENEDOR_NO_ENCONTRADO', 404, `No existe el contenedor ${id}`);
+
+  // Idempotente, igual que el backend: pedir dos veces lo mismo no cambia nada.
+  const isOut = container.estado === 'FUERA_DE_SERVICIO';
+  if (Boolean(out) === isOut) return respond(container);
+
+  if (out) {
+    container.estado = 'FUERA_DE_SERVICIO';
+  } else {
+    // Se reevalua contra el umbral de la zona: uno lleno vuelve CRITICO.
+    const threshold = zoneOf(container.zonaId).umbralCriticoPct;
+    const level = container.nivelLlenadoPct;
+    if (level >= threshold) container.estado = 'CRITICO';
+    else if (level >= threshold - WARNING_MARGIN_PCT) container.estado = 'ADVERTENCIA';
+    else container.estado = 'NORMAL';
+  }
+  container.actualizadoEn = now();
+  return respond(container);
+}
+
 export function linkSensor(containerId, data = {}) {
   const container = store.containers.find((c) => c.id === containerId);
   if (!container) return fail('CONTENEDOR_NO_ENCONTRADO', 404, `No existe el contenedor ${containerId}`);

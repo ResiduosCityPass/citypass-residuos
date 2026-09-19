@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import ContainerDetailPage from './ContainerDetailPage.jsx';
-import { fetchContainer, fetchAlerts, fetchPrediction } from '../api/waste.js';
+import { fetchContainer, fetchAlerts, fetchPrediction, setContainerOutOfService } from '../api/waste.js';
 import { ApiError } from '../api/client.js';
 
 vi.mock('../api/waste.js', () => ({
@@ -12,6 +13,7 @@ vi.mock('../api/waste.js', () => ({
   fetchPrediction: vi.fn(),
   acknowledgeAlert: vi.fn(),
   resolveAlert: vi.fn(),
+  setContainerOutOfService: vi.fn(),
 }));
 
 const ZONE = { id: 'zn-1', nombre: 'Centro', umbralCriticoPct: 70, umbralTemperaturaC: 60, bloqueada: false };
@@ -102,18 +104,49 @@ describe('detalle del contenedor', () => {
     expect(screen.getByText(/no significa que esté vacío/)).toBeInTheDocument();
   });
 
-  /**
-   * FUERA_DE_SERVICIO existe en el enum y el motor de reglas lo respeta, pero
-   * PATCH /contenedores/:id no acepta `estado` y no hay otro endpoint. El boton
-   * queda a la vista y apagado en vez de fingir algo que el backend no tiene.
-   */
-  it('deja el boton de fuera de servicio deshabilitado y explica por que', async () => {
-    fetchContainer.mockResolvedValue(detail());
+  it('saca el contenedor de servicio y recarga el detalle', async () => {
+    fetchContainer
+      .mockResolvedValueOnce(detail())
+      .mockResolvedValueOnce(detail({ estado: 'FUERA_DE_SERVICIO' }));
+    setContainerOutOfService.mockResolvedValue({ id: 'ct-3', estado: 'FUERA_DE_SERVICIO' });
     mount();
 
-    const button = await screen.findByRole('button', { name: 'Poner fuera de servicio' });
-    expect(button).toBeDisabled();
-    expect(button).toHaveAttribute('title', expect.stringContaining('endpoint'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Poner fuera de servicio' }));
+
+    expect(setContainerOutOfService).toHaveBeenCalledWith('ct-3', true);
+    expect(await screen.findByRole('button', { name: 'Reintegrar al servicio' })).toBeEnabled();
+    expect(fetchContainer).toHaveBeenCalledTimes(2);
+  });
+
+  /**
+   * Al reintegrarlo el backend lo reevalua contra el umbral de la zona: uno que
+   * quedo lleno vuelve CRITICO, no NORMAL. El aviso dice el estado que devolvio
+   * el backend, no el que uno supondria.
+   */
+  it('al reintegrarlo avisa el estado en que quedo segun el umbral', async () => {
+    fetchContainer
+      .mockResolvedValueOnce(detail({ estado: 'FUERA_DE_SERVICIO', nivelLlenadoPct: 85 }))
+      .mockResolvedValueOnce(detail({ estado: 'CRITICO', nivelLlenadoPct: 85 }));
+    setContainerOutOfService.mockResolvedValue({ id: 'ct-3', estado: 'CRITICO' });
+    mount();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Reintegrar al servicio' }));
+
+    expect(setContainerOutOfService).toHaveBeenCalledWith('ct-3', false);
+    expect(await screen.findByText(/umbral de Centro: queda en Critico/)).toBeInTheDocument();
+  });
+
+  it('si el cambio de servicio falla, muestra el error sin romper la pantalla', async () => {
+    fetchContainer.mockResolvedValue(detail());
+    setContainerOutOfService.mockRejectedValue(
+      new ApiError({ code: 'HTTP_403', status: 403, message: 'Acceso denegado' }),
+    );
+    mount();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Poner fuera de servicio' }));
+
+    expect(await screen.findByText('[HTTP_403]')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Poner fuera de servicio' })).toBeEnabled();
   });
 
   it('un 404 no rompe la pantalla, ofrece volver al listado', async () => {

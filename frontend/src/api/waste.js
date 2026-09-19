@@ -29,6 +29,7 @@ export const createContainer = (...args) => source.createContainer(...args);
 export const updateContainer = (...args) => source.updateContainer(...args);
 export const deleteContainer = (...args) => source.deleteContainer(...args);
 export const linkSensor = (...args) => source.linkSensor(...args);
+export const setContainerOutOfService = (...args) => source.setContainerOutOfService(...args);
 
 /* CU-02 · Zonas */
 export const fetchZones = (...args) => source.fetchZones(...args);

@@ -58,6 +58,15 @@ export const deleteContainer = (id) => api.delete(`/contenedores/${id}`);
 /** Rol ADMINISTRADOR. Devuelve la apiKey UNA SOLA VEZ: el backend guarda solo su hash. */
 export const linkSensor = (id, data) => api.post(`/contenedores/${id}/sensor`, data);
 
+/**
+ * Sacar de servicio (`true`) o reintegrar (`false`). Va por query y sin cuerpo,
+ * como el bloqueo de zonas: es un acto operativo, no la edicion de un campo.
+ * Al reintegrarlo el backend no lo vuelve a NORMAL a ciegas, lo reevalua contra
+ * el umbral de su zona: si estaba lleno, vuelve CRITICO. Es idempotente.
+ */
+export const setContainerOutOfService = (id, out) =>
+  api.patch(`/contenedores/${id}/servicio?fuera=${out}`);
+
 /* --- CU-02 · Zonas ------------------------------------------------------ */
 
 export const fetchZones = () => api.get('/zonas');

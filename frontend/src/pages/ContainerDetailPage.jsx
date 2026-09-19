@@ -6,7 +6,13 @@ import Notice from '../components/ui/Notice.jsx';
 import FillBar from '../components/ui/FillBar.jsx';
 import AlertRow from '../components/alerts/AlertRow.jsx';
 import PredictionCard from '../components/containers/PredictionCard.jsx';
-import { fetchContainer, fetchAlerts, acknowledgeAlert, resolveAlert } from '../api/waste.js';
+import {
+  fetchContainer,
+  fetchAlerts,
+  acknowledgeAlert,
+  resolveAlert,
+  setContainerOutOfService,
+} from '../api/waste.js';
 import { generalMessage } from '../domain/errors.js';
 import {
   STATE_LABEL,
@@ -30,6 +36,8 @@ export default function ContainerDetailPage({ onAlertsChanged }) {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [changingService, setChangingService] = useState(false);
+  const [serviceResult, setServiceResult] = useState(null);
 
   const load = useCallback(() => {
     Promise.all([fetchContainer(id), fetchAlerts({ contenedorId: id })])
@@ -50,6 +58,23 @@ export default function ContainerDetailPage({ onAlertsChanged }) {
     onAlertsChanged?.();
   };
 
+  // Se recarga el detalle en vez de usar la respuesta: el PATCH devuelve el
+  // contenedor sin la zona ni el sensor anidados, y la pantalla los necesita.
+  const toggleService = async () => {
+    const takingOut = container.estado !== 'FUERA_DE_SERVICIO';
+    setChangingService(true);
+    setServiceResult(null);
+    try {
+      const updated = await setContainerOutOfService(id, takingOut);
+      setServiceResult({ ok: true, takingOut, estado: updated.estado });
+      load();
+    } catch (e) {
+      setServiceResult({ ok: false, error: e });
+    } finally {
+      setChangingService(false);
+    }
+  };
+
   if (loading) return <p className="muted">Cargando contenedor…</p>;
 
   if (error) {
@@ -64,6 +89,7 @@ export default function ContainerDetailPage({ onAlertsChanged }) {
   const { zona, sensor } = container;
   const fire = alerts.find(isActiveFire);
   const unresolved = alerts.filter((a) => a.estado !== 'RESUELTA');
+  const outOfService = container.estado === 'FUERA_DE_SERVICIO';
 
   return (
     <div className="screen">
@@ -118,18 +144,28 @@ export default function ContainerDetailPage({ onAlertsChanged }) {
             <dd>{container.ultimaLecturaEn ? timeAgo(container.ultimaLecturaEn) : <span className="muted">nunca reportó</span>}</dd>
           </dl>
 
+          {serviceResult?.ok && (
+            <Notice type="success" title={serviceResult.takingOut ? 'Fuera de servicio' : 'Reintegrado'}>
+              {serviceResult.takingOut
+                ? 'Las lecturas ya no le cambian el estado ni generan alertas de llenado hasta que se lo reintegre.'
+                : `Se reevaluó contra el umbral de ${zona.nombre}: queda en ${STATE_LABEL[serviceResult.estado]}.`}
+            </Notice>
+          )}
+          {serviceResult && !serviceResult.ok && (
+            <Notice type="error" title={`[${serviceResult.error.code}]`}>
+              {generalMessage(serviceResult.error) ?? serviceResult.error.message}
+            </Notice>
+          )}
+
           <div className="detail-actions">
-            {/* El estado existe en el enum y el motor de reglas lo respeta, pero
-                no hay endpoint para ponerlo: PATCH /contenedores/:id no acepta
-                `estado`. Se deja el boton a la vista, deshabilitado y con el
-                motivo, en vez de fingir una funcionalidad que el backend no
-                tiene. Es un pedido de contrato pendiente con Francisco. */}
+            {/* PATCH /contenedores/:id/servicio?fuera=. Al reintegrarlo el
+                backend lo reevalua contra el umbral: no vuelve a NORMAL a ciegas. */}
             <Button
-              variant="warning"
-              disabled
-              disabledReason="El backend todavía no expone un endpoint para cambiar el estado a FUERA_DE_SERVICIO"
+              variant={outOfService ? 'secondary' : 'warning'}
+              disabled={changingService}
+              onClick={toggleService}
             >
-              Poner fuera de servicio
+              {outOfService ? 'Reintegrar al servicio' : 'Poner fuera de servicio'}
             </Button>
           </div>
         </section>
