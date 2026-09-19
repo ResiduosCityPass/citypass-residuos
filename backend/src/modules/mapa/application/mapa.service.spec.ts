@@ -118,12 +118,14 @@ describe('MapaService (CU-07)', () => {
       expect(marcador.incendioActivo).toBe(true);
     });
 
-    it('pide solo los incendios abiertos, no todas las alertas', async () => {
+    it('pide los incendios sin resolver, no todas las alertas', async () => {
       await service.marcadores({});
 
+      // En atencion cuenta: atender un incendio no lo apaga, y el halo tiene
+      // que seguir hasta que alguien lo resuelva.
       expect(alertas.listar).toHaveBeenCalledWith({
         tipo: TipoAlerta.INCENDIO,
-        estado: EstadoAlerta.ABIERTA,
+        estado: [EstadoAlerta.ABIERTA, EstadoAlerta.EN_ATENCION],
       });
     });
 

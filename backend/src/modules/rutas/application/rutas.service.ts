@@ -141,6 +141,19 @@ export class RutasService {
         });
       }
 
+      // Generar no reserva el camion: una propuesta no lo toma. Asi que entre
+      // generar y asignar pudo haber salido en otra ruta, o ir a mantenimiento.
+      // Sin este control el mismo camion quedaba con dos rutas vivas, y cerrar
+      // la primera lo liberaba con la segunda todavia en la calle.
+      const camion = await this.flota.obtener(ruta.camionId);
+
+      if (camion.estado !== EstadoCamion.DISPONIBLE) {
+        throw new ConflictException({
+          message: `El camion ${camion.patente} esta en estado ${camion.estado}`,
+          code: 'CAMION_NO_DISPONIBLE',
+        });
+      }
+
       // Valida que el chofer exista y siga activo. Sin esto, un id equivocado
       // asignaba la ruta con exito y el chofer no la veia nunca.
       const chofer = await this.choferes.obtenerActivo(dto.choferId);
@@ -152,7 +165,6 @@ export class RutasService {
 
       // Recien ahora el camion queda tomado: hasta la confirmacion era una
       // propuesta que nadie se comprometio a ejecutar.
-      const camion = await this.flota.obtener(ruta.camionId);
       camion.estado = EstadoCamion.EN_RUTA;
       await this.flota.guardarEstado(camion);
 
@@ -175,6 +187,33 @@ export class RutasService {
    * El listado no trae las paradas, pero si su avance: la tabla necesita
    * mostrar "2 de 3 vaciadas" y una llamada por fila para eso es un N+1.
    */
+  /**
+   * Descarta una propuesta que nadie va a asignar.
+   *
+   * Una propuesta compromete sus contenedores: ninguna otra ruta los toma
+   * mientras siga viva. Sin forma de descartarla, generar una ruta que no
+   * convencia dejaba esos contenedores afuera del ruteo para siempre.
+   *
+   * Solo desde PROPUESTA. Una ruta asignada ya tiene un chofer y un camion en la
+   * calle: esa se cierra desde las paradas, no se descarta desde el escritorio.
+   * El camion no se toca porque una propuesta nunca lo tomo.
+   */
+  async descartar(id: string): Promise<Ruta> {
+    const ruta = await this.obtener(id);
+
+    if (ruta.estado !== EstadoRuta.PROPUESTA) {
+      throw new ConflictException({
+        message: `La ruta esta en estado ${ruta.estado}: solo se descarta una PROPUESTA`,
+        code: 'RUTA_NO_PROPUESTA',
+      });
+    }
+
+    ruta.estado = EstadoRuta.CANCELADA;
+    await this.rutas.guardar(ruta);
+
+    return ruta;
+  }
+
   async listar(filtro: FiltroRutas): Promise<Ruta[]> {
     const rutas = await this.rutas.listar(filtro);
     const avances = await this.rutas.avanceDeParadas(rutas.map((ruta) => ruta.id));
