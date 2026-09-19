@@ -19,8 +19,8 @@ Para el contrato de la API endpoint por endpoint, con capturas reales de cada re
   Está en [ADR-009](docs/adr/ADR-009-identidad-de-los-choferes.md) y es el cambio más grande desde
   la versión anterior de este documento.
 - **No quedan pull requests pendientes de integrar en `develop`.** Lo que falta es el merge de
-  `develop` a `main` para que lo desplegado sea lo que se demuestra, y tres pedidos de contrato
-  menores.
+  `develop` a `main` para que lo desplegado sea lo que se demuestra, y conectar en el frontend dos
+  endpoints que el backend ya expone.
 - El ciclo completo está verificado: contenedor satura → se genera la alerta → se arma la ruta →
   se asigna al chofer → el chofer confirma → el contenedor vuelve a verde, la alerta se cierra y
   el camión queda libre.
@@ -180,7 +180,8 @@ vistas, no una.
 **Reglas:**
 
 - **La API key se muestra una única vez.** El backend guarda solo su hash. Si el usuario cierra el
-  modal sin copiarla, la única salida es desvincular el sensor y volver a vincularlo. Por eso el
+  modal sin copiarla, **hoy no hay salida**: no existe un endpoint para desvincular el sensor, y
+  volver a vincular falla con `409 CONTENEDOR_YA_TIENE_SENSOR`. Por eso el
   modal no tiene ×, muestra la clave en un bloque grande y monoespaciado, tiene botón de copiar, y
   **no deja cerrar hasta que se confirma que fue guardada**. Es la única fricción deliberada de
   toda la aplicación.
@@ -343,8 +344,9 @@ depósito.
   del todo: se dice cuántos quedaron afuera y por qué, porque *"no aparece mi camión"* es la
   pregunta que sigue.
 - **Las zonas bloqueadas no se ofrecen** en el filtro.
-- **El listado no trae las paradas** — eso lo expande solo el detalle. Por eso la tabla muestra la
-  carga estimada en litros, que sí viene, y el avance por paradas está en el detalle de la ruta.
+- **El listado no trae las paradas, pero sí el avance**: cuántas hay, cuántas se confirmaron y
+  cuántas se omitieron. Sale de una sola consulta agrupada del lado del backend, no de una llamada
+  por fila, y la tabla lo muestra en la columna "Avance". Las paradas en sí las expande el detalle.
 
 ---
 
@@ -577,7 +579,8 @@ solo tiene sentido si las dos fuentes devuelven exactamente lo mismo.
 
 # Qué falta
 
-Nada de esto es código a medio hacer. Son trámites, un despliegue y pedidos de contrato.
+Nada de esto es código a medio hacer del backend. Son trámites, un despliegue y dos pantallas que
+todavía no usan lo que el backend ya expone.
 
 Dos detalles del proceso que siguen valiendo: **GitHub propone `main` por defecto y el destino
 tiene que ser `develop`**, y **nadie mergea su propio PR**.
@@ -630,19 +633,21 @@ ser una entidad de este módulo, con ABM propio y una credencial que se emite de
 por qué, y las reglas están arriba en
 [CU-09 · Choferes](#cu-09--choferes-alta-baja-y-credencial).
 
-## 4. Tres pedidos de contrato al backend
+## 4. Lo que el backend ya expone y el frontend todavía no usa
 
-Ninguno bloquea la demo. Los tres son límites que están **visibles en la UI a propósito**, en vez
-de disimulados.
+Este documento listaba cuatro "pedidos de contrato al backend". **Los cuatro están resueltos en el
+backend desde el 03/09** (`3685192` y el de omitir parada); la tabla había quedado vieja. Lo que
+queda es del frontend:
 
-| Qué falta | Qué pasa hoy |
-|---|---|
-| **No se puede poner un contenedor en `FUERA_DE_SERVICIO`** | El estado existe en el modelo y el motor de reglas lo respeta, pero `PATCH /contenedores/:id` no acepta `estado` y no hay otro endpoint. El botón está en el detalle, deshabilitado y con el motivo en el tooltip. |
-| **`GET /contenedores` no dice si el contenedor ya tiene sensor** | No devuelve `sensor` ni un `tieneSensor`. La UI deja intentar y muestra el `409 CONTENEDOR_YA_TIENE_SENSOR` si corresponde. En el listado no se puede distinguir "sin sensor" de "sensor que nunca reportó". |
-| **`GET /rutas` no trae el avance de paradas** | El listado no incluye las paradas, así que la tabla no puede mostrar "2 de 3 vaciadas" sin una llamada por fila. Hoy muestra la carga estimada en litros, que sí viene. |
+| Qué | Backend | Frontend |
+|---|---|---|
+| **Poner un contenedor fuera de servicio** | `PATCH /contenedores/:id/servicio?fuera=true` para sacarlo, `?fuera=false` para reintegrarlo. Va por query, sin cuerpo. No viaja en el `PATCH` general a propósito: es un acto operativo, no la edición de un campo. Al reintegrarlo no vuelve a `NORMAL` a ciegas, se reevalúa contra el umbral de la zona | **Falta.** El botón del detalle sigue deshabilitado, con un tooltip que dice que el backend no tiene el endpoint — y sí lo tiene |
+| **Saber si el contenedor ya tiene sensor** | `GET /contenedores` trae `sensor` en cada fila. La `apiKeyHash` no viaja: está declarada `select: false` | **Falta.** El listado deja intentar vincular y espera el `409` |
+| **Avance de paradas en el listado de rutas** | `GET /rutas` trae `avance` con `total`, `confirmadas`, `omitidas` y `pendientes` | Hecho |
+| **Omitir una parada** | `PATCH /paradas/:id/omitir` con `{ motivo }` | Hecho |
 
-Un cuarto pedido —el endpoint para omitir una parada— ya está resuelto: `PATCH /paradas/:id/omitir`
-con `{ motivo }` está en `develop` y la pantalla del chofer lo usa.
+Ninguno de los dos que faltan bloquea la demo. **El tooltip sí conviene sacarlo** aunque no se
+conecte el botón, porque afirma algo falso sobre el backend.
 
 ## 5. Lo que depende de otros equipos
 
