@@ -14,6 +14,7 @@ import NearbyContainersPage from './pages/NearbyContainersPage.jsx';
 import DriverStopsPage from './pages/DriverStopsPage.jsx';
 import { fetchAlerts } from './api/waste.js';
 import { seedDevToken } from './api/client.js';
+import { matchesAnyPath } from './domain/paths.js';
 import './App.css';
 
 /**
@@ -47,9 +48,12 @@ function titleFor(pathname) {
  * Se enumeran las publicas en vez de derivarlas de las otras porque el
  * catch-all `*` tambien vive adentro del Shell: la polaridad correcta es
  * listar las excepciones.
+ *
+ * La comparacion va por segmento (`matchesPath`) y no con `startsWith` a secas:
+ * `/choferes` es del operador, vive adentro del Shell y empieza con `/chofer`.
  */
 const PUBLIC_PATHS = ['/cerca', '/chofer'];
-const isPublicPath = (pathname) => PUBLIC_PATHS.some((path) => pathname.startsWith(path));
+const isPublicPath = (pathname) => matchesAnyPath(pathname, PUBLIC_PATHS);
 
 /** Layout de las pantallas del operador. Solo monta en las rutas del Shell. */
 function ShellLayout({ openAlerts, onTokenChange }) {
