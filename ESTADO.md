@@ -28,7 +28,7 @@ Para el contrato de la API endpoint por endpoint, con capturas reales de cada re
 | | |
 |---|---|
 | Casos de uso | 12 de 12 implementados |
-| Pantallas | 10 (8 del operador + 2 de otros actores) |
+| Pantallas | 11 (9 del operador + 2 de otros actores) |
 | Desplegado | Frontend y API en Render, **corriendo `main`, que está atrás de `develop`** |
 | Tests del frontend | Se ejecutan en CI y antes de la demo |
 | Cobertura del frontend | Umbral de líneas: 60%, forzado en CI |

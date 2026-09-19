@@ -108,6 +108,20 @@ cd simulator && node simulador.js --reiniciar
 
 Media hora ensayando y un mapa con seis halos hace que el incendio de verdad no se note.
 
+### El chofer que deja la migración
+
+La migración de choferes convierte los `choferId` de texto libre que ya estaban en la base: por
+cada valor distinto crea un chofer, con ese texto de nombre **y** de legajo, y `usuarioSub` en
+`NULL`. Funciona, pero deja un chofer con nombre de identificador —`dev-chofer`, por ejemplo—
+**visible en el listado del ABM y en el selector de "Asignar a"**.
+
+No hace falta tocar nada: **dalo de baja**. La baja es lógica, y tanto el listado como el selector
+muestran solo activos, así que desaparece de los dos lugares sin perder el historial de las rutas
+que tenga asociadas.
+
+Si la baja falla con `CHOFER_CON_RUTA_ACTIVA`, es porque esa ruta sigue abierta: cerrala o
+reasignala primero. **Hacelo antes de la demo, no en vivo.**
+
 ### Tener a mano, en pestañas ya abiertas
 
 | Pestaña | Para qué |
@@ -345,6 +359,7 @@ Todas estas se ven como "no anda" cuando en realidad el sistema está haciendo l
 |---|---|---|
 | **Emitirle la credencial a Juana Perez** | El token de `token:dev -- CHOFER` deja de servir, y te quedás sin plan B | Emitir una credencial **rota** el identificador de sesión. Dar de alta un chofer nuevo en vivo y emitirle a ese |
 | **Un chofer sin credencial emitida** | Se le asigna la ruta bien, pero él no ve nada | Un chofer puede existir sin acceso configurado. La pantalla de asignación avisa antes de confirmar; si igual pasa, emitirle la credencial |
+| **El botón "Copiar" de la credencial falla callado** | Creés que la copiaste, cerrás el modal —que no se puede reabrir— y la credencial se perdió | Si el navegador no da permiso de portapapeles, no copia y antes no avisaba. La regla es simple: **si el botón no pasa a "✓ Copiada", no se copió.** Leerla y anotarla antes de cerrar |
 | **Cerrar la pestaña del celular** | El chofer pierde la credencial y no hay forma de recuperarla | Vive en `sessionStorage`: **aguanta un refresh pero muere con la pestaña**, y no se puede volver a consultar. Si pasa en vivo, emitirle otra desde `/choferes` — y tener presente que eso mata la anterior. Dejar la pestaña abierta desde el paso 6 |
 | **Correr `saturacion` dos veces** | La segunda vez no aparece ninguna alerta nueva | Es correcto: la alerta se emite solo en la transición. Usar otro contenedor, o explicarlo como una virtud |
 | **Saturación e incendio sobre el mismo contenedor** | El remate se cae: no podés mostrar un contenedor verde prendido fuego si lo acabás de saturar | Los escenarios pegan sobre el primer contenedor salvo que les digas otro. Usar `--contenedor CT-0007` en el de incendio |
