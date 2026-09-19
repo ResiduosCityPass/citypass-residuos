@@ -112,15 +112,26 @@ Media hora ensayando y un mapa con seis halos hace que el incendio de verdad no 
 
 La migración de choferes convierte los `choferId` de texto libre que ya estaban en la base: por
 cada valor distinto crea un chofer, con ese texto de nombre **y** de legajo, y `usuarioSub` en
-`NULL`. Funciona, pero deja un chofer con nombre de identificador —`dev-chofer`, por ejemplo—
-**visible en el listado del ABM y en el selector de "Asignar a"**.
+`NULL`. Funciona, pero deja choferes con nombre de identificador **visibles en el listado del ABM
+y en el selector de "Asignar a"**. Pueden ser varios, y se llaman como sea que estuviera escrito en
+la base: **el `SELECT DISTINCT "choferId"` que se corre antes de migrar dice cuántos y cuáles**.
 
-No hace falta tocar nada: **dalo de baja**. La baja es lógica, y tanto el listado como el selector
-muestran solo activos, así que desaparece de los dos lugares sin perder el historial de las rutas
-que tenga asociadas.
+La idea es darlos de baja: la baja es lógica, y el listado y el selector muestran solo activos, así
+que desaparecen de los dos lugares sin perder el historial de sus rutas.
 
-Si la baja falla con `CHOFER_CON_RUTA_ACTIVA`, es porque esa ruta sigue abierta: cerrala o
-reasignala primero. **Hacelo antes de la demo, no en vivo.**
+**Si alguno tiene una ruta abierta, la baja falla con `CHOFER_CON_RUTA_ACTIVA`**, y esa ruta no se
+puede cerrar ni reasignar desde el operador: asignar solo acepta rutas en `PROPUESTA`, y las
+paradas solo las cierra el rol `CHOFER`. Con `usuarioSub` en `NULL`, nadie puede entrar como él.
+Lo que sí funciona, en este orden:
+
+1. **Emitirle una credencial** desde `/choferes`.
+2. **Entrar con esa credencial en `/chofer`**, en otra pestaña, y **omitir las paradas que
+   queden**. Omitir pide un motivo, no la posición, así que se hace desde el escritorio. Con la
+   última parada cerrada, la ruta pasa a `COMPLETADA` y el camión vuelve a `DISPONIBLE`.
+3. **Recién ahí, darlo de baja.**
+
+Un chofer migrado sin rutas abiertas se da de baja directo. **Todo esto va el domingo, después de
+desplegar, no el día de la demo.**
 
 ### Tener a mano, en pestañas ya abiertas
 
