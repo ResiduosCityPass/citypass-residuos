@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   setZoneBlocked,
+  setContainerOutOfService,
   linkSensor,
   fetchMapContainers,
   deleteZone,
@@ -39,6 +40,19 @@ describe('rutas contra la API real', () => {
 
     expect(calledPath()).toMatch(/\/zonas\/zn-1\/bloqueo\?bloqueada=true$/);
     expect(calledOptions().method).toBe('PATCH');
+  });
+
+  it('fuera de servicio manda el valor por query, no en el cuerpo', async () => {
+    await setContainerOutOfService('ct-3', true);
+
+    expect(calledPath()).toMatch(/\/contenedores\/ct-3\/servicio\?fuera=true$/);
+    expect(calledOptions().method).toBe('PATCH');
+  });
+
+  it('reintegrar manda fuera=false', async () => {
+    await setContainerOutOfService('ct-3', false);
+
+    expect(calledPath()).toMatch(/\/contenedores\/ct-3\/servicio\?fuera=false$/);
   });
 
   it('vincular sensor sin codigo manda un objeto vacio, no null', async () => {

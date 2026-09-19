@@ -19,8 +19,8 @@ Para el contrato de la API endpoint por endpoint, con capturas reales de cada re
   Está en [ADR-009](docs/adr/ADR-009-identidad-de-los-choferes.md) y es el cambio más grande desde
   la versión anterior de este documento.
 - **No quedan pull requests pendientes de integrar en `develop`.** Lo que falta es el merge de
-  `develop` a `main` para que lo desplegado sea lo que se demuestra, y conectar en el frontend dos
-  endpoints que el backend ya expone.
+  `develop` a `main` para que lo desplegado sea lo que se demuestra, y conectar en el frontend un
+  endpoint que el backend ya expone.
 - El ciclo completo está verificado: contenedor satura → se genera la alerta → se arma la ruta →
   se asigna al chofer → el chofer confirma → el contenedor vuelve a verde, la alerta se cierra y
   el camión queda libre.
@@ -579,8 +579,8 @@ solo tiene sentido si las dos fuentes devuelven exactamente lo mismo.
 
 # Qué falta
 
-Nada de esto es código a medio hacer del backend. Son trámites, un despliegue y dos pantallas que
-todavía no usan lo que el backend ya expone.
+Nada de esto es código a medio hacer del backend. Son trámites, un despliegue y una pantalla que
+todavía no usa lo que el backend ya expone.
 
 Dos detalles del proceso que siguen valiendo: **GitHub propone `main` por defecto y el destino
 tiene que ser `develop`**, y **nadie mergea su propio PR**.
@@ -641,13 +641,12 @@ queda es del frontend:
 
 | Qué | Backend | Frontend |
 |---|---|---|
-| **Poner un contenedor fuera de servicio** | `PATCH /contenedores/:id/servicio?fuera=true` para sacarlo, `?fuera=false` para reintegrarlo. Va por query, sin cuerpo. No viaja en el `PATCH` general a propósito: es un acto operativo, no la edición de un campo. Al reintegrarlo no vuelve a `NORMAL` a ciegas, se reevalúa contra el umbral de la zona | **Falta.** El botón del detalle sigue deshabilitado, con un tooltip que dice que el backend no tiene el endpoint — y sí lo tiene |
+| **Poner un contenedor fuera de servicio** | `PATCH /contenedores/:id/servicio?fuera=true` para sacarlo, `?fuera=false` para reintegrarlo. Va por query, sin cuerpo. No viaja en el `PATCH` general a propósito: es un acto operativo, no la edición de un campo. Al reintegrarlo no vuelve a `NORMAL` a ciegas, se reevalúa contra el umbral de la zona | Hecho. El botón del detalle alterna entre sacarlo y reintegrarlo, y al reintegrar avisa en qué estado quedó |
 | **Saber si el contenedor ya tiene sensor** | `GET /contenedores` trae `sensor` en cada fila. La `apiKeyHash` no viaja: está declarada `select: false` | **Falta.** El listado deja intentar vincular y espera el `409` |
 | **Avance de paradas en el listado de rutas** | `GET /rutas` trae `avance` con `total`, `confirmadas`, `omitidas` y `pendientes` | Hecho |
 | **Omitir una parada** | `PATCH /paradas/:id/omitir` con `{ motivo }` | Hecho |
 
-Ninguno de los dos que faltan bloquea la demo. **El tooltip sí conviene sacarlo** aunque no se
-conecte el botón, porque afirma algo falso sobre el backend.
+El que falta no bloquea la demo.
 
 ## 5. Lo que depende de otros equipos
 
