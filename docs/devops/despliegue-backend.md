@@ -131,12 +131,26 @@ Si responde un array, la API llegó hasta PostgreSQL. Si responde `[]`, la app f
 sembrar datos. Si un endpoint privado responde `401` sin token, es buena señal: los guards están
 activos.
 
-## 7. Evidencia del despliegue
+## 7. CD desde GitHub Actions
+
+Render esta configurado con `autoDeployTrigger: off`. El deploy de produccion ocurre en el job
+`Deploy — Render` del workflow `CI`, solo despues de que backend, frontend, Docker y SonarQube
+terminan en verde sobre `main`.
+
+El job usa dos secretos del repositorio, que no se versionan:
+
+- `RENDER_DEPLOY_HOOK_API`
+- `RENDER_DEPLOY_HOOK_FRONTEND`
+
+Son los deploy hooks de los servicios correspondientes en Render. Al terminar el job hay que
+confirmar el estado final en el dashboard y correr los chequeos de la seccion anterior.
+
+## 8. Evidencia del despliegue
 
 La evidencia del Blueprint creado, URLs publicas y chequeos post-deploy esta en
 [`evidencia-despliegue.md`](evidencia-despliegue.md).
 
-## 8. Documentos relacionados
+## 9. Documentos relacionados
 
 - [ADR-002](../adr/ADR-002-persistencia.md) — por qué el esquema sale de migraciones.
 - [ADR-005](../adr/ADR-005-seguridad-identidad.md) — identidad, roles y health público.

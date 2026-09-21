@@ -24,7 +24,7 @@ RabbitMQ está declarado pero no se usa hasta el Sprint 2: hasta entonces el bac
 | 1 | Proteger `main` y `develop`: PR obligatorio, CI en verde, sin bypass | 0 | Guía lista en [`docs/devops/proteccion-ramas.md`](../docs/devops/proteccion-ramas.md) |
 | 2 | `Dockerfile` multi-stage para el backend | 1 | **Hecho** — ver abajo |
 | 3 | `Dockerfile` para el frontend (React + Vite: build y servir estáticos) | 2 | **Hecho** — ver abajo |
-| 4 | Job de deploy en el pipeline | 3 | **Hecho** — job informativo `Deploy — Render auto deploy` |
+| 4 | Job de deploy en el pipeline | 3 | **Hecho** — `Deploy — Render`, disparado por hooks despues de CI verde |
 | 5 | Elegir destino cloud y escribirlo como IaC — la dimensión 7 pide *infraestructura como código*, no despliegue manual | 3-4 | **Hecho** — Render + [`render.yaml`](../render.yaml) |
 
 ---
@@ -95,10 +95,11 @@ Docker, PostgreSQL administrado y secretos configurados fuera del repo.
 La evidencia del despliegue creado esta documentada en
 [`docs/devops/evidencia-despliegue.md`](../docs/devops/evidencia-despliegue.md).
 
-El workflow `CI` tiene un job final `Deploy — Render auto deploy`, que corre solo en pushes a
-`main` despues de backend, frontend y Docker. Ese job deja evidencia en GitHub Actions y verifica
-que el Blueprint mantenga `autoDeployTrigger: checksPass`; el deploy real lo dispara Render cuando
-los checks de GitHub pasan.
+El workflow `CI` tiene un job final `Deploy — Render`, que corre solo en pushes a `main` despues
+de backend, frontend, Docker y SonarQube. Ese job dispara los deploy hooks de los dos servicios.
+Los hooks se guardan como secretos de GitHub (`RENDER_DEPLOY_HOOK_API` y
+`RENDER_DEPLOY_HOOK_FRONTEND`); Render queda con `autoDeployTrigger: off` para no ejecutar un
+segundo deploy por la deteccion automatica del push.
 
 Para crear el entorno en Render:
 
