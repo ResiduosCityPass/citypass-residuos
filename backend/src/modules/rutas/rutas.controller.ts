@@ -78,10 +78,18 @@ export class RutasController {
     return this.rutas.obtener(id);
   }
 
+  @Patch(':id/descartar')
+  @Roles(Rol.ADMINISTRADOR, Rol.OPERADOR)
+  @ApiOperation({ summary: 'CU-08 · Descartar una propuesta y liberar sus contenedores' })
+  @ApiResponse({ status: 409, description: 'RUTA_NO_PROPUESTA' })
+  descartar(@Param('id', ParseUUIDPipe) id: string) {
+    return this.rutas.descartar(id);
+  }
+
   @Patch(':id/asignar')
   @Roles(Rol.ADMINISTRADOR, Rol.OPERADOR)
   @ApiOperation({ summary: 'CU-09 · Confirmar la propuesta y asignarle chofer' })
-  @ApiResponse({ status: 409, description: 'RUTA_NO_PROPUESTA' })
+  @ApiResponse({ status: 409, description: 'RUTA_NO_PROPUESTA, CAMION_NO_DISPONIBLE' })
   asignar(@Param('id', ParseUUIDPipe) id: string, @Body() dto: AsignarRutaDto) {
     return this.rutas.asignar(id, dto);
   }

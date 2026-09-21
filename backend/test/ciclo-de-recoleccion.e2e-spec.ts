@@ -240,6 +240,73 @@ describe('Ciclo de recoleccion (e2e)', () => {
       expect(segunda.body.code).toBe('RUTA_SIN_CONTENEDORES');
     });
 
+    it('descartar una propuesta libera sus contenedores para otra ruta', async () => {
+      // Sin descartar, una propuesta que nadie asignaba dejaba sus contenedores
+      // comprometidos para siempre: cualquier otra ruta daba RUTA_SIN_CONTENEDORES.
+      const { camion } = await prepararEscenario(2);
+      const propuesta = await http
+        .post('/api/v1/rutas/generar')
+        .set(auth(admin))
+        .send({ camionId: camion.id })
+        .expect(201);
+
+      const descartada = await http
+        .patch(`/api/v1/rutas/${propuesta.body.id}/descartar`)
+        .set(auth(admin))
+        .expect(200);
+      expect(descartada.body.estado).toBe(EstadoRuta.CANCELADA);
+
+      const otra = await http
+        .post('/api/v1/rutas/generar')
+        .set(auth(admin))
+        .send({ camionId: camion.id })
+        .expect(201);
+      expect(otra.body.paradas).toHaveLength(2);
+    });
+
+    it('una ruta asignada no se descarta', async () => {
+      const { camion, choferId } = await prepararEscenario(1);
+      const ruta = await http
+        .post('/api/v1/rutas/generar')
+        .set(auth(admin))
+        .send({ camionId: camion.id })
+        .expect(201);
+      await http
+        .patch(`/api/v1/rutas/${ruta.body.id}/asignar`)
+        .set(auth(admin))
+        .send({ choferId })
+        .expect(200);
+
+      const respuesta = await http
+        .patch(`/api/v1/rutas/${ruta.body.id}/descartar`)
+        .set(auth(admin))
+        .expect(409);
+      expect(respuesta.body.code).toBe('RUTA_NO_PROPUESTA');
+    });
+
+    it('no asigna una propuesta si el camion ya salio en otra ruta', async () => {
+      // Generar no reserva el camion. Antes se podian asignar dos propuestas
+      // del mismo camion, y cerrar la primera lo liberaba con la segunda viva.
+      const { camion, choferId } = await prepararEscenario(1);
+      const primera = await http
+        .post('/api/v1/rutas/generar')
+        .set(auth(admin))
+        .send({ camionId: camion.id })
+        .expect(201);
+      await http
+        .patch(`/api/v1/camiones/${camion.id}`)
+        .set(auth(admin))
+        .send({ estado: 'MANTENIMIENTO' })
+        .expect(200);
+
+      const respuesta = await http
+        .patch(`/api/v1/rutas/${primera.body.id}/asignar`)
+        .set(auth(admin))
+        .send({ choferId })
+        .expect(409);
+      expect(respuesta.body.code).toBe('CAMION_NO_DISPONIBLE');
+    });
+
     it('no rutea contenedores de una zona bloqueada', async () => {
       const { zona, camion } = await prepararEscenario(1);
 
@@ -632,6 +699,32 @@ describe('Ciclo de recoleccion (e2e)', () => {
         .set(auth(admin))
         .expect(200);
       expect(alertas.body).toHaveLength(1);
+    });
+
+    it('confirmar cierra tambien una alerta de saturacion que alguien estaba atendiendo', async () => {
+      // Antes solo se cerraban las ABIERTA: si el operador habia tocado
+      // "Atender" antes de que el chofer vaciara, la alerta quedaba EN_ATENCION
+      // para siempre, con el contenedor ya vacio.
+      const { chofer, paradas, contenedores } = await rutaAsignada(1);
+      const objetivo = contenedores.find((c: { id: string }) => c.id === paradas[0].contenedorId)!;
+
+      const [alerta] = (
+        await http
+          .get(`/api/v1/alertas?tipo=SATURACION&contenedorId=${objetivo.id}`)
+          .set(auth(admin))
+          .expect(200)
+      ).body;
+      await http.patch(`/api/v1/alertas/${alerta.id}/atender`).set(auth(admin)).expect(200);
+
+      const confirmacion = await http
+        .patch(`/api/v1/paradas/${paradas[0].id}/confirmar`)
+        .set(auth(chofer))
+        .send({ lat: objetivo.lat, lng: objetivo.lng })
+        .expect(200);
+      expect(confirmacion.body.alertasCerradas).toBe(1);
+
+      const despues = await http.get(`/api/v1/alertas/${alerta.id}`).set(auth(admin)).expect(200);
+      expect(despues.body.estado).toBe('RESUELTA');
     });
 
     it('no exige estar cerca del contenedor', async () => {

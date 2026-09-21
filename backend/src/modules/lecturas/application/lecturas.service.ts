@@ -1,4 +1,11 @@
-import { ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EstadoContenedor, TipoAlerta } from '../../../shared/domain/enums';
 import { ContextoTransaccional } from '../../../shared/persistence/contexto-transaccional';
@@ -23,6 +30,16 @@ import {
   hayRiesgoDeIncendio,
   severidadPorSaturacion,
 } from '../domain/reglas/evaluador-estado';
+
+/**
+ * Cuanto puede venir adelantado el reloj de un sensor.
+ *
+ * Los relojes derivan, asi que exigir `registradaEn <= ahora` exacto rechazaria
+ * lecturas buenas. Pero sin tope, una sola lectura con fecha futura congelaba el
+ * contenedor: toda lectura real posterior quedaba "fuera de orden" contra ella
+ * y se rechazaba con 409, aunque viniera al 95%.
+ */
+export const TOLERANCIA_RELOJ_SENSOR_MS = 5 * 60 * 1000;
 
 export interface ResultadoIngesta {
   lecturaId: string;
@@ -102,6 +119,16 @@ export class LecturasService {
     }
 
     const registradaEn = datos.registradaEn ?? new Date();
+
+    if (registradaEn.getTime() > Date.now() + TOLERANCIA_RELOJ_SENSOR_MS) {
+      throw new BadRequestException({
+        message:
+          `La lectura dice haberse tomado en ${registradaEn.toISOString()}, en el futuro. ` +
+          `Revisar el reloj del sensor ${sensor.codigo}.`,
+        code: 'LECTURA_EN_EL_FUTURO',
+      });
+    }
+
     await this.verificarCronologia(contenedor.id, registradaEn);
 
     const lectura = await this.lecturas.crear({

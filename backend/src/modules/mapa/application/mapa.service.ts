@@ -1,11 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
-import {
-  EstadoAlerta,
-  EstadoContenedor,
-  TipoAlerta,
-  TipoResiduo,
-} from '../../../shared/domain/enums';
+import { EstadoContenedor, TipoAlerta, TipoResiduo } from '../../../shared/domain/enums';
 import { AlertasService } from '../../alertas/application/alertas.service';
+import { ESTADOS_SIN_RESOLVER } from '../../alertas/domain/alerta.repository';
 import {
   CONTENEDOR_REPOSITORY,
   ContenedorRepository,
@@ -55,7 +51,8 @@ export class MapaService {
   async marcadores(filtro: FiltroContenedores): Promise<MarcadorMapa[]> {
     const [contenedores, incendios] = await Promise.all([
       this.contenedores.listarConZona({ ...filtro, soloActivos: true }),
-      this.alertas.listar({ tipo: TipoAlerta.INCENDIO, estado: EstadoAlerta.ABIERTA }),
+      // Atender un incendio no lo apaga: el halo sigue mientras no se resuelva.
+      this.alertas.listar({ tipo: TipoAlerta.INCENDIO, estado: ESTADOS_SIN_RESOLVER }),
     ]);
 
     const conIncendio = new Set(incendios.map((a) => a.contenedorId));

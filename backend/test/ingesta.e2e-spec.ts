@@ -124,6 +124,60 @@ describe('Flujo de ingesta (e2e)', () => {
     expect(respuesta.body.alertasGeneradas).toContain('INCENDIO');
   });
 
+  it('CU-06: atender un incendio no genera otro mientras el contenedor sigue caliente', async () => {
+    // Antes solo ABIERTA contaba como alerta viva. Atender el incendio lo pasaba
+    // a EN_ATENCION, y la lectura siguiente —todavia caliente— creaba otra
+    // alerta y le mandaba a Emergencias un segundo aviso del mismo fuego.
+    const { apiKey } = await alta();
+    await reportar(apiKey, { nivelLlenadoPct: 30, temperaturaC: 75, bateriaPct: 90 }).expect(202);
+
+    const [alerta] = (
+      await http
+        .get('/api/v1/alertas?tipo=INCENDIO')
+        .set('Authorization', `Bearer ${admin}`)
+        .expect(200)
+    ).body;
+    await http
+      .patch(`/api/v1/alertas/${alerta.id}/atender`)
+      .set('Authorization', `Bearer ${admin}`)
+      .expect(200);
+
+    const siguiente = await reportar(apiKey, {
+      nivelLlenadoPct: 30,
+      temperaturaC: 76,
+      bateriaPct: 90,
+    }).expect(202);
+
+    expect(siguiente.body.alertasGeneradas).not.toContain('INCENDIO');
+
+    const incendios = await http
+      .get('/api/v1/alertas?tipo=INCENDIO')
+      .set('Authorization', `Bearer ${admin}`)
+      .expect(200);
+    expect(incendios.body).toHaveLength(1);
+
+    const [{ count }] = await ctx.dataSource.query(
+      `SELECT count(*) FROM evento_pendiente WHERE "eventType" = 'residuos.incendio.detectado'`,
+    );
+    expect(Number(count)).toBe(1);
+  });
+
+  it('rechaza una lectura con fecha futura, que congelaria el contenedor', async () => {
+    const { apiKey } = await alta();
+    const enUnAnio = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+
+    const respuesta = await reportar(apiKey, {
+      nivelLlenadoPct: 10,
+      temperaturaC: 20,
+      bateriaPct: 90,
+      registradaEn: enUnAnio,
+    }).expect(400);
+    expect(respuesta.body.code).toBe('LECTURA_EN_EL_FUTURO');
+
+    // Lo que importa: la lectura real que viene despues entra.
+    await reportar(apiKey, { nivelLlenadoPct: 95, temperaturaC: 20, bateriaPct: 90 }).expect(202);
+  });
+
   it('el listado de alertas trae el codigo del contenedor resuelto por la base', async () => {
     const { contenedor, apiKey } = await alta();
     await reportar(apiKey, { nivelLlenadoPct: 80, temperaturaC: 21, bateriaPct: 90 }).expect(202);

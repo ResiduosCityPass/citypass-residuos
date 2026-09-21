@@ -56,12 +56,12 @@ export class FlotaService {
     const camion = await this.obtener(id);
 
     // Un camion en ruta no se manda a mantenimiento por el medio: quedaria una
-    // ruta viva apuntando a un camion que ya no esta circulando. Primero se
-    // cierra o cancela la ruta.
+    // ruta viva apuntando a un camion que ya no esta circulando. Primero tiene
+    // que terminar la ruta.
     if (camion.estado === EstadoCamion.EN_RUTA && dto.estado && dto.estado !== camion.estado) {
       throw new ConflictException({
         message:
-          `El camion ${camion.patente} esta en ruta: cerra o cancela su ruta antes de ` +
+          `El camion ${camion.patente} esta en ruta: su ruta tiene que terminar antes de ` +
           `cambiarle el estado.`,
         code: 'CAMION_EN_RUTA',
       });

@@ -191,6 +191,28 @@ describe('LecturasService (CU-04)', () => {
         }),
       ).resolves.toBeDefined();
     });
+
+    it('rechaza una lectura con fecha futura, antes de guardarla', async () => {
+      // Sin este tope, una sola lectura del futuro congelaba el contenedor:
+      // toda lectura real posterior quedaba fuera de orden contra ella.
+      construir(contenedorDe());
+      const enUnaHora = new Date(Date.now() + 60 * 60 * 1000);
+
+      await expect(
+        service.registrar(sensorDe(), { ...lecturaNormal, registradaEn: enUnaHora }),
+      ).rejects.toMatchObject({ response: { code: 'LECTURA_EN_EL_FUTURO' } });
+      expect(lecturas.crear).not.toHaveBeenCalled();
+    });
+
+    it('tolera un reloj de sensor apenas adelantado', async () => {
+      // Los relojes derivan: exigir <= ahora exacto rechazaria lecturas buenas.
+      construir(contenedorDe());
+      const enUnMinuto = new Date(Date.now() + 60 * 1000);
+
+      await expect(
+        service.registrar(sensorDe(), { ...lecturaNormal, registradaEn: enUnMinuto }),
+      ).resolves.toBeDefined();
+    });
   });
 
   describe('CU-05 · deteccion de contenedor critico', () => {
