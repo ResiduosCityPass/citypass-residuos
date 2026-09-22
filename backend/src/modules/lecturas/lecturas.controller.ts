@@ -26,6 +26,7 @@ export class LecturasController {
   @ApiOperation({ summary: 'CU-04 · Registrar una lectura de sensor' })
   @ApiResponse({ status: 202, description: 'Lectura aceptada y reglas evaluadas' })
   @ApiResponse({ status: 401, description: 'X-Sensor-Key ausente o invalida' })
+  @ApiResponse({ status: 400, description: 'LECTURA_EN_EL_FUTURO' })
   @ApiResponse({ status: 409, description: 'La lectura llega fuera de orden cronologico' })
   registrar(@Req() request: Request, @Body() dto: RegistrarLecturaDto) {
     return this.lecturas.registrar(request.sensor!, dto);

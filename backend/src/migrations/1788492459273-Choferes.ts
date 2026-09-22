@@ -10,11 +10,12 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * los choferes que hoy existen como texto, se traduce cada ruta a su id, y
  * recien ahi se reemplaza la columna.
  *
- * Verificada sobre datos legacy, no solo sobre una base vacia: con tres rutas
- * escritas a mano -dos de un identificador y una de otro- quedan dos choferes
- * con sus rutas intactas, ninguna ruta pierde a quien la ejecuto, y el `down()`
- * devuelve el texto original exacto. El CI solo ejercita el camino desde una
- * base vacia, asi que esa parte se probo a mano.
+ * Verificada sobre datos legacy, no solo sobre una base vacia: con rutas
+ * escritas a mano -incluidos dos identificadores de 55 caracteres que comparten
+ * los primeros 51- cada texto distinto queda en un chofer propio, ninguna ruta
+ * pierde a quien la ejecuto, y el `down()` devuelve el texto original exacto.
+ * El CI solo ejercita el camino desde una base vacia, asi que esa parte se
+ * probo a mano.
  */
 export class Choferes1788492459273 implements MigrationInterface {
   name = 'Choferes1788492459273';
@@ -43,18 +44,30 @@ export class Choferes1788492459273 implements MigrationInterface {
     // credencial. Que es exactamente la situacion de alguien que hasta ayer era
     // un texto en un campo. El indice unico es parcial, asi que varios NULL
     // conviven sin chocar.
+    //
+    // El texto viejo admitia 120 caracteres y `legajo` tiene 40. Sin recortarlo,
+    // un solo identificador largo hacia fallar el INSERT, y como en produccion
+    // las migraciones corren al arrancar, el contenedor no levantaba. Los largos
+    // se recortan y se les agrega un sufijo del hash del texto completo, para que
+    // dos identificadores que comparten los primeros caracteres no choquen contra
+    // la unicidad del legajo. El texto entero queda en `nombre`, que es de 120.
     await queryRunner.query(
       `INSERT INTO "chofer" ("nombre", "legajo")
-       SELECT DISTINCT "choferId", "choferId"
-       FROM "ruta"
-       WHERE "choferId" IS NOT NULL`,
+       SELECT "choferId",
+              CASE WHEN length("choferId") <= 40 THEN "choferId"
+                   ELSE left("choferId", 31) || '-' || left(md5("choferId"), 8)
+              END
+       FROM (SELECT DISTINCT "choferId" FROM "ruta" WHERE "choferId" IS NOT NULL) AS viejos`,
     );
 
+    // Se cruza por `nombre`, que tiene el texto completo: el legajo pudo quedar
+    // recortado. Dentro de esta migracion `nombre` es unico, porque cada chofer
+    // sale de un DISTINCT sobre ese mismo texto.
     await queryRunner.query(`ALTER TABLE "ruta" ADD "choferIdNuevo" uuid`);
     await queryRunner.query(
       `UPDATE "ruta" SET "choferIdNuevo" = "chofer"."id"
        FROM "chofer"
-       WHERE "chofer"."legajo" = "ruta"."choferId"`,
+       WHERE "chofer"."nombre" = "ruta"."choferId"`,
     );
 
     await queryRunner.query(`DROP INDEX "public"."IDX_3845ac02d47f0dd4f9321e2727"`);
@@ -70,9 +83,11 @@ export class Choferes1788492459273 implements MigrationInterface {
   }
 
   /**
-   * Vuelve a texto libre traduciendo cada id a su legajo, que es el campo que
-   * sobrevive a la ida y vuelta. El `usuarioSub` no sirve para esto: es
-   * nullable, y ademas es informacion que el modelo viejo no sabia representar.
+   * Vuelve a texto libre traduciendo cada id a su `nombre`, que es donde el
+   * `up()` dejo el texto original completo. El legajo no sirve: un
+   * identificador de mas de 40 caracteres quedo recortado ahi. Tampoco el
+   * `usuarioSub`, que es nullable y es informacion que el modelo viejo no sabia
+   * representar.
    */
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`ALTER TABLE "ruta" DROP CONSTRAINT "FK_3845ac02d47f0dd4f9321e27274"`);
@@ -80,7 +95,7 @@ export class Choferes1788492459273 implements MigrationInterface {
 
     await queryRunner.query(`ALTER TABLE "ruta" ADD "choferIdViejo" character varying(120)`);
     await queryRunner.query(
-      `UPDATE "ruta" SET "choferIdViejo" = "chofer"."legajo"
+      `UPDATE "ruta" SET "choferIdViejo" = "chofer"."nombre"
        FROM "chofer"
        WHERE "chofer"."id" = "ruta"."choferId"`,
     );

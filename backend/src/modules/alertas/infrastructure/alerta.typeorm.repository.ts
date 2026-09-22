@@ -2,10 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ContextoTransaccional } from '../../../shared/persistence/contexto-transaccional';
 import { RepositorioTypeorm } from '../../../shared/persistence/repositorio-typeorm';
-import { FindOptionsWhere, Repository } from 'typeorm';
-import { EstadoAlerta, TipoAlerta } from '../../../shared/domain/enums';
+import { FindOptionsWhere, In, Repository } from 'typeorm';
+import { TipoAlerta } from '../../../shared/domain/enums';
 import { Alerta } from '../domain/alerta.entity';
-import { AlertaRepository, FiltroAlertas } from '../domain/alerta.repository';
+import { AlertaRepository, ESTADOS_SIN_RESOLVER, FiltroAlertas } from '../domain/alerta.repository';
 
 @Injectable()
 export class AlertaTypeormRepository
@@ -34,7 +34,7 @@ export class AlertaTypeormRepository
 
   buscarAbierta(contenedorId: string, tipo: TipoAlerta): Promise<Alerta | null> {
     return this.repo().findOne({
-      where: { contenedorId, tipo, estado: EstadoAlerta.ABIERTA },
+      where: { contenedorId, tipo, estado: In(ESTADOS_SIN_RESOLVER) },
     });
   }
 
@@ -44,7 +44,9 @@ export class AlertaTypeormRepository
     if (filtro.contenedorId) where.contenedorId = filtro.contenedorId;
     if (filtro.tipo) where.tipo = filtro.tipo;
     if (filtro.severidad) where.severidad = filtro.severidad;
-    if (filtro.estado) where.estado = filtro.estado;
+    if (filtro.estado) {
+      where.estado = Array.isArray(filtro.estado) ? In(filtro.estado) : filtro.estado;
+    }
 
     return this.repo().find({
       where,
@@ -56,6 +58,8 @@ export class AlertaTypeormRepository
   }
 
   listarAbiertasPorContenedor(contenedorId: string, tipo: TipoAlerta): Promise<Alerta[]> {
-    return this.repo().find({ where: { contenedorId, tipo, estado: EstadoAlerta.ABIERTA } });
+    return this.repo().find({
+      where: { contenedorId, tipo, estado: In(ESTADOS_SIN_RESOLVER) },
+    });
   }
 }

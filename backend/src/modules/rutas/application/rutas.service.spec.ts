@@ -263,6 +263,50 @@ describe('RutasService (CU-08, CU-09)', () => {
         NotFoundException,
       );
     });
+
+    it.each([EstadoCamion.EN_RUTA, EstadoCamion.MANTENIMIENTO])(
+      'no asigna si el camion paso a %s despues de generar la propuesta',
+      async (estado) => {
+        // Generar no reserva el camion. Sin este control, el mismo camion
+        // quedaba con dos rutas vivas, o salia de mantenimiento sin avisar.
+        flota.obtener.mockResolvedValue({ ...CAMION, estado } as Camion);
+
+        await expect(service.asignar('rt-1', { choferId: 'ch-1' })).rejects.toMatchObject({
+          response: { code: 'CAMION_NO_DISPONIBLE' },
+        });
+        expect(rutas.guardar).not.toHaveBeenCalled();
+        expect(flota.guardarEstado).not.toHaveBeenCalled();
+      },
+    );
+  });
+
+  describe('CU-08 · descartar', () => {
+    it('pasa la propuesta a CANCELADA, que libera sus contenedores', async () => {
+      const ruta = rutaCreada();
+      rutas.buscarPorId.mockResolvedValue(ruta);
+
+      await service.descartar('rt-1');
+
+      // CANCELADA no esta entre los estados vivos, asi que sus contenedores
+      // vuelven a quedar disponibles para otra ruta.
+      expect(ruta.estado).toBe(EstadoRuta.CANCELADA);
+      expect(rutas.guardar).toHaveBeenCalledWith(ruta);
+    });
+
+    it('no toca el camion: una propuesta nunca lo tomo', async () => {
+      await service.descartar('rt-1');
+
+      expect(flota.guardarEstado).not.toHaveBeenCalled();
+    });
+
+    it('una ruta ya asignada no se descarta: tiene un chofer en la calle', async () => {
+      rutas.buscarPorId.mockResolvedValue(rutaCreada({ estado: EstadoRuta.ASIGNADA }));
+
+      await expect(service.descartar('rt-1')).rejects.toMatchObject({
+        response: { code: 'RUTA_NO_PROPUESTA' },
+      });
+      expect(rutas.guardar).not.toHaveBeenCalled();
+    });
   });
 
   describe('listar · avance de paradas', () => {
