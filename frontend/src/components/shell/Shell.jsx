@@ -23,6 +23,11 @@ export default function Shell({ title, subtitle, openAlerts, onTokenChange, chil
   // tocarlos, pero el boton atras del navegador no pasaba por ahi.
   const { pathname } = useLocation();
   const [openedAt, setOpenedAt] = useState(null);
+  // Salir de la pantalla olvida que estaba abierto. Sin esto, atras lo cerraba
+  // pero adelante volvia a la pantalla anotada y el cajon se reabria solo, con
+  // el body en `no-scroll`. Va durante el render y no en un efecto: es el
+  // patron de React para ajustar estado cuando cambia una prop.
+  if (openedAt !== null && openedAt !== pathname) setOpenedAt(null);
   const menuOpen = openedAt === pathname;
   const close = useCallback(() => setOpenedAt(null), []);
   const opener = useRef(null);

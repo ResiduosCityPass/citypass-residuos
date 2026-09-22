@@ -32,10 +32,15 @@ function fakeMatchMedia() {
   };
 }
 
-/** Un boton de "atras" que no pasa por el menu, como el del navegador. */
+/** Los botones atras y adelante del navegador: no pasan por el menu. */
 function BackButton() {
   const navigate = useNavigate();
-  return <button type="button" onClick={() => navigate(-1)}>Atras del navegador</button>;
+  return (
+    <>
+      <button type="button" onClick={() => navigate(-1)}>Atras del navegador</button>
+      <button type="button" onClick={() => navigate(1)}>Adelante del navegador</button>
+    </>
+  );
 }
 
 const renderShell = (initialEntries = ['/mapa']) =>
@@ -209,6 +214,25 @@ describe('menu lateral y barra superior', () => {
 
     expect(within(sidebar()).getByRole('link', { name: 'Mapa en vivo' })).toHaveClass('active');
     expect(sidebar()).not.toHaveClass('open');
+  });
+
+  /**
+   * Volver hacia adelante a la pantalla donde se habia abierto no lo reabre.
+   * Lo encontro Fran en la revision: el estado seguia anotando esa pantalla y
+   * al volver a ella el cajon aparecia abierto, con el body sin scroll.
+   */
+  it('atras y despues adelante no lo vuelve a abrir', async () => {
+    const user = userEvent.setup();
+    renderShell(['/mapa', '/contenedores']);
+
+    await user.click(menuButton());
+    await user.click(screen.getByRole('button', { name: 'Atras del navegador' }));
+    await user.click(screen.getByRole('button', { name: 'Adelante del navegador' }));
+
+    expect(within(sidebar()).getByRole('link', { name: 'Contenedores' })).toHaveClass('active');
+    expect(sidebar()).not.toHaveClass('open');
+    expect(menuButton()).toHaveAttribute('aria-expanded', 'false');
+    expect(document.body).not.toHaveClass('no-scroll');
   });
 
   /**
