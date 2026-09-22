@@ -145,6 +145,73 @@ desplegar, no el día de la demo.**
 
 ---
 
+## Corriendo el guion contra Render (video del 23/09 y demo del 24/09)
+
+Fran confirmó el 22/09 que Render ya tiene la versión sin códigos de caso de uso. A partir de acá
+el video y la demo se ensayan contra el deploy, no contra `localhost`. Las pantallas del operador y
+del ciudadano son las mismas, cambiando el host:
+
+| Local | Render |
+|---|---|
+| `http://localhost:5173` | `https://citypass-residuos-frontend.onrender.com` |
+| `http://localhost:3000/api/v1/health` | `https://citypass-residuos-api.onrender.com/api/v1/health` |
+| `http://localhost:3000/docs` | `https://citypass-residuos-api.onrender.com/docs` |
+
+Lo que cambia paso a paso, decidido en el grupo el 22/09:
+
+### Paso 3 — el simulador (**pendiente, no tocar todavía**)
+
+Producción ya tiene los 8 contenedores con sensores (los cargó Rami el 08/09). Falta que confirme
+si todavía tiene las API keys de `simulator/sensores.json` de esa carga — se muestran una sola vez,
+y sin ellas el simulador no puede autenticar contra Render.
+
+- **Si las tiene:** las pasa por privado (son credenciales, no van al repo) y el paso 3 se corre
+  apuntando `simulator` a la API de Render en vez de local.
+- **Si se perdieron:** hay que sembrar contenedores nuevos y dar de baja los viejos, para no
+  duplicar el mapa.
+
+Fran no lo corre hasta saber cuál de los dos casos es, para no duplicar el mapa en vivo.
+
+### Paso 4 — el evento (cambia: se muestra en local)
+
+A la base de Render no se puede entrar desde afuera (`ipAllowList` vacía y sin consola en el plan
+gratis), y abrirla ahora es tocar infraestructura de producción por una demo. La tabla
+`evento_pendiente` se muestra en **local**, en la misma laptop — tiene el mismo código y las mismas
+migraciones que Render — y el `docker exec ... psql` de la sección "El guion" se corre ahí, no
+contra el deploy. Como respaldo, tener a mano el test de integración de outbox.
+
+### Paso 6 — el chofer de prueba (**pendiente**)
+
+Falta dar de alta en Render un chofer de prueba para emitirle la credencial en vivo, igual que en
+local. Todavía no está creado.
+
+### Paso 7 — el chofer, ubicación (cambia: DevTools, no el simulador de GPS)
+
+En Render el simulador de GPS está apagado. Para el `403` por estar lejos del contenedor, simular
+la ubicación con **Chrome DevTools → More tools → Sensors → Location**, coordenadas del Obelisco:
+`-34.6037, -58.3816`.
+
+### Antes de grabar o de entrar a la demo
+
+La API en Render se duerme sola sin tráfico: un pedido en frío puede tardar más de 15 segundos y
+quien esté grabando o presentando se queda mirando una pantalla en blanco. **Pegarle al health
+unos minutos antes:**
+
+```bash
+curl https://citypass-residuos-api.onrender.com/api/v1/health
+```
+
+El frontend es estático y no se duerme, así que solo hace falta despertar la API. Lo hace quien
+grabe el video, y lo mismo antes de la demo del 24/09.
+
+### Plan B en Render
+
+Juana Perez y el token de `npm run token:dev -- CHOFER` no existen en producción — son datos del
+seed local. El respaldo acá es **el chofer que dio de alta Fran**, y no se toca en los ensayos, por
+la misma razón que Juana no se toca en local.
+
+---
+
 ## El guion
 
 ### 1 · El mapa (1 min) — CU-07
