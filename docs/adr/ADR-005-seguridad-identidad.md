@@ -44,18 +44,19 @@ puede atravesar un flujo de login interactivo.
 | Recurso | Administrador | Operador | Chofer | Ciudadano | Sensor |
 |---|---|---|---|---|---|
 | Contenedores — alta, baja, edición | Sí | — | — | — | — |
-| Contenedores — lectura | Sí | Sí | Sí | Sí (vista pública) | — |
+| Contenedores — marcar fuera de servicio | Sí | Sí | — | — | — |
+| Contenedores — lectura | Sí | Sí | — | Sí (vista pública) | — |
 | Zonas y umbrales — alta, baja, edición | Sí | — | — | — | — |
-| Zonas y umbrales — lectura | Sí | Sí | — | — | — |
+| Zonas y umbrales — lectura y bloqueo | Sí | Sí | — | — | — |
 | Flota | Sí | Sí (lectura) | — | — | — |
-| Lecturas — alta | — | — | — | — | Sí |
-| Alertas | Sí | Sí | — | — | — |
-| Rutas — generar y asignar | Sí | Sí | — | — | — |
 | Choferes — ABM | Sí | — | — | — | — |
 | Choferes — lectura | Sí | Sí | — | — | — |
-| Rutas — ver el detalle por id | Sí | Sí | — | — | — |
+| Lecturas — alta | — | — | — | — | Sí |
+| Alertas | Sí | Sí | — | — | — |
+| Rutas — generar, listar, ver detalle por id, descartar, asignar | Sí | Sí | — | — | — |
 | Rutas — ver la propia (`/rutas/mias`) | — | — | Sí | — | — |
-| Confirmar vaciado | — | — | Sí | — | — |
+| Paradas — confirmar u omitir vaciado | — | — | Sí | — | — |
+| Predicción de saturación | Sí | Sí | — | — | — |
 
 ## Consecuencias
 
@@ -118,12 +119,37 @@ contra la matriz. Dos diferencias:
 
 - **Zonas — lectura:** el código ya le da acceso a Operador (`@Roles(ADMINISTRADOR, OPERADOR)`),
   siguiendo a [api-preliminar.md](../arquitectura/api-preliminar.md), que documentaba esto desde
-  antes. La matriz de este ADR había quedado vieja — corregida arriba, no era un problema de
-  seguridad.
-- **Contenedores — lectura:** la matriz promete acceso a Chofer; el código de `contenedores.controller.ts`
-  solo permite Administrador y Operador. **Acción abierta:** decidir si el chofer necesita pegarle
-  directo a `/contenedores`, o le alcanza con lo que traiga `/rutas/mias` (todavía sin mergear a
-  `develop`). Responsable: Adriel, a definir cuando `rutas` llegue a `develop`.
+  antes. La matriz de este ADR había quedado vieja — corregida, no era un problema de seguridad.
+- **Contenedores — lectura:** la matriz prometía acceso a Chofer; el código solo permitía
+  Administrador y Operador. Quedó como acción abierta hasta que `rutas` llegara a `develop`.
+  **Cerrada en la auditoría siguiente, ver abajo.**
 
-`flota`, `rutas` y `paradas` todavía no están en `develop` (están en `feat/CU-12-prediccion`) —
-repetir esta auditoría cuando se mergeen.
+## Auditoría 2026-09-22 — repetida sobre `develop` con `rutas`, `paradas`, `flota` y `choferes` ya mergeados
+
+Van los tres módulos que faltaban la vez pasada, más `choferes` y `prediccion`, que no existían
+cuando se escribió la matriz original y no tenían fila.
+
+- **Contenedores — lectura, cerrada: Chofer NO entra.** Se saca el "Sí" que tenía en la matriz.
+  Ninguna pantalla del chofer llama a `/contenedores` — `DriverStopsPage` resuelve todo por
+  `/rutas/mias`, que ya devuelve el contenedor de cada parada expandido. Abrirle el endpoint
+  agregaría una vía de lectura que nadie usa, sin necesidad real detrás. Si en algún sprint futuro
+  el chofer necesita otra cosa de un contenedor puntual, que sea una decisión nueva con un caso de
+  uso concreto, no un acceso general heredado de una matriz vieja.
+- **Tres endpoints nuevos que no estaban documentados, y no son un problema de seguridad — son un
+  hueco de documentación:**
+  - `PATCH /contenedores/:id/servicio` (CU-01, sacar/reintegrar de servicio): Administrador y
+    Operador. Coherente con el resto de las acciones operativas sobre un contenedor puntual.
+  - `PATCH /rutas/:id/descartar` (CU-08, descartar una propuesta): Administrador y Operador.
+    Mismo par que genera y asigna rutas.
+  - `PATCH /paradas/:id/omitir` (CU-10): Chofer, igual que confirmar. Es la otra cara de la misma
+    acción — el chofer llegó pero no pudo vaciar — así que comparte fila con "confirmar" en la
+    matriz.
+- **`choferes` (CU-09) ya tenía fila** (`Choferes — ABM` / `Choferes — lectura`, agregada al
+  escribir ADR-009) y sigue vigente sin cambios: coincide con el código.
+- **`prediccion` (CU-12) no tenía fila.** Se agrega: Administrador y Operador, igual que el resto
+  de la información operativa de un contenedor.
+
+No quedan endpoints sin revisar: los once controllers de `backend/src/modules` (doce contando
+`health`, que es `@Public()` por ser un healthcheck de infraestructura, no un recurso del dominio)
+están cubiertos por la matriz de arriba. Repetir esta auditoría si se agrega un módulo nuevo o se
+toca un `@Roles()` existente.
