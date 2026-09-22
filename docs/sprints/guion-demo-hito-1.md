@@ -215,18 +215,26 @@ corridas y si no, el mapa arranca medio naranja.
 
 ### Sin resolver todavía
 
-**CT-0010 a CT-0017 en Render, ¿quién lo revisa antes de grabar?** Fran encontró un `CT-0001` que no
-aparece en la vista pública, probablemente marcado fuera de servicio de cuando se probó el botón del
-#28 — nadie lo reclamó todavía. Si es un caso de prueba abandonado, avisarle a Fran para que lo dé
-de baja. También quedaron dos zonas de prueba (`Centro 178889...` y `zona test`) que Fran va a
-intentar borrar; si no se dejan, no molestan para la demo.
+**Un `CT-0001` en Render, sin reclamar.** No aparece en la vista pública, probablemente marcado
+fuera de servicio de cuando se probó el botón del #28. **Se deja así hasta después de la demo**: no
+molesta (en el mapa del operador se ve gris), la baja de un contenedor no se puede deshacer desde la
+API —no hay endpoint para reactivarlo— y hasta sirve como ejemplo si alguien pregunta por el estado
+`FUERA_DE_SERVICIO`. También quedaron dos zonas de prueba (`Centro 178889...` y `zona test`) que
+Fran va a intentar borrar; si no se dejan, no molestan para la demo.
 
 ### Plan B en Render
 
-El resiembro del 22/09 creó a **Juana Pérez también en Render**, así que ahora el mismo plan B del
-guion local existe ahí. **Para ensayar, usar a Juana. No emitirle una credencial nueva desde
-`/choferes`**: eso le rota la sesión y la deja inservible como respaldo — es la misma trampa que en
-local. El "Chofer Respaldo" que armó Fran (RESP-001) tampoco se toca, es otro respaldo aparte.
+**Juana Pérez NO sirve de respaldo en Render tal cual está hoy.** El resiembro del 22/09 la creó,
+pero con la sesión `dev-chofer` y sin credencial emitida. Para entrar como ella hace falta un token
+de rol CHOFER firmado con el `JWT_SECRET` de producción, que **solo tiene Rami** — verificado en el
+guard: acepta credencial (`token_use: chofer-interno`, emisor de choferes) o un token de rol CHOFER,
+pero cualquiera de los dos tiene que estar firmado con el secreto de Render.
+
+**El único plan B que funciona hoy es el "Chofer Respaldo" (RESP-001)** que armó Fran, con su
+credencial ya guardada. No se toca en los ensayos.
+
+Si Rami genera y pasa por privado un token de CHOFER firmado con el secreto de producción, Juana
+pasa a ser un segundo plan B válido — hasta entonces, no usarla como respaldo.
 
 ---
 
