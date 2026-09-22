@@ -343,7 +343,7 @@ municipio.
 Sin volver al código:
 
 - **El CI en verde**: lint, build, y los tests de los dos lados. Backend: **393 unitarios y 82 de
-  integración** contra PostgreSQL real, **90% de cobertura**. Frontend: **190 tests, 85,78% de
+  integración** contra PostgreSQL real, **90% de cobertura**. Frontend: **268 tests, 88,77% de
   líneas**. El mínimo exigido es 60% y se fuerza en el CI: si baja, el build falla.
 - **El despliegue cloud**: Render Blueprint, `render.yaml`, API, frontend, PostgreSQL y job
   `Deploy — Render`, que dispara los deploy hooks cuando el CI de `main` termina en verde. La evidencia viva esta en
