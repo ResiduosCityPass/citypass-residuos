@@ -439,7 +439,7 @@ stateDiagram-v2
     [*] --> ABIERTA: la detecta el motor de reglas
     ABIERTA --> EN_ATENCION: el operador la toma
     ABIERTA --> RESUELTA: vaciado confirmado (CU-10)
-    EN_ATENCION --> RESUELTA: el operador la cierra
+    EN_ATENCION --> RESUELTA: el operador la cierra<br/>o vaciado confirmado (CU-10)
     RESUELTA --> [*]
 
     note right of ABIERTA
@@ -458,8 +458,7 @@ stateDiagram-v2
     PROPUESTA --> ASIGNADA: CU-09 confirma<br/>(el camión pasa a EN_RUTA)
     ASIGNADA --> EN_CURSO: primera parada cerrada
     EN_CURSO --> COMPLETADA: última parada cerrada<br/>(el camión vuelve a DISPONIBLE)
-    PROPUESTA --> CANCELADA
-    ASIGNADA --> CANCELADA
+    PROPUESTA --> CANCELADA: se descarta<br/>(libera sus contenedores)
     COMPLETADA --> [*]
     CANCELADA --> [*]
 

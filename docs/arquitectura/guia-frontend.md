@@ -615,6 +615,9 @@ Cuando un contenedor cruza el umbral se genera **una** alerta de saturación y s
 evento al bus. Si el sensor sigue reportando 81%, 87%, 94% — **no se generan alertas nuevas**.
 La alerta existente queda `ABIERTA` y el `nivelLlenadoPct` del contenedor sigue subiendo.
 
+Una alerta `EN_ATENCION` cuenta igual: sigue sin resolver. Atenderla no habilita una alerta nueva,
+no apaga el halo de incendio del mapa, y el vaciado de CU-10 la cierra igual que a una abierta.
+
 Es a propósito: sin eso, un contenedor saturado generaría una alerta cada 15 minutos.
 
 Para vos significa que **el estado del contenedor y la alerta son dos cosas distintas**. El
@@ -1034,7 +1037,10 @@ Pasa la ruta a `ASIGNADA`, sella `asignadaEn` y **recién ahí el camión pasa a
 la ruta con el `chofer` expandido.
 
 Errores: `409 RUTA_NO_PROPUESTA` · `404 RUTA_NO_ENCONTRADA` · `404 CHOFER_NO_ENCONTRADO` ·
-`409 CHOFER_INACTIVO` · `400` si no es un uuid.
+`409 CHOFER_INACTIVO` · `409 CAMION_NO_DISPONIBLE` · `400` si no es un uuid.
+
+`CAMION_NO_DISPONIBLE` aparece cuando, entre generar y asignar, el camión salió en otra ruta o
+pasó a mantenimiento: generar no lo reserva. La salida es descartar la propuesta y generar otra.
 
 > ### `choferId` cambió: ahora es el id de un chofer nuestro
 >
@@ -1055,6 +1061,18 @@ Errores: `409 RUTA_NO_PROPUESTA` · `404 RUTA_NO_ENCONTRADA` · `404 CHOFER_NO_E
 > - **La ruta trae `chofer` expandido**, con su nombre y legajo, en el detalle *y* en el listado.
 >   Ya podés mostrar "Juana Perez" en vez de un uuid.
 > - Tu `<select>` deja de tener datos falsos: se llena con `GET /choferes`.
+
+### `PATCH /rutas/:id/descartar` — CU-08
+
+Roles: `ADMINISTRADOR`, `OPERADOR`. **Sin cuerpo.** Pasa una `PROPUESTA` a `CANCELADA` y devuelve
+la ruta.
+
+Existe porque una propuesta compromete sus contenedores aunque nadie la asigne: ninguna otra ruta
+los toma mientras siga viva. Sin esto, una propuesta que no convencía los dejaba afuera del ruteo
+para siempre. El camión no se toca, porque una propuesta nunca lo tomó.
+
+Errores: `409 RUTA_NO_PROPUESTA` (ya se asignó: esa se cierra desde las paradas) ·
+`404 RUTA_NO_ENCONTRADA`.
 
 ### `GET /rutas/:id` — detalle
 
@@ -1161,7 +1179,7 @@ la ruta pasa a `COMPLETADA` y el camión vuelve a `DISPONIBLE`.
 | `code` | HTTP | Cuándo |
 |---|---|---|
 | `RUTA_NO_ENCONTRADA` | 404 | — |
-| `RUTA_NO_PROPUESTA` | 409 | Se quiso asignar una ruta que ya no es propuesta |
+| `RUTA_NO_PROPUESTA` | 409 | Se quiso asignar o descartar una ruta que ya no es propuesta |
 | `RUTA_SIN_CONTENEDORES` | 409 | No hay críticos ruteables para ese camión |
 | `CAMION_NO_DISPONIBLE` | 409 | El camión está en ruta o en mantenimiento |
 | `PARADA_NO_ENCONTRADA` | 404 | — |
@@ -1194,6 +1212,10 @@ Recibe nivel, temperatura y batería, y devuelve la transición:
 
 Cada vez que el simulador manda una de estas, el mapa cambia. Por eso `npm run saturacion`
 es la forma más rápida de probar tu UI sin esperar.
+
+Una lectura con `registradaEn` más de 5 minutos en el futuro se rechaza con
+`400 LECTURA_EN_EL_FUTURO`: una sola aceptada congelaba el contenedor, porque todas las reales que
+llegaban después quedaban fuera de orden contra ella.
 
 ---
 
