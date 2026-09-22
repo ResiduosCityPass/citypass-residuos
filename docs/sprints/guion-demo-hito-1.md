@@ -159,18 +159,22 @@ del ciudadano son las mismas, cambiando el host:
 
 Lo que cambia paso a paso, decidido en el grupo el 22/09:
 
-### Paso 3 — el simulador (**pendiente, no tocar todavía**)
+### Paso 3 — el simulador (**listo**, probado contra Render el 22/09)
 
-Producción ya tiene los 8 contenedores con sensores (los cargó Rami el 08/09). Falta que confirme
-si todavía tiene las API keys de `simulator/sensores.json` de esa carga — se muestran una sola vez,
-y sin ellas el simulador no puede autenticar contra Render.
+Rami no tenía las API keys de los 8 sensores del 08/09 (no hay endpoint para recuperarlas ni para
+desvincular un sensor). Fran resembró producción: contenedores nuevos **CT-0010 a CT-0017** con sus
+sensores, y dio de baja los 8 viejos (baja lógica, no se pierde el histórico) para que el mapa no
+quede duplicado.
 
-- **Si las tiene:** las pasa por privado (son credenciales, no van al repo) y el paso 3 se corre
-  apuntando `simulator` a la API de Render en vez de local.
-- **Si se perdieron:** hay que sembrar contenedores nuevos y dar de baja los viejos, para no
-  duplicar el mapa.
+Probado de punta a punta contra Render: CT-0010 cruzó el umbral a 76% y generó la alerta, después
+siguió reportando hasta 100% sin generar ninguna otra — la regla de "una sola vez, en la transición"
+que se cuenta en este paso.
 
-Fran no lo corre hasta saber cuál de los dos casos es, para no duplicar el mapa en vivo.
+**Las API keys de los sensores nuevos están solo en la máquina de Fran**, que es la que se usa en la
+demo. El simulador contra Render lo corre él: avisale cuando lleguen a este paso.
+
+**CT-0010 quedó al 100%, en rojo, a propósito** — sirve para el primer ensayo del ciclo completo,
+que termina vaciándolo.
 
 ### Paso 4 — el evento (cambia: se muestra en local)
 
@@ -180,10 +184,11 @@ gratis), y abrirla ahora es tocar infraestructura de producción por una demo. L
 migraciones que Render — y el `docker exec ... psql` de la sección "El guion" se corre ahí, no
 contra el deploy. Como respaldo, tener a mano el test de integración de outbox.
 
-### Paso 6 — el chofer de prueba (**pendiente**)
+### Paso 6 — el chofer de prueba (**listo**)
 
-Falta dar de alta en Render un chofer de prueba para emitirle la credencial en vivo, igual que en
-local. Todavía no está creado.
+Ya hay un chofer de prueba en Render, "Prueba Ensayo" (legajo `ENSAYO-999`), con credencial emitida
+el 22/09 para ensayar. **Se da de baja apenas termina el ensayo** — en la demo el alta va en vivo,
+es el paso en sí, no hay que dejar uno creado de antemano para el 24/09.
 
 ### Paso 7 — el chofer, ubicación (cambia: DevTools, no el simulador de GPS)
 
@@ -204,11 +209,24 @@ curl https://citypass-residuos-api.onrender.com/api/v1/health
 El frontend es estático y no se duerme, así que solo hace falta despertar la API. Lo hace quien
 grabe el video, y lo mismo antes de la demo del 24/09.
 
+Además, antes de grabar: **resolver en `/alertas` lo que haya quedado de los ensayos** y correr el
+simulador con `--reiniciar` (lo corre Fran, desde su máquina) — los niveles se guardan entre
+corridas y si no, el mapa arranca medio naranja.
+
+### Sin resolver todavía
+
+**CT-0010 a CT-0017 en Render, ¿quién lo revisa antes de grabar?** Fran encontró un `CT-0001` que no
+aparece en la vista pública, probablemente marcado fuera de servicio de cuando se probó el botón del
+#28 — nadie lo reclamó todavía. Si es un caso de prueba abandonado, avisarle a Fran para que lo dé
+de baja. También quedaron dos zonas de prueba (`Centro 178889...` y `zona test`) que Fran va a
+intentar borrar; si no se dejan, no molestan para la demo.
+
 ### Plan B en Render
 
-Juana Perez y el token de `npm run token:dev -- CHOFER` no existen en producción — son datos del
-seed local. El respaldo acá es **el chofer que dio de alta Fran**, y no se toca en los ensayos, por
-la misma razón que Juana no se toca en local.
+El resiembro del 22/09 creó a **Juana Pérez también en Render**, así que ahora el mismo plan B del
+guion local existe ahí. **Para ensayar, usar a Juana. No emitirle una credencial nueva desde
+`/choferes`**: eso le rota la sesión y la deja inservible como respaldo — es la misma trampa que en
+local. El "Chofer Respaldo" que armó Fran (RESP-001) tampoco se toca, es otro respaldo aparte.
 
 ---
 
