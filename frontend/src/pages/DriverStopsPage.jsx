@@ -355,7 +355,6 @@ export default function DriverStopsPage() {
       <header className="driver-header">
         <div className="driver-header-top">
           <span>Mi ruta</span>
-          <span className="driver-cu">CU-10</span>
         </div>
 
         {route ? (

@@ -80,8 +80,8 @@ export default function FleetPage() {
   return (
     <div className="screen">
       <Notice type="info" title="Para qué sirve la flota">
-        Cada camión declara qué tipo de residuo puede levantar y cuánto entra. Al generar una ruta
-        (CU-08), la heurística solo considera camiones <strong>disponibles</strong> y contenedores
+        Cada camión declara qué tipo de residuo puede levantar y cuánto entra. Al generar una ruta,
+        la heurística solo considera camiones <strong>disponibles</strong> y contenedores
         del tipo que ese camión tiene habilitado. Hoy hay {available} de {trucks.length} disponibles.
       </Notice>
 

@@ -88,12 +88,6 @@
 
 .sidebar-item span:nth-child(2) { flex: 1; }
 
-.sidebar-cu {
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
-  opacity: 0.5;
-}
-
 .sidebar-badge {
   min-width: 19px;
   padding: 0 5px;
@@ -566,7 +560,12 @@ body.no-scroll { overflow: hidden; }
   }
 
   .shell-content { padding: var(--space-4); }
-  .topbar { padding: var(--space-3) var(--space-4); }
+  .topbar { padding: var(--space-3) var(--space-4); column-gap: var(--space-3); }
+
+  /* La hamburguesa y el titulo van en el mismo renglon. Sin esto el titulo no
+     entraba al lado del boton, bajaba al renglon siguiente y la barra quedaba
+     de tres pisos: boton solo, titulo, acciones. */
+  .topbar-title { flex: 1 1 0; min-width: 0; }
 }
 
 /* Celular. Lo que sobra a este ancho es cromo, no contenido. */
@@ -581,6 +580,10 @@ body.no-scroll { overflow: hidden; }
     border-left: none;
   }
   .topbar-profile span { display: none; }
+
+  /* Las acciones bajan a su propio renglon, alineadas a la derecha. Al lado
+     del titulo lo dejaban en una columna de una palabra por linea. */
+  .topbar-actions { flex: 1 0 100%; justify-content: flex-end; }
 
   /* El input del token no entra al lado de sus botones a este ancho. */
   .token-bar { flex-wrap: wrap; }
@@ -842,7 +845,6 @@ body.no-scroll { overflow: hidden; }
   font-size: var(--font-size-lg);
 }
 
-.driver-cu { font-size: var(--font-size-xs); color: var(--sky); font-family: var(--font-mono); }
 .driver-route-line { display: flex; align-items: center; gap: var(--space-2); }
 .driver-progress { margin: 0; font-size: var(--font-size-sm); color: var(--sky); }
 

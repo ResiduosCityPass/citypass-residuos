@@ -48,7 +48,7 @@ export default function DeleteContainerModal({ container, onConfirm, onClose }) 
       </p>
 
       <Notice type="info" title="Es una baja lógica">
-        El histórico de lecturas se conserva: es la fuente de datos del modelo predictivo de CU-12.
+        El histórico de lecturas se conserva: es la fuente de datos del modelo que predice la saturación.
         No se borra nada de la base.
       </Notice>
     </Modal>

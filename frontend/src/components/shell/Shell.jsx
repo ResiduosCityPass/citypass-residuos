@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar.jsx';
 import TopBar from './TopBar.jsx';
 
@@ -17,8 +18,52 @@ import TopBar from './TopBar.jsx';
  * hermanos, no padre e hijo.
  */
 export default function Shell({ title, subtitle, openAlerts, onTokenChange, children }) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const close = useCallback(() => setMenuOpen(false), []);
+  // Se guarda EN QUE pantalla se abrio y no un booleano: cambiar de pantalla
+  // cierra el cajon venga de donde venga. Los enlaces del menu ya lo cierran al
+  // tocarlos, pero el boton atras del navegador no pasaba por ahi.
+  const { pathname } = useLocation();
+  const [openedAt, setOpenedAt] = useState(null);
+  // Salir de la pantalla olvida que estaba abierto. Sin esto, atras lo cerraba
+  // pero adelante volvia a la pantalla anotada y el cajon se reabria solo, con
+  // el body en `no-scroll`. Va durante el render y no en un efecto: es el
+  // patron de React para ajustar estado cuando cambia una prop.
+  if (openedAt !== null && openedAt !== pathname) setOpenedAt(null);
+  const menuOpen = openedAt === pathname;
+  const close = useCallback(() => setOpenedAt(null), []);
+  const opener = useRef(null);
+
+  // Si la ventana se agranda con el cajon abierto, el menu vuelve a ser una
+  // columna y el cajon deja de existir, pero el estado seguia en `open`: el
+  // body quedaba con `no-scroll` y en escritorio no se podia scrollear. El
+  // punto de corte es el mismo 900px del CSS.
+  useEffect(() => {
+    if (!menuOpen || !window.matchMedia) return undefined;
+    const wide = window.matchMedia('(min-width: 901px)');
+    const onChange = (event) => {
+      if (event.matches) close();
+    };
+    wide.addEventListener?.('change', onChange);
+    return () => wide.removeEventListener?.('change', onChange);
+  }, [menuOpen, close]);
+
+  // Al cerrar, el foco vuelve a quien abrio el cajon (la hamburguesa). Sin
+  // esto quedaba en un enlace que ya no se ve, y el proximo Tab arrancaba
+  // desde un lugar invisible. Quien lo abrio se anota en el click y no en un
+  // efecto: el del Sidebar corre antes y ya movio el foco adentro del cajon.
+  useEffect(() => {
+    if (menuOpen || !opener.current) return;
+    if (opener.current.isConnected) opener.current.focus();
+    opener.current = null;
+  }, [menuOpen]);
+
+  const toggleMenu = () => {
+    if (menuOpen) {
+      close();
+      return;
+    }
+    opener.current = document.activeElement;
+    setOpenedAt(pathname);
+  };
 
   // Escape cierra, como en el modal. Es la unica salida sin mouse cuando el
   // cajon esta abierto y el foco quedo adentro.
@@ -55,7 +100,7 @@ export default function Shell({ title, subtitle, openAlerts, onTokenChange, chil
           openAlerts={openAlerts}
           onTokenChange={onTokenChange}
           menuOpen={menuOpen}
-          onToggleMenu={() => setMenuOpen((open) => !open)}
+          onToggleMenu={toggleMenu}
         />
         <main className="shell-content">{children}</main>
       </div>
