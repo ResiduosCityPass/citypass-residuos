@@ -1,6 +1,6 @@
 # Módulo de Residuos — estado, casos de uso y pendientes
 
-Squad 4 · Actualizado al **2026-09-17**
+Squad 4 · Actualizado al **2026-09-21**
 
 Qué hace cada caso de uso, dónde vive en el código, qué reglas no se pueden pasar por alto, y qué
 falta. Es el único documento de estado del módulo.
@@ -18,9 +18,8 @@ Para el contrato de la API endpoint por endpoint, con capturas reales de cada re
   string libre sin validar y pasó a ser una entidad de este módulo, con ABM y credencial propia.
   Está en [ADR-009](docs/adr/ADR-009-identidad-de-los-choferes.md) y es el cambio más grande desde
   la versión anterior de este documento.
-- **No quedan pull requests pendientes de integrar en `develop`.** Lo que falta es el merge de
-  `develop` a `main` para que lo desplegado sea lo que se demuestra, y conectar en el frontend un
-  endpoint que el backend ya expone.
+- **Lo desplegado es lo que se demuestra.** `main` y `develop` tienen el mismo código desde el
+  21/09, y Render corre ese código.
 - El ciclo completo está verificado: contenedor satura → se genera la alerta → se arma la ruta →
   se asigna al chofer → el chofer confirma → el contenedor vuelve a verde, la alerta se cierra y
   el camión queda libre.
@@ -29,7 +28,7 @@ Para el contrato de la API endpoint por endpoint, con capturas reales de cada re
 |---|---|
 | Casos de uso | 12 de 12 implementados |
 | Pantallas | 11 (9 del operador + 2 de otros actores) |
-| Desplegado | Frontend y API en Render, **corriendo `main`, que está atrás de `develop`** |
+| Desplegado | Frontend y API en Render, corriendo `main`, **igual a `develop`** |
 | Tests del frontend | Se ejecutan en CI y antes de la demo |
 | Cobertura del frontend | Umbral de líneas: 60%, forzado en CI |
 | CI | lint, build y tests de backend **y** frontend |
@@ -81,6 +80,16 @@ En desarrollo **la aplicación los carga sola** desde `VITE_DEV_TOKEN` y `VITE_D
 resto del módulo un `ADMINISTRADOR`. Vite borra ese código al compilar, así que no existe en el
 build de producción.
 
+**En Render el token se pega a mano** en el botón "Token" de la barra superior, y **uno generado
+en local no sirve**: da `401`. Tiene que estar firmado con el `JWT_SECRET` de Render, que no está
+en el repo, y con el emisor que declara `render.yaml`:
+
+```bash
+cd backend && JWT_SECRET='<el de Render>' JWT_ISSUER='https://idp.citypass.local' npm run token:dev -- ADMINISTRADOR
+```
+
+Dura 8 horas: el día de la demo hay que generarlo esa misma mañana.
+
 ---
 
 ## Mapa de pantallas
@@ -96,9 +105,6 @@ build de producción.
 | `/rutas` | Rutas | CU-08 |
 | `/rutas/:id` | Detalle de la ruta | CU-08 + CU-09 |
 | `/choferes` | Choferes | CU-09 |
-
-> La pantalla de `/choferes` **está en `develop`**, junto con el backend que consume. Llegará a
-> Render cuando se promueva `develop` a `main`.
 
 Y dos que corren **fuera del Shell**, porque no son del operador:
 
@@ -247,6 +253,11 @@ no se ven. Comparten pantalla porque comparten ciclo de vida.
   minutos. Por eso el detalle de una alerta puede decir 76% mientras el mapa muestra 94%: **el
   estado del contenedor y la alerta son cosas distintas**. Un contenedor puede estar en `CRITICO`
   con su alerta ya `RESUELTA`.
+- **`EN_ATENCION` sigue sin resolver.** Cuenta igual que `ABIERTA` (`ESTADOS_SIN_RESOLVER`): no se
+  genera otra alerta mientras haya una en atención, el vaciado de CU-10 también la cierra, y el
+  halo de incendio del mapa no se apaga por atenderla. Hasta el 21/09 no era así: atender un
+  incendio con el contenedor todavía caliente creaba otra alerta y le mandaba a Emergencias un
+  segundo evento del mismo fuego.
 - **El incendio no depende del llenado.** Se evalúa solo la temperatura contra el umbral de la
   zona, así que un contenedor al 5% —verde en el mapa— puede tener una alerta `CRITICA` abierta.
   Por eso los incendios sin resolver van en un **bloque rojo aparte, arriba de la lista**.
@@ -329,7 +340,7 @@ Problem* con capacidad, que es NP-hard. El recorte está justificado en
 [`GenerateRouteModal.jsx`](frontend/src/components/routes/GenerateRouteModal.jsx) ·
 [`RouteMap.jsx`](frontend/src/components/routes/RouteMap.jsx)
 
-**Consume:** `GET /rutas` · `POST /rutas/generar`
+**Consume:** `GET /rutas` · `POST /rutas/generar` · `PATCH /rutas/:id/descartar` (todavía sin botón)
 
 **Qué hace la heurística:** sale del depósito y en cada paso toma el contenedor crítico más cercano
 que todavía entre en el camión. Filtra por tipo de residuo habilitado, saltea los que ya están
@@ -344,6 +355,10 @@ depósito.
   del todo: se dice cuántos quedaron afuera y por qué, porque *"no aparece mi camión"* es la
   pregunta que sigue.
 - **Las zonas bloqueadas no se ofrecen** en el filtro.
+- **Una propuesta compromete sus contenedores** aunque nadie la asigne: ninguna otra ruta los toma.
+  Por eso existe `PATCH /rutas/:id/descartar`, que pasa una `PROPUESTA` a `CANCELADA` y los libera.
+  Solo desde `PROPUESTA` (`409 RUTA_NO_PROPUESTA`). **El frontend todavía no tiene el botón**: hoy
+  se descarta desde Swagger.
 - **El listado no trae las paradas, pero sí el avance**: cuántas hay, cuántas se confirmaron y
   cuántas se omitieron. Sale de una sola consulta agrupada del lado del backend, no de una llamada
   por fila, y la tabla lo muestra en la columna "Avance". Las paradas en sí las expande el detalle.
@@ -371,6 +386,9 @@ para asignar el chofer.
   alguien lo puede notar. Por eso el recorrido, el orden y la carga se ven *antes* del botón.
 - **Solo se asigna desde `PROPUESTA`.** Una ruta ya asignada no vuelve a ofrecer el botón.
 - **Al confirmar, el camión queda tomado** y pasa a `EN_RUTA`.
+- **Asignar exige que el camión siga `DISPONIBLE`** (`409 CAMION_NO_DISPONIBLE`). Generar no lo
+  reserva, así que entre la propuesta y la asignación pudo haber salido en otra ruta o ido a
+  mantenimiento. Sin este control el mismo camión quedaba con dos rutas vivas.
 - **La carga se muestra en barra** porque es el límite duro de la heurística: dice de un vistazo si
   la propuesta aprovecha el viaje o manda el camión medio vacío.
 - **El chofer se elige de una lista, no se escribe.** Hasta el Sprint 2 era un campo de texto que
@@ -385,7 +403,7 @@ para asignar el chofer.
 
 ## CU-09 · Choferes: alta, baja y credencial
 
-**Actor:** Administrador · **Pantalla:** `/choferes` (en `develop`)
+**Actor:** Administrador · **Pantalla:** `/choferes`
 
 **Dónde vive:** [`backend/src/modules/choferes/`](backend/src/modules/choferes/)
 
@@ -463,7 +481,7 @@ de alto mínimo y cabecera fija con el progreso. Por eso vive fuera del panel de
 - **No hay carga manual de coordenadas**, a diferencia de CU-11: dejarle escribir la posición al
   chofer anula el único control que tiene este caso de uso.
 - **La confirmación dispara un efecto en cascada:** el contenedor vuelve a `NORMAL` y 0%, se
-  cierran sus alertas de saturación (`alertasCerradas` es un **número**, no una lista de ids), la
+  cierran sus alertas de saturación, abiertas o en atención (`alertasCerradas` es un **número**, no una lista de ids), la
   primera confirmación pasa la ruta a `EN_CURSO` y **la última la cierra y libera el camión**. Sin
   eso el camión quedaría `EN_RUTA` para siempre. Las cinco pantallas cuentan la misma historia sin
   coordinarse.
@@ -545,6 +563,10 @@ actualiza el contenedor y dispara las reglas de CU-05 y CU-06.
 `POST /lecturas` se autentica con el header `X-Sensor-Key`, **no con JWT**: un sensor es un
 dispositivo, no una persona con sesión.
 
+**Una lectura con fecha futura se rechaza** (`400 LECTURA_EN_EL_FUTURO`), con 5 minutos de
+tolerancia para relojes adelantados. Sin ese tope, una sola lectura del futuro congelaba el
+contenedor: todas las reales que llegaban después quedaban fuera de orden contra ella.
+
 **No tiene pantalla y no la va a tener.** El frontend nunca llama a este endpoint. El simulador de
 `simulator/` es lo que hace este papel en desarrollo y en la demo.
 
@@ -579,36 +601,38 @@ solo tiene sentido si las dos fuentes devuelven exactamente lo mismo.
 
 # Qué falta
 
-Nada de esto es código a medio hacer del backend. Son trámites, un despliegue y una pantalla que
-todavía no usa lo que el backend ya expone.
+Nada de esto es código a medio hacer del backend. Son trámites, un par de botones que todavía no
+usan lo que el backend ya expone, y fallas conocidas que se dejaron para después del Hito 1.
 
 Dos detalles del proceso que siguen valiendo: **GitHub propone `main` por defecto y el destino
 tiene que ser `develop`**, y **nadie mergea su propio PR**.
 
-## 1. Lo desplegado no es lo que vamos a demostrar
+## 1. Lo desplegado
 
-Render despliega **desde `main`**, y entre entrega y entrega `main` queda atrás de `develop`.
-Cuánto, en cualquier momento:
+Al 21/09, **`main` y `develop` tienen el mismo código y Render corre ese código.** Incluye los
+choferes (la migración corrió bien contra la base real el 19/09) y los arreglos de la revisión del
+backend (#30).
+
+- API: `https://citypass-residuos-api.onrender.com/api/v1/health`
+- Frontend: `https://citypass-residuos-frontend.onrender.com`
+
+Si en algún momento vuelven a separarse, cuánto está atrás `main`:
 
 ```bash
 git fetch origin && git rev-list --count origin/main..origin/develop
 ```
 
-Mientras eso no se mergee, nada de choferes está en producción: `/choferes` devuelve 404 en la URL
-pública.
+Tres cosas a tener en cuenta:
 
-- API: `https://citypass-residuos-api.onrender.com/api/v1/health`
-- Frontend: `https://citypass-residuos-frontend.onrender.com`
-
-Las dos responden y el endpoint público devuelve los contenedores de la base real, así que el
-despliegue funciona. Falta **mergear `develop` a `main`**, que es de DevOps.
-
-Dos cosas a tener en cuenta cuando eso pase:
-
-- **Corre la migración de choferes contra la base real**, que es la que convierte `ruta.choferId`
-  de texto a clave foránea. Conviene backup antes.
+- **El deploy lo dispara el CI, no Render.** Desde el #33, el job `Deploy — Render` llama a los
+  deploy hooks cuando backend, frontend, Docker y SonarQube terminan en verde sobre `main`, y
+  Render tiene el auto-deploy apagado. Medido el 21/09: **unos 5 minutos** entre el merge y la API
+  nueva respondiendo. El detalle está en
+  [despliegue-backend.md](docs/devops/despliegue-backend.md).
 - **El plan gratuito de Render duerme el servicio.** Medido: **22,8 segundos** para responder el
   health en frío. Hay que despertarlo unos minutos antes de mostrar nada.
+- **Para usar el panel en Render hace falta un token firmado con el secreto de producción.** Ver
+  [El token](#el-token).
 
 ## 2. Dos cosas que nos hicieron perder tiempo con los pull requests
 
@@ -645,8 +669,10 @@ queda es del frontend:
 | **Saber si el contenedor ya tiene sensor** | `GET /contenedores` trae `sensor` en cada fila. La `apiKeyHash` no viaja: está declarada `select: false` | **Falta.** El listado deja intentar vincular y espera el `409` |
 | **Avance de paradas en el listado de rutas** | `GET /rutas` trae `avance` con `total`, `confirmadas`, `omitidas` y `pendientes` | Hecho |
 | **Omitir una parada** | `PATCH /paradas/:id/omitir` con `{ motivo }` | Hecho |
+| **Descartar una propuesta de ruta** | `PATCH /rutas/:id/descartar`, sin cuerpo. Solo desde `PROPUESTA`; si no, `409 RUTA_NO_PROPUESTA` | **Falta.** Hoy se descarta desde Swagger |
 
-El que falta no bloquea la demo.
+Ninguno de los dos que faltan bloquea la demo. El de descartar sirve para limpiar las propuestas
+que dejen los ensayos.
 
 ## 5. Lo que depende de otros equipos
 
@@ -666,6 +692,21 @@ Están decididos y documentados en [ADR-004](docs/adr/ADR-004-alcance-y-recortes
 - **Sin soporte offline** en la pantalla del chofer.
 - **Sin WebSocket** en el mapa: polling cada 30 segundos. Evaluado para el Sprint 5 si sobra
   tiempo.
+
+## 7. Fallas conocidas que no se tocan antes del Hito 1
+
+Salieron de la revisión del backend del 19/09. Ninguna afecta la demo, y por el congelamiento
+quedan para después del 24/09:
+
+- **Un contenedor dado de baja sigue recibiendo lecturas y generando alertas.** Su sensor sigue
+  vinculado y la ingesta no mira si el contenedor está activo.
+- **Una API key de sensor perdida no tiene salida.** Es el mismo límite de CU-01: no hay endpoint
+  para desvincular el sensor.
+- **`npm audit` marca 6 vulnerabilidades altas en `@nestjs/*`**, todas por `multer`. No son
+  explotables, porque el módulo no recibe ningún upload, y arreglarlas implica pasar a NestJS 12.
+- **Un endpoint nuevo sin `@Roles` queda abierto para cualquier token válido**, incluido el de un
+  chofer. Hoy todos los endpoints tienen rol explícito o son públicos a propósito. Al agregar uno,
+  no olvidarse del decorador.
 
 ---
 

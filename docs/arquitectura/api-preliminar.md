@@ -110,7 +110,8 @@ Payload liviano pensado para renderizar marcadores: `id`, `lat`, `lng`, `estado`
 | `POST` | `/choferes/:id/credencial` | Admin | Emite el token con el que entra el chofer. Se muestra una vez; emitir otra invalida la anterior |
 | `DELETE` | `/choferes/:id` | Admin | Baja logica. 409 si tiene una ruta activa |
 | `PATCH` | `/choferes/:id/reactivar` | Admin | Deshace la baja |
-| `PATCH` | `/rutas/:id/asignar` | Operador | Confirma, asigna chofer y pasa a `ASIGNADA`. Valida el chofer |
+| `PATCH` | `/rutas/:id/asignar` | Operador | Confirma, asigna chofer y pasa a `ASIGNADA`. Valida el chofer y que el camión siga `DISPONIBLE` |
+| `PATCH` | `/rutas/:id/descartar` | Operador | Pasa una `PROPUESTA` a `CANCELADA` y libera sus contenedores |
 | `GET` | `/rutas/:id` | Admin, Operador | Detalle de cualquier ruta. Sin Chofer: no verifica de quien es la ruta |
 | `GET` | `/rutas/mias` | Chofer | Ruta activa del chofer autenticado |
 

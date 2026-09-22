@@ -342,11 +342,11 @@ municipio.
 
 Sin volver al código:
 
-- **El CI en verde**: lint, build, y los tests de los dos lados. Backend: **344 unitarios y 58 de
-  integración** contra PostgreSQL real, **91% de cobertura**. Frontend: **190 tests, 85,78% de
+- **El CI en verde**: lint, build, y los tests de los dos lados. Backend: **393 unitarios y 82 de
+  integración** contra PostgreSQL real, **90% de cobertura**. Frontend: **268 tests, 88,77% de
   líneas**. El mínimo exigido es 60% y se fuerza en el CI: si baja, el build falla.
 - **El despliegue cloud**: Render Blueprint, `render.yaml`, API, frontend, PostgreSQL y job
-  `Deploy — Render auto deploy`. La evidencia viva esta en
+  `Deploy — Render`, que dispara los deploy hooks cuando el CI de `main` termina en verde. La evidencia viva esta en
   [`docs/devops/evidencia-despliegue.md`](../devops/evidencia-despliegue.md).
 
 > Los números cambian con cada PR. **Recontalos el día anterior** con `npm test` y `npm run
