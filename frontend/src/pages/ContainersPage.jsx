@@ -217,10 +217,10 @@ export default function ContainersPage() {
         />
       )}
 
-      {/* El listado no informa si el contenedor ya tiene sensor: GET /contenedores
-          no devuelve `sensor` ni un `tieneSensor`. Se deja intentar y, si ya lo
-          tiene, el backend responde 409 CONTENEDOR_YA_TIENE_SENSOR y el modal lo
-          muestra. Es un pedido de contrato pendiente con Francisco. */}
+      {/* GET /contenedores ya trae el `sensor` de cada fila (null si no tiene),
+          pero el listado todavia no lo usa: se deja intentar y, si ya lo tiene,
+          el backend responde 409 CONTENEDOR_YA_TIENE_SENSOR y el modal lo
+          muestra. Deshabilitar el boton queda para despues del Hito 1. */}
       {dialog?.type === 'sensor' && (
         <LinkSensorModal
           container={dialog.container}
