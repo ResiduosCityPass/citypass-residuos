@@ -14,7 +14,9 @@ services:
     rootDir: backend
     dockerfilePath: ./Dockerfile
     dockerContext: .
-    autoDeployTrigger: checksPass
+    # El workflow CI dispara el deploy por hook solo despues de que todos los
+    # chequeos pasan. Render no reintenta detectar el push por su cuenta.
+    autoDeployTrigger: off
     healthCheckPath: /api/v1/health
     numInstances: 1
     envVars:
@@ -57,7 +59,8 @@ services:
     rootDir: frontend
     buildCommand: npm ci && npm run build
     staticPublishPath: dist
-    autoDeployTrigger: checksPass
+    # Ver comentario equivalente en el servicio API.
+    autoDeployTrigger: off
     envVars:
       - key: VITE_API_ORIGIN
         fromService:
