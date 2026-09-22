@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { NavLink } from 'react-router-dom';
 import { Icons } from './Icons.jsx';
 
@@ -23,13 +24,13 @@ const OTHER_SQUAD_MODULES = [
 
 /* Las rutas quedan en castellano: espejan las del backend y las ve el usuario. */
 const WASTE_SECTIONS = [
-  { to: '/mapa', icon: 'map', label: 'Mapa en vivo', useCase: 'CU-07' },
-  { to: '/contenedores', icon: 'waste', label: 'Contenedores', useCase: 'CU-01' },
-  { to: '/zonas', icon: 'zones', label: 'Zonas y umbrales', useCase: 'CU-02' },
-  { to: '/alertas', icon: 'alerts', label: 'Alertas', useCase: 'CU-05/06' },
-  { to: '/flota', icon: 'fleet', label: 'Flota', useCase: 'CU-03' },
-  { to: '/choferes', icon: 'profile', label: 'Choferes', useCase: 'CU-09' },
-  { to: '/rutas', icon: 'routes', label: 'Rutas', useCase: 'CU-08/09' },
+  { to: '/mapa', icon: 'map', label: 'Mapa en vivo' },
+  { to: '/contenedores', icon: 'waste', label: 'Contenedores' },
+  { to: '/zonas', icon: 'zones', label: 'Zonas y umbrales' },
+  { to: '/alertas', icon: 'alerts', label: 'Alertas' },
+  { to: '/flota', icon: 'fleet', label: 'Flota' },
+  { to: '/choferes', icon: 'profile', label: 'Choferes' },
+  { to: '/rutas', icon: 'routes', label: 'Rutas' },
 ];
 
 /**
@@ -39,11 +40,19 @@ const WASTE_SECTIONS = [
  * Estan enlazadas igual para que la demo no obligue a tipear URLs.
  */
 const OTHER_ACTOR_VIEWS = [
-  { to: '/cerca', icon: 'map', label: 'Vista ciudadana', useCase: 'CU-11' },
-  { to: '/chofer', icon: 'routes', label: 'Mi ruta (chofer)', useCase: 'CU-10' },
+  { to: '/cerca', icon: 'map', label: 'Vista ciudadana' },
+  { to: '/chofer', icon: 'routes', label: 'Mi ruta (chofer)' },
 ];
 
 export default function Sidebar({ openAlerts = 0, open = false, onNavigate }) {
+  const closeButton = useRef(null);
+
+  // Al abrir el cajon el foco entra: si se queda en la hamburguesa, el Tab
+  // recorre la pantalla tapada por el fondo oscuro antes de llegar al menu.
+  useEffect(() => {
+    if (open) closeButton.current?.focus();
+  }, [open]);
+
   return (
     <nav
       className={`sidebar ${open ? 'open' : ''}`}
@@ -53,7 +62,7 @@ export default function Sidebar({ openAlerts = 0, open = false, onNavigate }) {
         <img src="/citypass-logo.png" alt="" className="sidebar-logo" />
         <span>CityPass<strong>+</strong></span>
         {/* Solo se ve en el cajon: en escritorio no hay nada que cerrar. */}
-        <button type="button" className="sidebar-close" onClick={onNavigate} aria-label="Cerrar el menu">
+        <button ref={closeButton} type="button" className="sidebar-close" onClick={onNavigate} aria-label="Cerrar el menu">
           <Icons.close />
         </button>
       </div>
@@ -74,7 +83,6 @@ export default function Sidebar({ openAlerts = 0, open = false, onNavigate }) {
                 {section.icon === 'alerts' && openAlerts > 0 && (
                   <span className="sidebar-badge">{openAlerts}</span>
                 )}
-                <span className="sidebar-cu">{section.useCase}</span>
               </NavLink>
             </li>
           );
@@ -94,7 +102,6 @@ export default function Sidebar({ openAlerts = 0, open = false, onNavigate }) {
               >
                 <Icon />
                 <span>{view.label}</span>
-                <span className="sidebar-cu">{view.useCase}</span>
               </NavLink>
             </li>
           );

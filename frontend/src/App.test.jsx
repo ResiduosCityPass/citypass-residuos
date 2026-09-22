@@ -30,6 +30,9 @@ vi.mock('./api/waste.js', () => ({
   fetchMyRoute: vi.fn(),
   confirmStop: vi.fn(),
   fetchNearbyContainers: vi.fn(),
+  fetchTrucks: vi.fn(() => Promise.resolve([])),
+  fetchDrivers: vi.fn(() => Promise.resolve([])),
+  fetchRoutes: vi.fn(() => Promise.resolve([])),
 }));
 
 vi.mock('./components/ContainersMap.jsx', () => ({
@@ -117,6 +120,23 @@ describe('shell de la aplicacion', () => {
     // Con mocks no hay token que cargar: el parche de desarrollo se esconde.
     expect(screen.queryByRole('button', { name: 'Token' })).not.toBeInTheDocument();
   });
+
+  /**
+   * Los codigos de caso de uso son vocabulario de la catedra. El operador no
+   * sabe que es un "CU-07" y en la demo no tienen que aparecer en ningun lado:
+   * ni en el menu, ni en el subtitulo de ninguna pantalla.
+   */
+  it.each(['/mapa', '/contenedores', '/zonas', '/alertas', '/flota', '/choferes', '/rutas'])(
+    '%s no muestra codigos de caso de uso',
+    async (path) => {
+      window.history.pushState({}, '', path);
+      const { container } = render(<App />);
+
+      await screen.findByRole('navigation', { name: /Modulos de CityPass/ });
+      expect(container.querySelector('.topbar').textContent).not.toMatch(/CU-?\d/);
+      expect(container.querySelector('.sidebar').textContent).not.toMatch(/CU-?\d/);
+    },
+  );
 
   it('una ruta inexistente vuelve al mapa', async () => {
     window.history.pushState({}, '', '/no-existe');

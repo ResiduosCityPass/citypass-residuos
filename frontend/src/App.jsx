@@ -25,18 +25,18 @@ import './App.css';
  * en la barra de direcciones.
  */
 const TITLES = {
-  '/mapa': ['Mapa en tiempo real', 'CU-07 · estado de los contenedores, minuto a minuto'],
-  '/contenedores': ['Contenedores', 'CU-01 · alta, edicion, baja y vinculacion de sensores'],
-  '/zonas': ['Zonas y umbrales', 'CU-02 · a partir de que nivel un contenedor es critico'],
-  '/alertas': ['Alertas', 'CU-05 / CU-06 · saturacion e incendio'],
-  '/flota': ['Flota', 'CU-03 · camiones, capacidad y disponibilidad'],
-  '/choferes': ['Choferes', 'CU-09 · a quién se le asigna una ruta y cómo entra a verla'],
-  '/rutas': ['Rutas', 'CU-08 / CU-09 · generacion y asignacion'],
+  '/mapa': ['Mapa en tiempo real', 'Estado de los contenedores, minuto a minuto'],
+  '/contenedores': ['Contenedores', 'Alta, edición, baja y vinculación de sensores'],
+  '/zonas': ['Zonas y umbrales', 'A partir de qué nivel un contenedor es crítico'],
+  '/alertas': ['Alertas', 'Saturación e incendio'],
+  '/flota': ['Flota', 'Camiones, capacidad y disponibilidad'],
+  '/choferes': ['Choferes', 'A quién se le asigna una ruta y cómo entra a verla'],
+  '/rutas': ['Rutas', 'Generación y asignación'],
 };
 
 function titleFor(pathname) {
-  if (pathname.startsWith('/contenedores/')) return ['Detalle del contenedor', 'CU-01'];
-  if (pathname.startsWith('/rutas/')) return ['Detalle de la ruta', 'CU-08 / CU-09'];
+  if (pathname.startsWith('/contenedores/')) return ['Detalle del contenedor', ''];
+  if (pathname.startsWith('/rutas/')) return ['Detalle de la ruta', ''];
   return TITLES[pathname] ?? ['Residuos', ''];
 }
 

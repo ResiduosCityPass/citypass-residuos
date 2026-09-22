@@ -1,8 +1,8 @@
 # Frontend — dueño: Máximo
 
-SPA del módulo de Residuos. Seis secciones: el mapa en tiempo real (CU-07), el ABM de
+SPA del módulo de Residuos. Siete secciones: el mapa en tiempo real (CU-07), el ABM de
 contenedores (CU-01) con la predicción de saturación (CU-12), el de zonas y umbrales (CU-02), el
-tablero de alertas (CU-05/CU-06), la flota (CU-03) y las rutas (CU-08/CU-09).
+tablero de alertas (CU-05/CU-06), la flota (CU-03), las rutas (CU-08/CU-09) y los choferes (CU-09).
 
 **Qué cubre cada pantalla, dónde vive y qué falta: [ESTADO.md](../ESTADO.md), en la raíz.**
 
@@ -58,6 +58,9 @@ cd backend && npm run token:dev -- ADMINISTRADOR
 Dura 8 horas y queda guardado en `localStorage`. Cuando el Squad 2 publique el login federado,
 cambia de dónde sale el token; el header `Authorization: Bearer <jwt>` no cambia.
 
+**Contra Render, uno generado así da `401`**: tiene que estar firmado con el `JWT_SECRET` de
+producción, que no está en el repo. Cómo generarlo está en [ESTADO.md](../ESTADO.md#el-token).
+
 ### Datos para ver algo en el mapa
 
 ```bash
@@ -90,7 +93,7 @@ npm run incendio                                # dispara una alerta crítica de
 | `src/components/` | Los que comparte más de una pantalla |
 | `src/pages/` | Una por ruta |
 | `src/styles/` | `tokens.css` (paleta y escalas) y `ui.css` |
-| `src/mocks/` | Datos falsos. **Andamiaje temporal:** se borra al conectar las pantallas |
+| `src/mocks/` | Datos falsos para correr sin backend (`VITE_USE_MOCKS=true`). Las pantallas ya están conectadas; esto queda para diseñar y para tener un plan B sin red |
 | `src/test/` | Setup de Vitest. Los tests viven al lado del archivo que prueban |
 
 **Ninguna pantalla importa datos de otro lado que `src/api/waste.js`**, y toda llamada real
@@ -129,9 +132,9 @@ Eso es todo. Cualquier tecnología de cliente que sepa hacer `fetch` sirve.
 
 ## Alcance
 
-**Los 11 casos de uso que tienen pantalla están diseñados**, ninguno conectado todavía: todos
-corren contra los mocks. El único de los 12 que no tiene pantalla es CU-04, porque lo llaman los
-sensores con `X-Sensor-Key`, no una persona con sesión.
+**Los 11 casos de uso que tienen pantalla están conectados a la API real**, y también corren
+contra los mocks si se prende `VITE_USE_MOCKS`. El único de los 12 que no tiene pantalla es CU-04,
+porque lo llaman los sensores con `X-Sensor-Key`, no una persona con sesión.
 
 Nueve viven adentro del panel del operador. Las otras dos son de otros actores y corren fuera del
 Shell, sin sidebar: `/cerca` es la consulta ciudadana (CU-11), pública y sin token, y `/chofer` es
@@ -146,12 +149,11 @@ reglas de dominio resuelve y qué límites del backend quedaron a la vista— es
 - **Colores del mapa:** Verde Urbano `NORMAL`, Ámbar `ADVERTENCIA`, Rojo Emergencia `CRITICO`,
   Gris Medio `FUERA_DE_SERVICIO`, según la paleta de CityPass+. Los valores exactos del enum están
   en `backend/src/shared/domain/enums.ts`.
-- **Tres límites del backend están visibles en la UI a propósito:** no hay endpoint para listar
-  usuarios con rol `CHOFER`, así que el `<select>` de CU-09 se llena con datos falsos y la
-  pantalla lo dice; el botón "Poner fuera de
-  servicio" del detalle está deshabilitado porque `PATCH /contenedores/:id` no acepta `estado`, y
-  el listado no puede saber si un contenedor ya tiene sensor, así que deja intentar y muestra el
-  `409 CONTENEDOR_YA_TIENE_SENSOR`. Los tres son pedidos de contrato pendientes.
+- **Los tres pedidos de contrato del Sprint 1 ya están resueltos del lado del backend:** el
+  `<select>` de CU-09 se llena con `GET /choferes`, el botón "Poner fuera de servicio" del detalle
+  funciona, y `GET /contenedores` trae el `sensor` de cada fila (`null` si no tiene). Lo último
+  todavía no se usa en el listado: el botón "Sensor" deja intentar igual y, si ya tiene uno,
+  muestra el `409 CONTENEDOR_YA_TIENE_SENSOR`. Queda para después del Hito 1.
 - **Refresco:** polling cada 30s alcanza para el Hito 1. WebSocket es mejora del Sprint 5, si hay
   tiempo.
 - Si algo del contrato de la API no te cierra o te falta un campo, decilo antes de que lo

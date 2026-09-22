@@ -144,7 +144,7 @@ export default function DriversPage() {
   return (
     <div className="screen">
       <Notice type="info" title="Para qué sirve">
-        Son los choferes que aparecen al asignar una ruta (CU-09). Cada uno entra a su pantalla con
+        Son los choferes que aparecen al asignar una ruta. Cada uno entra a su pantalla con
         una credencial que se emite acá: no hay login. Hoy {withAccess} de {active.length} activos
         tienen acceso.
       </Notice>
