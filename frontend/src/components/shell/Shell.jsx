@@ -40,10 +40,20 @@ export default function Shell({ title, subtitle, openAlerts, onTokenChange, chil
     if (!menuOpen || !window.matchMedia) return undefined;
     const wide = window.matchMedia('(min-width: 901px)');
     const onChange = (event) => {
-      if (event.matches) close();
+      if (!event.matches) return;
+      // La hamburguesa que abrio el cajon tambien desaparece por CSS en este
+      // punto de corte: devolverle el foco seria un no-op silencioso contra
+      // un boton oculto. Se anota que no hay a donde volver.
+      opener.current = null;
+      close();
     };
-    wide.addEventListener?.('change', onChange);
-    return () => wide.removeEventListener?.('change', onChange);
+    // Safari viejo (<14) solo tiene la API vieja de MediaQueryList.
+    if (wide.addEventListener) wide.addEventListener('change', onChange);
+    else wide.addListener?.(onChange);
+    return () => {
+      if (wide.removeEventListener) wide.removeEventListener('change', onChange);
+      else wide.removeListener?.(onChange);
+    };
   }, [menuOpen, close]);
 
   // Al cerrar, el foco vuelve a quien abrio el cajon (la hamburguesa). Sin
@@ -56,12 +66,15 @@ export default function Shell({ title, subtitle, openAlerts, onTokenChange, chil
     opener.current = null;
   }, [menuOpen]);
 
-  const toggleMenu = () => {
+  const toggleMenu = (event) => {
     if (menuOpen) {
       close();
       return;
     }
-    opener.current = document.activeElement;
+    // `event.currentTarget` es siempre el boton, a diferencia de
+    // `document.activeElement`: un click de mouse no deja el boton
+    // enfocado en Safari/iOS, y ahi el foco nunca volvia a la hamburguesa.
+    opener.current = event?.currentTarget ?? document.activeElement;
     setOpenedAt(pathname);
   };
 

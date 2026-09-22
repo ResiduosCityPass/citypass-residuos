@@ -253,6 +253,24 @@ describe('menu lateral y barra superior', () => {
     expect(media.listenerCount()).toBe(0);
   });
 
+  /**
+   * Agrandar la ventana esconde la hamburguesa por CSS (mismo punto de
+   * corte). Intentar enfocarla ahi seria un no-op silencioso; el efecto
+   * tiene que darse cuenta de que no hay a donde volver.
+   */
+  it('agrandar la ventana no intenta enfocar la hamburguesa que el CSS esconde', async () => {
+    const user = userEvent.setup();
+    renderShell();
+
+    const boton = menuButton();
+    await user.click(boton);
+    boton.focus = vi.fn();
+
+    media.widen();
+
+    expect(boton.focus).not.toHaveBeenCalled();
+  });
+
   it('los modulos de otros squads estan deshabilitados', () => {
     renderShell();
 
