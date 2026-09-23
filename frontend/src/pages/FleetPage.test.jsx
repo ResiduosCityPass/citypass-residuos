@@ -114,6 +114,47 @@ describe('CU-03 · flota', () => {
     expect(typeof enviado.capacidadLitros).toBe('number');
   });
 
+  /**
+   * Un camion cargado antes de que existiera la validacion de formato puede
+   * tener una patente vieja (pre-Mercosur). Si la patente viajara siempre en
+   * el PATCH, editar cualquier otra cosa la revalidaria contra el formato
+   * nuevo y el camion quedaria sin poder guardar nada. Solo tiene que viajar
+   * si la persona la toco.
+   */
+  it('editar la capacidad no reenvia una patente vieja que nadie toco', async () => {
+    const user = userEvent.setup();
+    fetchTrucks.mockResolvedValue([truck({ patente: 'ABC123' })]);
+    updateTruck.mockResolvedValue(truck({ patente: 'ABC123', capacidadLitros: 20000 }));
+    render(<FleetPage />);
+
+    await user.click(await screen.findByRole('button', { name: 'Editar' }));
+
+    const capacidad = screen.getByLabelText(/Capacidad/);
+    await user.clear(capacidad);
+    await user.type(capacidad, '20000');
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+    await waitFor(() => expect(updateTruck).toHaveBeenCalled());
+    expect(updateTruck.mock.calls[0][1]).not.toHaveProperty('patente');
+  });
+
+  it('si la patente se edita de verdad, sí viaja en el PATCH', async () => {
+    const user = userEvent.setup();
+    fetchTrucks.mockResolvedValue([truck({ patente: 'ABC123' })]);
+    updateTruck.mockResolvedValue(truck({ patente: 'AB123CD' }));
+    render(<FleetPage />);
+
+    await user.click(await screen.findByRole('button', { name: 'Editar' }));
+
+    const patente = screen.getByLabelText(/Patente/);
+    await user.clear(patente);
+    await user.type(patente, 'AB123CD');
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+    await waitFor(() => expect(updateTruck).toHaveBeenCalled());
+    expect(updateTruck.mock.calls[0][1].patente).toBe('AB123CD');
+  });
+
   it('la patente duplicada se muestra con su codigo de negocio', async () => {
     const user = userEvent.setup();
     createTruck.mockRejectedValue(
