@@ -114,7 +114,7 @@ describe('Seguridad (e2e)', () => {
         .post('/api/v1/camiones')
         .set(auth(admin))
         .send({
-          patente: `ZZ${Date.now().toString().slice(-5)}`,
+          patente: `ZZ${Date.now().toString().slice(-3)}QW`,
           capacidadLitros: 12_000,
           tipoResiduoHabilitado: TipoResiduo.RECICLABLE,
         })

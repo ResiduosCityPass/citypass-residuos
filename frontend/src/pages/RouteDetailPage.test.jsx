@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import RouteDetailPage from './RouteDetailPage.jsx';
-import { fetchRoute, fetchDrivers, assignRoute } from '../api/waste.js';
+import { fetchRoute, fetchDrivers, assignRoute, discardRoute } from '../api/waste.js';
 import { ApiError } from '../api/client.js';
 
 vi.mock('../api/waste.js', () => ({
@@ -11,6 +11,7 @@ vi.mock('../api/waste.js', () => ({
   fetchRoute: vi.fn(),
   fetchDrivers: vi.fn(),
   assignRoute: vi.fn(),
+  discardRoute: vi.fn(),
 }));
 
 // Leaflet necesita un contenedor con tamano real, que jsdom no tiene.
@@ -63,6 +64,7 @@ const mount = () =>
     <MemoryRouter initialEntries={['/rutas/rt-9']}>
       <Routes>
         <Route path="/rutas/:id" element={<RouteDetailPage />} />
+        <Route path="/rutas" element={<p>Listado de rutas</p>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -274,5 +276,72 @@ describe('CU-08 / CU-09 · revisar y asignar una ruta', () => {
     expect(await screen.findByText('CT-0001')).toBeInTheDocument();
     expect(await screen.findByText(/No se pudo traer la lista de choferes/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Confirmar y asignar' })).toBeDisabled();
+  });
+
+  /**
+   * El banner de propuesta decia "confirmala o descartala" sin que existiera
+   * ningun boton para lo segundo. Se pide confirmacion antes de mandar el
+   * PATCH: es una accion que no tiene vuelta atras para esta ruta.
+   */
+  describe('descartar una propuesta', () => {
+    it('pide confirmar antes de descartar', async () => {
+      const user = userEvent.setup();
+      fetchRoute.mockResolvedValue(route());
+      mount();
+
+      await user.click(await screen.findByRole('button', { name: 'Descartar propuesta' }));
+
+      expect(screen.getByText(/Sus contenedores quedan libres/)).toBeInTheDocument();
+      expect(discardRoute).not.toHaveBeenCalled();
+    });
+
+    it('al confirmar, descarta y vuelve al listado', async () => {
+      const user = userEvent.setup();
+      fetchRoute.mockResolvedValue(route());
+      discardRoute.mockResolvedValue(route({ estado: 'CANCELADA' }));
+      mount();
+
+      await user.click(await screen.findByRole('button', { name: 'Descartar propuesta' }));
+      await user.click(screen.getByRole('button', { name: 'Sí, descartar' }));
+
+      await waitFor(() => expect(discardRoute).toHaveBeenCalledWith('rt-9'));
+      expect(await screen.findByText('Listado de rutas')).toBeInTheDocument();
+    });
+
+    it('cancelar la confirmacion no manda nada', async () => {
+      const user = userEvent.setup();
+      fetchRoute.mockResolvedValue(route());
+      mount();
+
+      await user.click(await screen.findByRole('button', { name: 'Descartar propuesta' }));
+      await user.click(screen.getByRole('button', { name: 'Cancelar' }));
+
+      expect(screen.getByRole('button', { name: 'Descartar propuesta' })).toBeInTheDocument();
+      expect(discardRoute).not.toHaveBeenCalled();
+    });
+
+    it('si ya no es propuesta, el 409 del backend se muestra con su codigo', async () => {
+      const user = userEvent.setup();
+      fetchRoute.mockResolvedValue(route());
+      discardRoute.mockRejectedValue(
+        new ApiError({ code: 'RUTA_NO_PROPUESTA', status: 409, message: 'La ruta esta en estado ASIGNADA' }),
+      );
+      mount();
+
+      await user.click(await screen.findByRole('button', { name: 'Descartar propuesta' }));
+      await user.click(screen.getByRole('button', { name: 'Sí, descartar' }));
+
+      expect(await screen.findByText('[RUTA_NO_PROPUESTA]')).toBeInTheDocument();
+    });
+
+    it('una ruta ya asignada no ofrece descartar', async () => {
+      fetchRoute.mockResolvedValue(
+        route({ estado: 'ASIGNADA', choferId: JUANA.id, chofer: JUANA, asignadaEn: new Date().toISOString() }),
+      );
+      mount();
+
+      await screen.findByText('Juana Perez');
+      expect(screen.queryByRole('button', { name: 'Descartar propuesta' })).not.toBeInTheDocument();
+    });
   });
 });

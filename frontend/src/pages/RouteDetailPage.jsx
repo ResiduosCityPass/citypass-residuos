@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import Button from '../components/ui/Button.jsx';
 import Chip from '../components/ui/Chip.jsx';
 import Field from '../components/ui/Field.jsx';
 import Notice from '../components/ui/Notice.jsx';
 import FillBar from '../components/ui/FillBar.jsx';
 import RouteMap from '../components/routes/RouteMap.jsx';
-import { fetchRoute, fetchDrivers, assignRoute } from '../api/waste.js';
+import { fetchRoute, fetchDrivers, assignRoute, discardRoute } from '../api/waste.js';
 import { fieldErrors, generalMessage } from '../domain/errors.js';
 import {
   ROUTE_STATE_LABEL,
@@ -29,12 +29,16 @@ import {
  */
 export default function RouteDetailPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [route, setRoute] = useState(null);
   const [driverId, setDriverId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [assignError, setAssignError] = useState(null);
   const [assigning, setAssigning] = useState(false);
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false);
+  const [discardError, setDiscardError] = useState(null);
+  const [discarding, setDiscarding] = useState(false);
 
   const [drivers, setDrivers] = useState([]);
   const [driversError, setDriversError] = useState(null);
@@ -88,6 +92,22 @@ export default function RouteDetailPage() {
     }
   };
 
+  // Descartar saca del ruteo una propuesta que no conviene: libera sus
+  // contenedores para el proximo CU-08 sin dejarlos colgados de una ruta que
+  // nadie va a confirmar nunca. Ya no vuelve a asignarse, asi que no tiene
+  // sentido quedarse en el detalle de una ruta CANCELADA: se vuelve al listado.
+  const discard = async () => {
+    setDiscarding(true);
+    setDiscardError(null);
+    try {
+      await discardRoute(id);
+      navigate('/rutas');
+    } catch (e) {
+      setDiscardError(e);
+      setDiscarding(false);
+    }
+  };
+
   if (loading) return <p className="muted">Cargando ruta…</p>;
 
   if (error) {
@@ -117,8 +137,32 @@ export default function RouteDetailPage() {
 
       {canAssign(route) && (
         <Notice type="warning" title="Esta ruta es una propuesta">
-          Todavía no está asignada y ningún chofer la ve. La generó la heurística; revisá el orden
-          de las paradas y la carga antes de confirmarla.
+          <p>
+            Todavía no está asignada y ningún chofer la ve. La generó la heurística; revisá el
+            orden de las paradas y la carga antes de confirmarla o descartala si no conviene.
+          </p>
+
+          {confirmingDiscard ? (
+            <div className="actions-cell">
+              <span className="muted">¿Descartar? Sus contenedores quedan libres para el próximo ruteo.</span>
+              <Button variant="danger" onClick={discard} disabled={discarding}>
+                {discarding ? 'Descartando…' : 'Sí, descartar'}
+              </Button>
+              <Button variant="secondary" onClick={() => setConfirmingDiscard(false)} disabled={discarding}>
+                Cancelar
+              </Button>
+            </div>
+          ) : (
+            <Button variant="secondary" onClick={() => setConfirmingDiscard(true)}>
+              Descartar propuesta
+            </Button>
+          )}
+        </Notice>
+      )}
+
+      {discardError && (
+        <Notice type="error" title={`[${discardError.code}]`}>
+          {generalMessage(discardError) ?? discardError.message}
         </Notice>
       )}
 
