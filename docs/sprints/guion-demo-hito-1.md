@@ -176,6 +176,25 @@ demo. El simulador contra Render lo corre él: avisale cuando lleguen a este pas
 **CT-0010 quedó al 100%, en rojo, a propósito** — sirve para el primer ensayo del ciclo completo,
 que termina vaciándolo.
 
+**Lo que salió del ensayo del 23/09 contra Render:**
+
+- **Los códigos del guion no existen en Render.** `CT-0001` está en una zona de prueba fuera del
+  mapa y `CT-0007` está dado de baja. En Render se usan los contenedores de CT-0010 a CT-0017.
+- **El comando tiene que llevar `API_URL`**; sin eso el simulador le pega a `localhost`:
+
+  ```bash
+  API_URL=https://citypass-residuos-api.onrender.com/api/v1 node simulador.js --escenario saturacion --contenedor CT-0013
+  API_URL=https://citypass-residuos-api.onrender.com/api/v1 node simulador.js --escenario incendio --contenedor CT-0017
+  ```
+
+- **Saturación siempre con `--contenedor`, y sobre uno COMÚN.** El camión es común, y la ruta
+  necesita dos o más comunes críticos para poder confirmar una parada y omitir la última.
+- **`saturacion` sube a todos los sensores, no solo al elegido.** En 40 segundos quedaron cinco
+  rojos. **Cortar con Ctrl+C apenas el elegido se pone rojo** (unos 15–20 s), o se pierde el "uno
+  se pone rojo solo".
+- **Incendio sobre el contenedor más verde del mapa.** Tarda unos 15 s en aparecer la alerta.
+  Cortarlo apenas aparece.
+
 ### Paso 4 — el evento (cambia: se muestra en local)
 
 A la base de Render no se puede entrar desde afuera (`ipAllowList` vacía y sin consola en el plan
@@ -186,15 +205,40 @@ contra el deploy. Como respaldo, tener a mano el test de integración de outbox.
 
 ### Paso 6 — el chofer de prueba (**listo**)
 
-Ya hay un chofer de prueba en Render, "Prueba Ensayo" (legajo `ENSAYO-999`), con credencial emitida
-el 22/09 para ensayar. **Se da de baja apenas termina el ensayo** — en la demo el alta va en vivo,
-es el paso en sí, no hay que dejar uno creado de antemano para el 24/09.
+El chofer de prueba "Prueba Ensayo" (`ENSAYO-999`) se usó en el ensayo del 23/09 y **ya está dado
+de baja**. En la demo el alta va en vivo: es el paso en sí.
+
+**En Render no había ningún camión**: el resiembro del 22/09 no creó flota, y sin camión no se
+puede generar la ruta. El 23/09 se dio de alta **AB123CD, 12.000 L, residuo común**. **No se
+edita**: hasta que #47 llegue a Render, el formulario de camión manda la capacidad como texto si
+se toca el campo, y el backend la rechaza con un confuso "must not be greater than 40000".
+Para dar de alta otro camión, **no tocar el campo de capacidad** y dejar el 12000 que trae.
+
+### Paso 5 — la predicción (cuidado con la tasa)
+
+El simulador manda lecturas cada pocos segundos, así que la tarjeta muestra tasas de 700 a
+1.200% por hora y "horas hasta el umbral" casi en cero. **No leer la tasa en voz alta**: contar la
+idea (una recta sobre el ciclo actual) y señalar la confianza.
 
 ### Paso 7 — el chofer, ubicación (cambia: DevTools, no el simulador de GPS)
 
-En Render el simulador de GPS está apagado. Para el `403` por estar lejos del contenedor, simular
-la ubicación con **Chrome DevTools → More tools → Sensors → Location**, coordenadas del Obelisco:
-`-34.6037, -58.3816`.
+En Render el simulador de GPS está apagado. La ubicación se simula con **Chrome DevTools →
+Cmd+Shift+P → "sensors" → Location → Other…**.
+
+**Para confirmar una parada hay que estar en la ubicación de ESE contenedor**, no en el Obelisco.
+El Obelisco (`-34.6037, -58.3816`) sirve solo para mostrar a propósito el `403` de "estás lejos".
+Omitir una parada no pide ubicación.
+
+| Contenedor | Latitud | Longitud |
+|---|---|---|
+| CT-0010 | `-34.596703` | `-58.385618` |
+| CT-0013 | `-34.602193` | `-58.38425` |
+| CT-0016 | `-34.598244` | `-58.377573` |
+
+Revisar que en DevTools el **Network no quede en "3G"**: Chrome lo recuerda y hace que todo tarde.
+
+**La frase "se cerró la alerta" solo vale si esa parada tenía una alerta abierta.** Si ese
+contenedor ya tenía la alerta resuelta, el aviso dice solo "volvió a 0%".
 
 ### Antes de grabar o de entrar a la demo
 
