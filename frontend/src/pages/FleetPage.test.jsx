@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import FleetPage from './FleetPage.jsx';
-import { fetchTrucks, createTruck } from '../api/waste.js';
+import { fetchTrucks, createTruck, updateTruck } from '../api/waste.js';
 import { ApiError } from '../api/client.js';
 
 vi.mock('../api/waste.js', () => ({
@@ -88,6 +88,30 @@ describe('CU-03 · flota', () => {
 
     await waitFor(() => expect(createTruck).toHaveBeenCalled());
     expect(createTruck.mock.calls[0][0]).not.toHaveProperty('estado');
+  });
+
+  /**
+   * `capacidadLitros` sale de un <input type="number">, y el valor de un
+   * evento de input siempre es un string. Si viaja asi tal cual, el backend
+   * lo rechaza con un error de rango que confunde: el numero nunca estuvo
+   * fuera de rango, nunca llego a ser un numero.
+   */
+  it('manda la capacidad como numero al editarla, no como el string del input', async () => {
+    const user = userEvent.setup();
+    updateTruck.mockResolvedValue(truck({ capacidadLitros: 20000 }));
+    render(<FleetPage />);
+
+    await user.click(await screen.findByRole('button', { name: 'Editar' }));
+
+    const capacidad = screen.getByLabelText(/Capacidad/);
+    await user.clear(capacidad);
+    await user.type(capacidad, '20000');
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+    await waitFor(() => expect(updateTruck).toHaveBeenCalled());
+    const enviado = updateTruck.mock.calls[0][1];
+    expect(enviado.capacidadLitros).toBe(20000);
+    expect(typeof enviado.capacidadLitros).toBe('number');
   });
 
   it('la patente duplicada se muestra con su codigo de negocio', async () => {
