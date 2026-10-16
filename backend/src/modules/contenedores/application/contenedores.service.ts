@@ -72,8 +72,16 @@ export class ContenedoresService {
   async actualizar(id: string, dto: ActualizarContenedorDto): Promise<Contenedor> {
     const contenedor = await this.obtener(id);
 
+    // `contenedor.zona` (la relacion cargada por `obtener`) tiene que quedar
+    // en sincronia con `zonaId`, no solo la columna. TypeORM, al guardar una
+    // entidad que trae las dos cosas, prioriza el objeto de la relacion sobre
+    // la columna cruda para resolver la FK: si solo se pisa `zonaId` con
+    // `aplicarCambios`, el `save()` la sobreescribe de vuelta con la zona
+    // vieja que sigue colgando de `contenedor.zona`, y el cambio no persiste
+    // aunque la respuesta (el mismo objeto en memoria) muestre el `zonaId`
+    // nuevo. El sintoma es silencioso: 200, sin error, zona vieja en la base.
     if (dto.zonaId && dto.zonaId !== contenedor.zonaId) {
-      await this.zonas.obtener(dto.zonaId);
+      contenedor.zona = await this.zonas.obtener(dto.zonaId);
     }
 
     aplicarCambios(contenedor, dto);
