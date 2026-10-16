@@ -3,6 +3,7 @@ import { render, screen, within, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import Shell from './Shell.jsx';
+import { decodeTokenClaims } from '../../api/client.js';
 
 vi.mock('../../api/waste.js', () => ({ USING_MOCKS: false }));
 
@@ -13,6 +14,7 @@ vi.mock('../../api/client.js', () => ({
   readToken: () => '',
   saveToken: () => true,
   clearToken: () => {},
+  decodeTokenClaims: vi.fn(() => null),
 }));
 
 /**
@@ -106,6 +108,32 @@ describe('menu lateral y barra superior', () => {
 
     expect(within(sidebar()).getByRole('link', { name: /Alertas/ })).toHaveTextContent('3');
     expect(screen.getByTitle('3 alertas sin resolver')).toBeInTheDocument();
+  });
+
+  /** La campana era estatica: el numero se veia pero clickearla no llevaba a ningun lado. */
+  it('la campana de alertas lleva a /alertas', () => {
+    renderShell();
+
+    expect(screen.getByTitle('3 alertas sin resolver')).toHaveAttribute('href', '/alertas');
+  });
+
+  /**
+   * "Operador" estaba escrito a mano en la barra, sin importar quien entrara.
+   * Ahora sale del primer grupo reconocido del token (ADR-009), igual que la
+   * autorizacion real del backend.
+   */
+  it('el rol de la barra sale del token, no queda fijo en Operador', () => {
+    decodeTokenClaims.mockReturnValueOnce({ groups: ['chofer'] });
+    renderShell();
+
+    expect(screen.getByText('Chofer')).toBeInTheDocument();
+    expect(screen.queryByText('Operador')).not.toBeInTheDocument();
+  });
+
+  it('sin token decodificable, la barra dice "Sin rol" en vez de mentir un rol fijo', () => {
+    renderShell();
+
+    expect(screen.getByText('Sin rol')).toBeInTheDocument();
   });
 
   it('muestra el titulo y el subtitulo de la pantalla', () => {
@@ -251,6 +279,24 @@ describe('menu lateral y barra superior', () => {
     expect(sidebar()).not.toHaveClass('open');
     expect(document.body).not.toHaveClass('no-scroll');
     expect(media.listenerCount()).toBe(0);
+  });
+
+  /**
+   * Agrandar la ventana esconde la hamburguesa por CSS (mismo punto de
+   * corte). Intentar enfocarla ahi seria un no-op silencioso; el efecto
+   * tiene que darse cuenta de que no hay a donde volver.
+   */
+  it('agrandar la ventana no intenta enfocar la hamburguesa que el CSS esconde', async () => {
+    const user = userEvent.setup();
+    renderShell();
+
+    const boton = menuButton();
+    await user.click(boton);
+    boton.focus = vi.fn();
+
+    media.widen();
+
+    expect(boton.focus).not.toHaveBeenCalled();
   });
 
   it('los modulos de otros squads estan deshabilitados', () => {

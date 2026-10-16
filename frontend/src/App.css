@@ -155,6 +155,9 @@ body.no-scroll { overflow: hidden; }
   background: var(--surface);
   color: var(--text-muted);
   cursor: pointer;
+  /* La campana de alertas es un <Link>, no un <button>: sin esto hereda el
+     subrayado por defecto del navegador. */
+  text-decoration: none;
 }
 
 .topbar-dot {

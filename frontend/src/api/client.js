@@ -174,6 +174,28 @@ export function seedDevToken(pathname = '') {
 export const usingDevToken = () =>
   Boolean(import.meta.env.DEV && import.meta.env.VITE_DEV_TOKEN);
 
+/**
+ * Decodifica el payload del JWT actual, sin verificar la firma.
+ *
+ * Es solo para mostrar quien es la persona en la barra superior -- la
+ * autorizacion real la hace el backend en cada request, con la firma
+ * verificada. Nunca usar esto para decidir que mostrar u ocultar en la UI.
+ *
+ * @returns {object|null} los claims, o null si no hay token o no es un JWT.
+ */
+export function decodeTokenClaims() {
+  const token = readToken();
+  const payload = token.split('.')[1];
+  if (!payload) return null;
+
+  try {
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(decodeURIComponent(escape(atob(base64))));
+  } catch {
+    return null;
+  }
+}
+
 
 /**
  * Error de API con el `code` estable del backend.

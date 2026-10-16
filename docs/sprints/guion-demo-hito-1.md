@@ -145,6 +145,99 @@ desplegar, no el día de la demo.**
 
 ---
 
+## Corriendo el guion contra Render (video del 23/09 y demo del 24/09)
+
+Fran confirmó el 22/09 que Render ya tiene la versión sin códigos de caso de uso. A partir de acá
+el video y la demo se ensayan contra el deploy, no contra `localhost`. Las pantallas del operador y
+del ciudadano son las mismas, cambiando el host:
+
+| Local | Render |
+|---|---|
+| `http://localhost:5173` | `https://citypass-residuos-frontend.onrender.com` |
+| `http://localhost:3000/api/v1/health` | `https://citypass-residuos-api.onrender.com/api/v1/health` |
+| `http://localhost:3000/docs` | `https://citypass-residuos-api.onrender.com/docs` |
+
+Lo que cambia paso a paso, decidido en el grupo el 22/09:
+
+### Paso 3 — el simulador (**listo**, probado contra Render el 22/09)
+
+Rami no tenía las API keys de los 8 sensores del 08/09 (no hay endpoint para recuperarlas ni para
+desvincular un sensor). Fran resembró producción: contenedores nuevos **CT-0010 a CT-0017** con sus
+sensores, y dio de baja los 8 viejos (baja lógica, no se pierde el histórico) para que el mapa no
+quede duplicado.
+
+Probado de punta a punta contra Render: CT-0010 cruzó el umbral a 76% y generó la alerta, después
+siguió reportando hasta 100% sin generar ninguna otra — la regla de "una sola vez, en la transición"
+que se cuenta en este paso.
+
+**Las API keys de los sensores nuevos están solo en la máquina de Fran**, que es la que se usa en la
+demo. El simulador contra Render lo corre él: avisale cuando lleguen a este paso.
+
+**CT-0010 quedó al 100%, en rojo, a propósito** — sirve para el primer ensayo del ciclo completo,
+que termina vaciándolo.
+
+### Paso 4 — el evento (cambia: se muestra en local)
+
+A la base de Render no se puede entrar desde afuera (`ipAllowList` vacía y sin consola en el plan
+gratis), y abrirla ahora es tocar infraestructura de producción por una demo. La tabla
+`evento_pendiente` se muestra en **local**, en la misma laptop — tiene el mismo código y las mismas
+migraciones que Render — y el `docker exec ... psql` de la sección "El guion" se corre ahí, no
+contra el deploy. Como respaldo, tener a mano el test de integración de outbox.
+
+### Paso 6 — el chofer de prueba (**listo**)
+
+Ya hay un chofer de prueba en Render, "Prueba Ensayo" (legajo `ENSAYO-999`), con credencial emitida
+el 22/09 para ensayar. **Se da de baja apenas termina el ensayo** — en la demo el alta va en vivo,
+es el paso en sí, no hay que dejar uno creado de antemano para el 24/09.
+
+### Paso 7 — el chofer, ubicación (cambia: DevTools, no el simulador de GPS)
+
+En Render el simulador de GPS está apagado. Para el `403` por estar lejos del contenedor, simular
+la ubicación con **Chrome DevTools → More tools → Sensors → Location**, coordenadas del Obelisco:
+`-34.6037, -58.3816`.
+
+### Antes de grabar o de entrar a la demo
+
+La API en Render se duerme sola sin tráfico: un pedido en frío puede tardar más de 15 segundos y
+quien esté grabando o presentando se queda mirando una pantalla en blanco. **Pegarle al health
+unos minutos antes:**
+
+```bash
+curl https://citypass-residuos-api.onrender.com/api/v1/health
+```
+
+El frontend es estático y no se duerme, así que solo hace falta despertar la API. Lo hace quien
+grabe el video, y lo mismo antes de la demo del 24/09.
+
+Además, antes de grabar: **resolver en `/alertas` lo que haya quedado de los ensayos** y correr el
+simulador con `--reiniciar` (lo corre Fran, desde su máquina) — los niveles se guardan entre
+corridas y si no, el mapa arranca medio naranja.
+
+### Sin resolver todavía
+
+**Un `CT-0001` en Render, sin reclamar.** No aparece en la vista pública, probablemente marcado
+fuera de servicio de cuando se probó el botón del #28. **Se deja así hasta después de la demo**: no
+molesta (en el mapa del operador se ve gris), la baja de un contenedor no se puede deshacer desde la
+API —no hay endpoint para reactivarlo— y hasta sirve como ejemplo si alguien pregunta por el estado
+`FUERA_DE_SERVICIO`. También quedaron dos zonas de prueba (`Centro 178889...` y `zona test`) que
+Fran va a intentar borrar; si no se dejan, no molestan para la demo.
+
+### Plan B en Render
+
+**Juana Pérez NO sirve de respaldo en Render tal cual está hoy.** El resiembro del 22/09 la creó,
+pero con la sesión `dev-chofer` y sin credencial emitida. Para entrar como ella hace falta un token
+de rol CHOFER firmado con el `JWT_SECRET` de producción, que **solo tiene Rami** — verificado en el
+guard: acepta credencial (`token_use: chofer-interno`, emisor de choferes) o un token de rol CHOFER,
+pero cualquiera de los dos tiene que estar firmado con el secreto de Render.
+
+**El único plan B que funciona hoy es el "Chofer Respaldo" (RESP-001)** que armó Fran, con su
+credencial ya guardada. No se toca en los ensayos.
+
+Si Rami genera y pasa por privado un token de CHOFER firmado con el secreto de producción, Juana
+pasa a ser un segundo plan B válido — hasta entonces, no usarla como respaldo.
+
+---
+
 ## El guion
 
 ### 1 · El mapa (1 min) — CU-07

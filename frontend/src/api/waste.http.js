@@ -206,6 +206,13 @@ export const generateRoute = (data) => api.post('/rutas/generar', data);
  */
 export const assignRoute = (id, data) => api.patch(`/rutas/${id}/asignar`, data);
 
+/**
+ * CU-08 · Descarta una propuesta y libera sus contenedores para el próximo
+ * ruteo. Solo aplica a una ruta todavía PROPUESTA: 409 RUTA_NO_PROPUESTA si ya
+ * se asignó o si se intenta dos veces.
+ */
+export const discardRoute = (id) => api.patch(`/rutas/${id}/descartar`);
+
 /* --- CU-10 · Mi ruta y confirmar vaciado -------------------------------- */
 
 /**

@@ -863,6 +863,23 @@ export function assignRoute(id, data = {}) {
   return respond(expandRoute(route));
 }
 
+/**
+ * CU-08 · Descarta una propuesta y libera sus contenedores para el próximo
+ * ruteo. Solo desde PROPUESTA: una ASIGNADA ya tiene chofer y camión en la
+ * calle, y esa se cierra desde las paradas, no se descarta desde acá.
+ */
+export function discardRoute(id) {
+  const route = store.routes.find((r) => r.id === id);
+  if (!route) return fail('RUTA_NO_ENCONTRADA', 404, `No existe la ruta ${id}`);
+  if (route.estado !== 'PROPUESTA') {
+    return fail('RUTA_NO_PROPUESTA', 409, `La ruta esta en estado ${route.estado}: solo se descarta una PROPUESTA`);
+  }
+
+  route.estado = 'CANCELADA';
+
+  return respond(expandRoute(route));
+}
+
 /* ========================================================================
  * CU-10 · Confirmar vaciado
  * ====================================================================== */

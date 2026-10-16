@@ -1,4 +1,11 @@
-import { ArgumentsHost, BadRequestException, ConflictException, Logger } from '@nestjs/common';
+import {
+  ArgumentsHost,
+  BadRequestException,
+  ConflictException,
+  HttpException,
+  HttpStatus,
+  Logger,
+} from '@nestjs/common';
 import { HttpExceptionFilter } from './http-exception.filter';
 
 describe('HttpExceptionFilter', () => {
@@ -74,5 +81,24 @@ describe('HttpExceptionFilter', () => {
 
     expect(status).toHaveBeenCalledWith(500);
     expect(json).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 500 }));
+  });
+
+  it('no revienta si lo que se lanza no es un Error (por ejemplo, un string)', () => {
+    filter.catch('algo exploto', host);
+
+    expect(status).toHaveBeenCalledWith(500);
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({ statusCode: 500, message: 'Error interno del servidor' }),
+    );
+  });
+
+  it('devuelve el mensaje tal cual cuando el cuerpo de la excepcion HTTP es un string', () => {
+    const excepcionConCuerpoString = new HttpException('mensaje plano', HttpStatus.FORBIDDEN);
+
+    filter.catch(excepcionConCuerpoString, host);
+
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({ statusCode: 403, message: 'mensaje plano', code: 'HTTP_403' }),
+    );
   });
 });

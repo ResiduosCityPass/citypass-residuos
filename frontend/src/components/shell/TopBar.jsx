@@ -1,10 +1,26 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Icons } from './Icons.jsx';
 import TokenBar from '../TokenBar.jsx';
 import Chip from '../ui/Chip.jsx';
 import Button from '../ui/Button.jsx';
 import { USING_MOCKS } from '../../api/waste.js';
-import { usingDevToken } from '../../api/client.js';
+import { usingDevToken, decodeTokenClaims } from '../../api/client.js';
+
+/**
+ * Grupo del token (ADR-009) -> etiqueta para mostrar. Es cosmetico, no
+ * autorizacion -- eso lo resuelve el backend con `grupo-rol.map.ts`. Si el
+ * primer grupo reconocido no aparece aca, se muestra el grupo crudo antes que
+ * nada: un operador viendo "operador" en vez de "Sin rol" sigue entendiendo
+ * quien es.
+ */
+const ROLE_LABEL = { administrador: 'Administrador', operador: 'Operador', chofer: 'Chofer' };
+
+function currentRoleLabel() {
+  const groups = decodeTokenClaims()?.groups ?? [];
+  const known = groups.find((group) => ROLE_LABEL[group]);
+  return known ? ROLE_LABEL[known] : (groups[0] ?? 'Sin rol');
+}
 
 /**
  * Barra superior: titulo de la pantalla, alertas abiertas, sesion.
@@ -56,10 +72,10 @@ export default function TopBar({ title, subtitle, openAlerts, onTokenChange, men
           </Chip>
         )}
 
-        <button className="topbar-icon" type="button" title={`${openAlerts} alertas sin resolver`}>
+        <Link to="/alertas" className="topbar-icon" title={`${openAlerts} alertas sin resolver`}>
           <Icons.alerts />
           {openAlerts > 0 && <span className="topbar-dot">{openAlerts}</span>}
-        </button>
+        </Link>
 
         {mostrarToken && (
           <Button variant="ghost" size="sm" onClick={() => setTokenOpen((v) => !v)}>
@@ -69,7 +85,7 @@ export default function TopBar({ title, subtitle, openAlerts, onTokenChange, men
 
         <div className="topbar-profile">
           <Icons.profile />
-          <span>Operador</span>
+          <span>{currentRoleLabel()}</span>
         </div>
       </div>
 

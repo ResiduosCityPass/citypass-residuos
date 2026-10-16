@@ -91,7 +91,7 @@ describe('Ciclo de recoleccion (e2e)', () => {
       .post('/api/v1/camiones')
       .set(auth(admin))
       .send({
-        patente: `AB${Date.now().toString().slice(-5)}`,
+        patente: `AB${Date.now().toString().slice(-3)}CD`,
         capacidadLitros: 12_000,
         tipoResiduoHabilitado: TipoResiduo.RECICLABLE,
       })
@@ -225,7 +225,7 @@ describe('Ciclo de recoleccion (e2e)', () => {
         .post('/api/v1/camiones')
         .set(auth(admin))
         .send({
-          patente: `XY${Date.now().toString().slice(-5)}`,
+          patente: `XY${Date.now().toString().slice(-3)}QW`,
           capacidadLitros: 12_000,
           tipoResiduoHabilitado: TipoResiduo.RECICLABLE,
         })

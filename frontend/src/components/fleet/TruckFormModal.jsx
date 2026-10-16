@@ -45,8 +45,21 @@ export default function TruckFormModal({ truck, onSave, onClose }) {
       // todo camion nace DISPONIBLE. Y en un camion EN_RUTA tampoco, porque el
       // backend solo acepta DISPONIBLE o MANTENIMIENTO y reenviarle su propio
       // EN_RUTA le daria un 400 al guardar un cambio de patente o capacidad.
-      const { estado: _ignored, ...rest } = values;
-      await onSave(editing && !onRoute ? values : rest);
+      const { estado, patente, ...rest } = values;
+      // `capacidadLitros` sale de un <input type="number">, pero el valor de
+      // un evento de input siempre es un string. Si viaja asi, el backend lo
+      // rechaza con un error de rango que confunde: no es que el numero este
+      // fuera de rango, es que nunca llego a ser un numero.
+      const numerico = { ...rest, capacidadLitros: Number(rest.capacidadLitros) };
+      // La patente solo viaja si la persona la toco. En el alta siempre hace
+      // falta (el backend la exige), pero en una edicion mandarla sin cambios
+      // revalida contra el formato Mercosur una patente que nadie edito: un
+      // camion cargado con una patente vieja (pre-Mercosur) quedaria sin poder
+      // guardar NADA, ni siquiera un cambio de capacidad, hasta re-tipear la
+      // patente entera con el formato nuevo.
+      const patenteCambio = !editing || patente !== truck.patente;
+      const payload = patenteCambio ? { ...numerico, patente } : numerico;
+      await onSave(editing && !onRoute ? { ...payload, estado } : payload);
     } catch (e) {
       setError(e);
       setSaving(false);
@@ -70,7 +83,7 @@ export default function TruckFormModal({ truck, onSave, onClose }) {
         {general && <Notice type="error" title={`[${error.code}]`}>{general}</Notice>}
 
         <Field label="Patente" htmlFor="patente" required error={byField.patente}
-               hint="Se guarda en mayusculas. No puede repetirse.">
+               hint="Formato Mercosur (AA123BB). Se guarda en mayusculas. No puede repetirse.">
           <input id="patente" className="mono" value={values.patente}
                  onChange={change('patente')} maxLength={10} placeholder="AB123CD" />
         </Field>
