@@ -1,4 +1,4 @@
-import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventTypes, buildEvent } from '../../../shared/domain/domain-event';
 import {
@@ -16,6 +16,10 @@ import {
 } from '../../contenedores/domain/contenedor.repository';
 import { ChoferesService } from '../../choferes/application/choferes.service';
 import { FlotaService } from '../../flota/application/flota.service';
+import {
+  REFUERZOS_VIGENTES,
+  RefuerzosVigentes,
+} from '../../integracion/domain/integracion.repository';
 import { ZonasService } from '../../zonas/application/zonas.service';
 import { PARADA_REPOSITORY, ParadaRepository } from '../domain/parada.repository';
 import { Ruta } from '../domain/ruta.entity';
@@ -57,6 +61,11 @@ export class RutasService {
     private readonly zonas: ZonasService,
     private readonly transaccion: ContextoTransaccional,
     config: ConfigService,
+    // Opcional: sin el modulo de integracion (o en tests previos) el ruteo
+    // funciona como antes, solo con contenedores criticos.
+    @Optional()
+    @Inject(REFUERZOS_VIGENTES)
+    private readonly refuerzos?: RefuerzosVigentes,
   ) {
     this.deposito = {
       lat: Number(config.get('DEPOSITO_LAT', DEPOSITO_DEFAULT.lat)),
@@ -262,23 +271,27 @@ export class RutasService {
 
   /**
    * Contenedores criticos que este camion puede levantar y que todavia no
-   * estan comprometidos en otra ruta viva.
+   * estan comprometidos en otra ruta viva. Se suman los de un refuerzo vigente
+   * por evento cultural (CU-INT-01) aunque no esten criticos.
    */
   private async buscarCandidatos(
     tipoResiduo: TipoResiduo,
     zonaId?: string,
   ): Promise<CandidatoRuteo[]> {
-    const [contenedores, yaRuteados, zonas] = await Promise.all([
+    const [criticos, reforzados, yaRuteados, zonas] = await Promise.all([
       this.contenedores.listar({
         estado: EstadoContenedor.CRITICO,
         tipoResiduo,
         zonaId,
         soloActivos: true,
       }),
+      this.contenedoresReforzados(tipoResiduo, zonaId),
       this.rutas.contenedoresEnRutasVivas(),
       this.zonas.listar(),
     ]);
 
+    const porId = new Map([...criticos, ...reforzados].map((c) => [c.id, c]));
+    const contenedores = [...porId.values()];
     const comprometidos = new Set(yaRuteados);
     const bloqueadas = new Set(zonas.filter((z) => z.bloqueada).map((z) => z.id));
 
@@ -290,5 +303,22 @@ export class RutasService {
         lng: c.lng,
         litrosOcupados: litrosOcupados(c.capacidadLitros, c.nivelLlenadoPct),
       }));
+  }
+
+  /** Contenedores de los refuerzos por evento vigentes ahora, del tipo pedido. */
+  private async contenedoresReforzados(tipoResiduo: TipoResiduo, zonaId?: string) {
+    if (!this.refuerzos) {
+      return [];
+    }
+
+    const ids = new Set(
+      (await this.refuerzos.vigentes(new Date())).flatMap((r) => r.contenedorIds),
+    );
+    if (ids.size === 0) {
+      return [];
+    }
+
+    const delTipo = await this.contenedores.listar({ tipoResiduo, zonaId, soloActivos: true });
+    return delTipo.filter((c) => ids.has(c.id));
   }
 }

@@ -5,6 +5,7 @@ import { ContextoTransaccional } from '../persistence/contexto-transaccional';
 import { EVENT_PUBLISHER } from './event-publisher';
 import { InMemoryEventPublisher } from './in-memory.event-publisher';
 import { TRANSPORTE_EVENTOS } from './transporte-eventos';
+import { GatewayTransporte } from './gateway/gateway.transporte';
 import { DespachadorOutbox } from './outbox/despachador-outbox';
 import { EventoPendiente } from './outbox/evento-pendiente.entity';
 import { OutboxEventPublisher } from './outbox/outbox.event-publisher';
@@ -21,7 +22,7 @@ import { OutboxTypeormRepository } from './outbox/outbox.typeorm.repository';
  * El transporte se elige por EVENT_BUS_DRIVER:
  *   inmemory  -> sprints 1 y 2, y tests
  *   rabbitmq  -> pendiente
- *   platform  -> bus real del Squad 1, sprint 3
+ *   platform  -> bus real del Squad 1 (GatewayTransporte, CU-INT-01)
  *
  * Cuando esos existan, el unico archivo que cambia sigue siendo este.
  */
@@ -31,22 +32,31 @@ import { OutboxTypeormRepository } from './outbox/outbox.typeorm.repository';
   providers: [
     ContextoTransaccional,
     InMemoryEventPublisher,
+    GatewayTransporte,
     OutboxEventPublisher,
     DespachadorOutbox,
     { provide: OUTBOX_REPOSITORY, useClass: OutboxTypeormRepository },
     {
       provide: TRANSPORTE_EVENTOS,
-      inject: [ConfigService, InMemoryEventPublisher],
-      useFactory: (config: ConfigService, inMemory: InMemoryEventPublisher) => {
+      inject: [ConfigService, InMemoryEventPublisher, GatewayTransporte],
+      useFactory: (
+        config: ConfigService,
+        inMemory: InMemoryEventPublisher,
+        gateway: GatewayTransporte,
+      ) => {
         const driver = config.get<string>('EVENT_BUS_DRIVER', 'inmemory');
 
         if (driver === 'inmemory') {
           return inMemory;
         }
 
+        if (driver === 'platform') {
+          return gateway;
+        }
+
         throw new Error(
           `EVENT_BUS_DRIVER="${driver}" todavia no esta implementado. ` +
-            `Drivers disponibles: inmemory. Ver ADR-003.`,
+            `Drivers disponibles: inmemory, platform. Ver ADR-003.`,
         );
       },
     },

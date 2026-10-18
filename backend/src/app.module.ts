@@ -16,6 +16,7 @@ import { PrediccionModule } from './modules/prediccion/prediccion.module';
 import { PublicoModule } from './modules/publico/publico.module';
 import { FlotaModule } from './modules/flota/flota.module';
 import { RutasModule } from './modules/rutas/rutas.module';
+import { IntegracionModule } from './modules/integracion/integracion.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { RutasModule } from './modules/rutas/rutas.module';
     FlotaModule,
     ChoferesModule,
     RutasModule,
+    IntegracionModule,
     // Sprint 4: FlotaModule (CU-03), RutasModule (CU-08..CU-10), PublicoModule (CU-11)
   ],
 })

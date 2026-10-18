@@ -27,6 +27,8 @@ export const EventTypes = {
   RUTA_GENERADA: 'residuos.ruta.generada',
   RUTA_ASIGNADA: 'residuos.ruta.asignada',
   PARADA_OMITIDA: 'residuos.parada.omitida',
+  /** CU-INT-01: refuerzo de recoleccion cerca de un evento cultural. */
+  REFUERZO_PROGRAMADO: 'residuos.refuerzo.programado',
 } as const;
 
 export type EventType = (typeof EventTypes)[keyof typeof EventTypes];

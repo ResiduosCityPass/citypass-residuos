@@ -77,6 +77,8 @@ export class AlertasService {
       buildEvent(
         EventTypes.CONTENEDOR_CRITICO,
         {
+          alertaId: alerta.id,
+          severidad,
           contenedorId: contenedor.codigo,
           zonaId: zona.nombre,
           tipoResiduo: contenedor.tipoResiduo,
@@ -121,6 +123,7 @@ export class AlertasService {
       buildEvent(
         EventTypes.INCENDIO_DETECTADO,
         {
+          alertaId: alerta.id,
           contenedorId: contenedor.codigo,
           zonaId: zona.nombre,
           temperaturaCelsius: contenedor.temperaturaC,
@@ -156,6 +159,15 @@ export class AlertasService {
 
   /** Cierra las alertas abiertas de un tipo. Lo usa CU-10 al confirmar el vaciado. */
   async resolverAbiertasPorTipo(contenedorId: string, tipo: TipoAlerta): Promise<number> {
+    return (await this.resolverAbiertasPorTipoConIds(contenedorId, tipo)).length;
+  }
+
+  /**
+   * Igual que `resolverAbiertasPorTipo`, pero devuelve los ids de las alertas
+   * cerradas: el evento de vaciado los lleva para que Analitica una cada
+   * recoleccion con la alerta que resolvio (CU-INT-01).
+   */
+  async resolverAbiertasPorTipoConIds(contenedorId: string, tipo: TipoAlerta): Promise<string[]> {
     const abiertas = await this.alertas.listarAbiertasPorContenedor(contenedorId, tipo);
 
     for (const alerta of abiertas) {
@@ -164,7 +176,7 @@ export class AlertasService {
       await this.alertas.guardar(alerta);
     }
 
-    return abiertas.length;
+    return abiertas.map((alerta) => alerta.id);
   }
 
   async listar(filtro: FiltroAlertas): Promise<AlertaListada[]> {
