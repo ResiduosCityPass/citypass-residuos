@@ -105,6 +105,28 @@ class VariablesEntorno {
   @IsOptional()
   EVENT_BUS_DRIVER: string = 'inmemory';
 
+  // --- Bus de CityPass+ (CU-INT-01). Solo se usan con EVENT_BUS_DRIVER=platform.
+  @IsString()
+  @IsOptional()
+  GATEWAY_URL?: string;
+
+  @IsString()
+  @IsOptional()
+  GATEWAY_TOKEN_URL?: string;
+
+  @IsString()
+  @IsOptional()
+  GATEWAY_CLIENT_ID?: string;
+
+  @IsString()
+  @IsOptional()
+  GATEWAY_CLIENT_SECRET?: string;
+
+  /** Secreto de la URL del webhook (?token=...). Vacio: el webhook rechaza todo. */
+  @IsString()
+  @IsOptional()
+  GATEWAY_WEBHOOK_TOKEN?: string;
+
   @IsString()
   @IsOptional()
   CORS_ORIGIN?: string;

@@ -144,10 +144,11 @@ export class ParadasService {
     }
     await this.contenedores.guardar(contenedor);
 
-    const alertasCerradas = await this.alertas.resolverAbiertasPorTipo(
+    const alertasCerradasIds = await this.alertas.resolverAbiertasPorTipoConIds(
       contenedor.id,
       TipoAlerta.SATURACION,
     );
+    const alertasCerradas = alertasCerradasIds.length;
 
     const estadoRuta = await this.avanzarRuta(parada.rutaId);
 
@@ -156,6 +157,8 @@ export class ParadasService {
         EventTypes.CONTENEDOR_VACIADO,
         {
           contenedorId: contenedor.codigo,
+          paradaId: parada.id,
+          alertaIds: alertasCerradasIds,
           rutaId: parada.rutaId,
           camionId: ruta.camion?.patente ?? ruta.camionId,
           choferId: ruta.chofer?.legajo ?? sub,

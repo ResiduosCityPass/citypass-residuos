@@ -370,4 +370,37 @@ describe('RutasService (CU-08, CU-09)', () => {
       expect(rutas.buscarActivaDeChofer).not.toHaveBeenCalled();
     });
   });
+
+  describe('CU-INT-01 · refuerzo por evento cultural', () => {
+    it('suma al ruteo los contenedores reforzados aunque no esten criticos', async () => {
+      const normal = {
+        ...contenedor('c-3', 0.01, 30),
+        estado: EstadoContenedor.NORMAL,
+      } as Contenedor;
+      contenedores.listar.mockImplementation(async (filtro) =>
+        filtro.estado === EstadoContenedor.CRITICO
+          ? [contenedor('c-1', 0.005)]
+          : [contenedor('c-1', 0.005), normal],
+      );
+      const refuerzos = { vigentes: jest.fn().mockResolvedValue([{ contenedorIds: ['c-3'] }]) };
+
+      const conRefuerzos = new RutasService(
+        rutas,
+        paradas,
+        contenedores,
+        eventos,
+        flota as unknown as FlotaService,
+        choferes as unknown as ChoferesService,
+        zonas as unknown as ZonasService,
+        { ejecutar: <T>(b: () => Promise<T>) => b() } as unknown as ContextoTransaccional,
+        new ConfigService({}),
+        refuerzos,
+      );
+
+      await conRefuerzos.generar({ camionId: 'cm-1' });
+
+      const creadas = paradas.crearVarias.mock.calls[0][0];
+      expect(creadas.map((p) => p.contenedorId).sort()).toEqual(['c-1', 'c-3']);
+    });
+  });
 });

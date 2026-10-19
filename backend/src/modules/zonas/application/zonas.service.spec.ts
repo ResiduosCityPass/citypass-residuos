@@ -113,14 +113,51 @@ describe('ZonasService', () => {
     });
   });
 
-  describe('cambiarBloqueo', () => {
-    it('bloquea la zona para excluirla del ruteo', async () => {
+  describe('cambiarBloqueo (operador)', () => {
+    beforeEach(() => repo.guardar.mockImplementation(async (z) => z));
+
+    it('bloquea la zona para excluirla del ruteo y anota que fue a mano', async () => {
       repo.buscarPorId.mockResolvedValue(zonaDe());
-      repo.guardar.mockImplementation(async (z) => z);
 
       const resultado = await service.cambiarBloqueo('z-1', true);
 
-      expect(resultado.bloqueada).toBe(true);
+      expect(resultado).toMatchObject({ bloqueada: true, bloqueoManual: true });
+    });
+
+    it('desbloquear a mano libera la zona aunque la tuviera bloqueada una emergencia', async () => {
+      repo.buscarPorId.mockResolvedValue(zonaDe({ bloqueada: true, bloqueoManual: false }));
+
+      const resultado = await service.cambiarBloqueo('z-1', false);
+
+      expect(resultado).toMatchObject({ bloqueada: false, bloqueoManual: false });
+    });
+  });
+
+  describe('cambiarBloqueoPorIncidente (emergencia)', () => {
+    beforeEach(() => repo.guardar.mockImplementation(async (z) => z));
+
+    it('bloquea la zona sin anotarla como manual', async () => {
+      repo.buscarPorId.mockResolvedValue(zonaDe({ bloqueoManual: false }));
+
+      const resultado = await service.cambiarBloqueoPorIncidente('z-1', true);
+
+      expect(resultado).toMatchObject({ bloqueada: true, bloqueoManual: false });
+    });
+
+    it('al levantarse desbloquea la zona', async () => {
+      repo.buscarPorId.mockResolvedValue(zonaDe({ bloqueada: true, bloqueoManual: false }));
+
+      const resultado = await service.cambiarBloqueoPorIncidente('z-1', false);
+
+      expect(resultado.bloqueada).toBe(false);
+    });
+
+    it('al levantarse no toca el bloqueo de un operador', async () => {
+      repo.buscarPorId.mockResolvedValue(zonaDe({ bloqueada: true, bloqueoManual: true }));
+
+      const resultado = await service.cambiarBloqueoPorIncidente('z-1', false);
+
+      expect(resultado).toMatchObject({ bloqueada: true, bloqueoManual: true });
     });
   });
 });

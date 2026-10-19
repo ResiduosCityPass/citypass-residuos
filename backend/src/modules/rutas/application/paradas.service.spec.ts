@@ -34,7 +34,7 @@ describe('ParadasService (CU-10)', () => {
   let rutas: jest.Mocked<RutaRepository>;
   let contenedores: jest.Mocked<ContenedorRepository>;
   let eventos: InMemoryEventPublisher;
-  let alertas: jest.Mocked<Pick<AlertasService, 'resolverAbiertasPorTipo'>>;
+  let alertas: jest.Mocked<Pick<AlertasService, 'resolverAbiertasPorTipoConIds'>>;
   let choferes: jest.Mocked<Pick<ChoferesService, 'buscarActivoPorUsuarioSub'>>;
   let flota: jest.Mocked<Pick<FlotaService, 'obtener' | 'guardarEstado'>>;
   let service: ParadasService;
@@ -98,7 +98,7 @@ describe('ParadasService (CU-10)', () => {
       contar: jest.fn(),
     };
     eventos = new InMemoryEventPublisher();
-    alertas = { resolverAbiertasPorTipo: jest.fn().mockResolvedValue(1) };
+    alertas = { resolverAbiertasPorTipoConIds: jest.fn().mockResolvedValue(['al-1']) };
     // Resuelve SOLO la sesion del dueno. Un doble que devuelva el mismo chofer
     // para cualquier `sub` deja pasar los tests de "no podes tocar lo de otro"
     // sin probar nada.
@@ -143,7 +143,10 @@ describe('ParadasService (CU-10)', () => {
     it('cierra las alertas de saturacion abiertas', async () => {
       const resultado = await service.confirmar('pd-1', SESION, EN_EL_CONTENEDOR);
 
-      expect(alertas.resolverAbiertasPorTipo).toHaveBeenCalledWith('c-1', TipoAlerta.SATURACION);
+      expect(alertas.resolverAbiertasPorTipoConIds).toHaveBeenCalledWith(
+        'c-1',
+        TipoAlerta.SATURACION,
+      );
       expect(resultado.alertasCerradas).toBe(1);
     });
 
@@ -291,7 +294,7 @@ describe('ParadasService (CU-10)', () => {
     it('NO cierra las alertas del contenedor', async () => {
       await service.omitir('pd-1', SESION, MOTIVO);
 
-      expect(alertas.resolverAbiertasPorTipo).not.toHaveBeenCalled();
+      expect(alertas.resolverAbiertasPorTipoConIds).not.toHaveBeenCalled();
     });
 
     it('no exige estar dentro del radio: el caso tipico es no poder acercarse', async () => {

@@ -1,0 +1,92 @@
+import { EventTypes, buildEvent } from '../../domain/domain-event';
+import { traducirAGateway } from './traductor-gateway';
+
+describe('traducirAGateway (CU-INT-01)', () => {
+  const ubicacion = { lat: -34.6118, lng: -58.396 };
+
+  it('la saturacion sale como AlertaGenerada con su alertaId', () => {
+    const evento = buildEvent(
+      EventTypes.CONTENEDOR_CRITICO,
+      {
+        alertaId: 'al-1',
+        severidad: 'ALTA',
+        contenedorId: 'CT-0421',
+        zonaId: 'Centro',
+        nivelLlenado: 87.4,
+        ubicacion,
+        detectadoEn: '2026-11-01T15:00:00.000Z',
+      },
+      { correlationId: 'corr-1' },
+    );
+
+    expect(traducirAGateway(evento)).toEqual({
+      tipo: 'AlertaGenerada',
+      datos: {
+        alertaId: 'al-1',
+        contenedorId: 'CT-0421',
+        tipoAlerta: 'SATURACION',
+        nivelLlenado: 87.4,
+        zona: 'Centro',
+        prioridad: 'ALTA',
+        latitud: -34.6118,
+        longitud: -58.396,
+        correlationId: 'corr-1',
+        occurredAt: '2026-11-01T15:00:00.000Z',
+      },
+    });
+  });
+
+  it('el incendio sale como AlertaGenerada de tipo INCENDIO y prioridad CRITICA', () => {
+    const evento = buildEvent(EventTypes.INCENDIO_DETECTADO, {
+      alertaId: 'al-2',
+      contenedorId: 'CT-0421',
+      zonaId: 'Centro',
+      ubicacion,
+      severidad: 'CRITICA',
+      detectadoEn: '2026-11-01T15:00:00.000Z',
+    });
+
+    const traducido = traducirAGateway(evento);
+
+    expect(traducido?.datos).toMatchObject({
+      tipoAlerta: 'INCENDIO',
+      prioridad: 'CRITICA',
+      nivelLlenado: null,
+      correlationId: null,
+    });
+  });
+
+  it('el vaciado sale como RecoleccionCompletada unida a la alerta que resolvio', () => {
+    const evento = buildEvent(EventTypes.CONTENEDOR_VACIADO, {
+      contenedorId: 'CT-0421',
+      paradaId: 'pa-9',
+      alertaIds: ['al-1'],
+      camionId: 'AB123CD',
+      confirmadoEn: '2026-11-01T16:05:22.100Z',
+    });
+
+    expect(traducirAGateway(evento)?.datos).toMatchObject({
+      alertaId: 'al-1',
+      recoleccionId: 'pa-9',
+      camionId: 'AB123CD',
+      occurredAt: '2026-11-01T16:05:22.100Z',
+    });
+  });
+
+  it('un vaciado sin alerta abierta lleva alertaId null', () => {
+    const evento = buildEvent(EventTypes.CONTENEDOR_VACIADO, {
+      contenedorId: 'CT-1',
+      alertaIds: [],
+      camionId: 'AB123CD',
+    });
+
+    expect(traducirAGateway(evento)?.datos.alertaId).toBeNull();
+  });
+
+  it('los eventos sin consumidores fuera del modulo no salen', () => {
+    expect(traducirAGateway(buildEvent(EventTypes.RUTA_GENERADA, { rutaId: 'rt-1' }))).toBeNull();
+    expect(
+      traducirAGateway(buildEvent(EventTypes.PARADA_OMITIDA, { paradaId: 'pa-1' })),
+    ).toBeNull();
+  });
+});
