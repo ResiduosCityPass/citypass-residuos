@@ -92,11 +92,24 @@ describe('Integracion CityPass+ (e2e)', () => {
     expect(await bloqueada(zonaId)).toBe(false);
   });
 
-  it('una zona bloqueada a mano sigue bloqueada cuando termina la emergencia', async () => {
+  const bloquearAMano = (zonaId: string) =>
+    http.patch(`/api/v1/zonas/${zonaId}/bloqueo?bloqueada=true`).set(auth(admin)).expect(200);
+
+  it('una zona bloqueada a mano antes de la emergencia sigue bloqueada cuando termina', async () => {
     const zonaId = await zonaConContenedor();
-    await http.patch(`/api/v1/zonas/${zonaId}/bloqueo?bloqueada=true`).set(auth(admin)).expect(200);
+    await bloquearAMano(zonaId);
 
     await emergenciaCreada('em-1', 'ev-1');
+    await emergenciaResuelta('em-1', 'ev-2');
+
+    expect(await bloqueada(zonaId)).toBe(true);
+  });
+
+  it('una zona bloqueada a mano durante la emergencia sigue bloqueada cuando termina', async () => {
+    const zonaId = await zonaConContenedor();
+
+    await emergenciaCreada('em-1', 'ev-1');
+    await bloquearAMano(zonaId);
     await emergenciaResuelta('em-1', 'ev-2');
 
     expect(await bloqueada(zonaId)).toBe(true);

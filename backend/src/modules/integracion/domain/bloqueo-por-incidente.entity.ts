@@ -2,9 +2,9 @@ import { Column, CreateDateColumn, Entity, PrimaryColumn, UpdateDateColumn } fro
 
 /**
  * Zonas bloqueadas para el ruteo por una emergencia que corta la circulacion
- * (incendio, derrumbe, disturbio). Se guardan las zonas que esta emergencia
- * mantiene bloqueadas, aunque las comparta con otra emergencia activa, pero
- * nunca las que bloqueo un operador a mano: al cerrarla esas no se tocan.
+ * (incendio, derrumbe, disturbio). Se guardan todas las zonas afectadas, aunque
+ * otra emergencia o un operador ya las tuviera bloqueadas: el bloqueo manual se
+ * guarda aparte en la zona (`Zona.bloqueoManual`) y sobrevive al cierre.
  */
 @Entity('bloqueo_por_incidente')
 export class BloqueoPorIncidente {

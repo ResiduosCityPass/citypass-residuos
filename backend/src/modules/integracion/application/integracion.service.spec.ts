@@ -7,6 +7,7 @@ import { Contenedor } from '../../contenedores/domain/contenedor.entity';
 import { ContenedorRepository } from '../../contenedores/domain/contenedor.repository';
 import { ZonasService } from '../../zonas/application/zonas.service';
 import { Zona } from '../../zonas/domain/zona.entity';
+import { ZonaRepository } from '../../zonas/domain/zona.repository';
 import { BloqueoPorIncidente } from '../domain/bloqueo-por-incidente.entity';
 import { IntegracionRepository } from '../domain/integracion.repository';
 import { IntegracionService, SobreGateway } from './integracion.service';
@@ -44,15 +45,16 @@ const eventoCultural = (cambios: Record<string, unknown> = {}) =>
 describe('IntegracionService (CU-INT-01)', () => {
   let integracion: jest.Mocked<IntegracionRepository>;
   let contenedores: jest.Mocked<Pick<ContenedorRepository, 'listar'>>;
-  let zonas: jest.Mocked<Pick<ZonasService, 'listar' | 'cambiarBloqueo'>>;
+  let zonas: ZonasService;
   let eventos: InMemoryEventPublisher;
   let service: IntegracionService;
   let bloqueos: BloqueoPorIncidente[];
-  let zonasBloqueadas: Set<string>;
+  let zonasGuardadas: Map<string, Zona>;
+
+  const bloqueada = (zonaId: string) => zonasGuardadas.get(zonaId)?.bloqueada;
 
   beforeEach(() => {
     bloqueos = [];
-    zonasBloqueadas = new Set();
     integracion = {
       registrarEvento: jest.fn().mockResolvedValue(true),
       guardarRefuerzo: jest.fn().mockImplementation(async (r) => r),
@@ -69,33 +71,30 @@ describe('IntegracionService (CU-INT-01)', () => {
       bloqueosActivos: jest.fn().mockImplementation(async () => bloqueos.filter((b) => b.activo)),
     };
     contenedores = { listar: jest.fn().mockResolvedValue([CERCA, LEJOS]) };
-    // Con estado, como la base: lo que bloquea una emergencia lo ve la siguiente.
-    // Un doble que siempre devuelve lo mismo esconde el caso de dos emergencias
-    // superpuestas en la misma zona.
-    zonas = {
-      listar: jest
-        .fn()
-        .mockImplementation(async () =>
-          ['z-palermo', 'z-caballito'].map(
-            (id) => ({ id, bloqueada: zonasBloqueadas.has(id) }) as Zona,
-          ),
-        ),
-      cambiarBloqueo: jest.fn().mockImplementation(async (id: string, bloqueada: boolean) => {
-        if (bloqueada) {
-          zonasBloqueadas.add(id);
-        } else {
-          zonasBloqueadas.delete(id);
-        }
-        return { id, bloqueada } as Zona;
-      }),
-    };
+    // ZonasService real sobre un repositorio en memoria, con estado como la base:
+    // lo que bloquea una emergencia lo ve la siguiente, y el bloqueo de un
+    // operador pasa por el mismo metodo que usa PATCH /zonas/:id/bloqueo.
+    zonasGuardadas = new Map(
+      ['z-palermo', 'z-caballito'].map((id) => [
+        id,
+        { id, bloqueada: false, bloqueoManual: false } as Zona,
+      ]),
+    );
+    zonas = new ZonasService({
+      buscarPorId: async (id: string) => zonasGuardadas.get(id) ?? null,
+      listar: async () => [...zonasGuardadas.values()],
+      guardar: async (zona: Zona) => {
+        zonasGuardadas.set(zona.id, zona);
+        return zona;
+      },
+    } as unknown as ZonaRepository);
     eventos = new InMemoryEventPublisher();
 
     service = new IntegracionService(
       integracion,
       contenedores as unknown as ContenedorRepository,
       eventos,
-      zonas as unknown as ZonasService,
+      zonas,
       { ejecutar: <T>(b: () => Promise<T>) => b() } as unknown as ContextoTransaccional,
       new ConfigService({}),
     );
@@ -150,11 +149,18 @@ describe('IntegracionService (CU-INT-01)', () => {
       afectaCirculacion: true,
     });
 
+    const termina = (emergenciaId: string, eventId: string, estadoNuevo = 'RESUELTA') =>
+      sobre(
+        'com.citypass.emergencias.EmergenciaActualizada',
+        { emergenciaId, estadoNuevo },
+        eventId,
+      );
+
     it('bloquea para el ruteo la zona de los contenedores cercanos', async () => {
       await service.procesar(incendio);
 
-      expect(zonas.cambiarBloqueo).toHaveBeenCalledTimes(1);
-      expect(zonas.cambiarBloqueo).toHaveBeenCalledWith('z-palermo', true);
+      expect(bloqueada('z-palermo')).toBe(true);
+      expect(bloqueada('z-caballito')).toBe(false);
     });
 
     it('una emergencia que no corta la circulacion no bloquea nada', async () => {
@@ -168,58 +174,24 @@ describe('IntegracionService (CU-INT-01)', () => {
         }),
       );
 
-      expect(zonas.cambiarBloqueo).not.toHaveBeenCalled();
-    });
-
-    it('no toma como suya una zona que ya estaba bloqueada a mano', async () => {
-      zonasBloqueadas.add('z-palermo');
-
-      await service.procesar(incendio);
-      await service.procesar(
-        sobre(
-          'com.citypass.emergencias.EmergenciaActualizada',
-          { emergenciaId: 'em-1', estadoNuevo: 'RESUELTA' },
-          'ev-2',
-        ),
-      );
-
-      expect(zonas.cambiarBloqueo).not.toHaveBeenCalled();
+      expect(bloqueada('z-palermo')).toBe(false);
     });
 
     it('al resolverse la emergencia desbloquea la zona', async () => {
       await service.procesar(incendio);
-      await service.procesar(
-        sobre(
-          'com.citypass.emergencias.EmergenciaActualizada',
-          { emergenciaId: 'em-1', estadoNuevo: 'RESUELTA' },
-          'ev-2',
-        ),
-      );
+      await service.procesar(termina('em-1', 'ev-2'));
 
-      expect(zonas.cambiarBloqueo).toHaveBeenLastCalledWith('z-palermo', false);
+      expect(bloqueada('z-palermo')).toBe(false);
     });
 
     it('un cambio de estado intermedio no desbloquea', async () => {
       await service.procesar(incendio);
-      await service.procesar(
-        sobre(
-          'com.citypass.emergencias.EmergenciaActualizada',
-          { emergenciaId: 'em-1', estadoNuevo: 'DESPACHADA' },
-          'ev-2',
-        ),
-      );
+      await service.procesar(termina('em-1', 'ev-2', 'DESPACHADA'));
 
-      expect(zonas.cambiarBloqueo).toHaveBeenCalledTimes(1);
+      expect(bloqueada('z-palermo')).toBe(true);
     });
 
     it('con dos emergencias en la misma zona, sigue bloqueada hasta que terminan las dos', async () => {
-      const termina = (emergenciaId: string, eventId: string) =>
-        sobre(
-          'com.citypass.emergencias.EmergenciaActualizada',
-          { emergenciaId, estadoNuevo: 'RESUELTA' },
-          eventId,
-        );
-
       await service.procesar(incendio);
       await service.procesar(
         sobre(
@@ -236,10 +208,36 @@ describe('IntegracionService (CU-INT-01)', () => {
       );
 
       await service.procesar(termina('em-1', 'ev-3'));
-      expect(zonasBloqueadas.has('z-palermo')).toBe(true);
+      expect(bloqueada('z-palermo')).toBe(true);
 
       await service.procesar(termina('em-2', 'ev-4'));
-      expect(zonasBloqueadas.has('z-palermo')).toBe(false);
+      expect(bloqueada('z-palermo')).toBe(false);
+    });
+
+    describe('bloqueo manual de un operador', () => {
+      it('hecho antes de la emergencia, sigue al terminar la emergencia', async () => {
+        await zonas.cambiarBloqueo('z-palermo', true);
+
+        await service.procesar(incendio);
+        await service.procesar(termina('em-1', 'ev-2'));
+
+        expect(bloqueada('z-palermo')).toBe(true);
+      });
+
+      it('hecho durante la emergencia, sigue al terminar la emergencia', async () => {
+        await service.procesar(incendio);
+        await zonas.cambiarBloqueo('z-palermo', true);
+        await service.procesar(termina('em-1', 'ev-2'));
+
+        expect(bloqueada('z-palermo')).toBe(true);
+      });
+
+      it('desbloquear a mano libera la zona aunque la emergencia siga activa', async () => {
+        await service.procesar(incendio);
+        await zonas.cambiarBloqueo('z-palermo', false);
+
+        expect(bloqueada('z-palermo')).toBe(false);
+      });
     });
   });
 

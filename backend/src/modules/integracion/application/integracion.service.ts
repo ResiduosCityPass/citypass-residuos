@@ -144,29 +144,16 @@ export class IntegracionService {
       return;
     }
 
-    const zonaIds = new Set((await this.contenedoresCerca(punto)).map((c) => c.zonaId));
-    if (zonaIds.size === 0) {
+    // Se anotan todas las zonas afectadas, esten o no bloqueadas ya: dos
+    // emergencias en la misma zona la comparten, y el bloqueo de un operador
+    // se guarda aparte en la zona (`bloqueoManual`), asi que no se pierde.
+    const afectadas = [...new Set((await this.contenedoresCerca(punto)).map((c) => c.zonaId))];
+    if (afectadas.length === 0) {
       return;
     }
 
-    // Una zona ya bloqueada puede estarlo por otra emergencia activa o por un
-    // operador. Las de otra emergencia se anotan tambien para esta: si no, al
-    // terminar la primera se desbloquean con esta todavia activa. Las que
-    // bloqueo un operador no se anotan, para no desbloquearlas al cerrar.
-    const yaBloqueadas = new Set(
-      (await this.zonas.listar()).filter((z) => z.bloqueada).map((z) => z.id),
-    );
-    const porOtraEmergencia = new Set(
-      (await this.integracion.bloqueosActivos()).flatMap((b) => b.zonaIds),
-    );
-    const afectadas = [...zonaIds].filter(
-      (id) => !yaBloqueadas.has(id) || porOtraEmergencia.has(id),
-    );
-
     for (const zonaId of afectadas) {
-      if (!yaBloqueadas.has(zonaId)) {
-        await this.zonas.cambiarBloqueo(zonaId, true);
-      }
+      await this.zonas.cambiarBloqueoPorIncidente(zonaId, true);
     }
 
     await this.integracion.guardarBloqueo({
@@ -189,14 +176,15 @@ export class IntegracionService {
     bloqueo.activo = false;
     await this.integracion.guardarBloqueo(bloqueo);
 
-    // Una zona puede seguir bloqueada por otra emergencia activa en la misma zona.
+    // Una zona puede seguir bloqueada por otra emergencia activa en la misma
+    // zona. Si un operador la bloqueo a mano, ZonasService la deja bloqueada.
     const siguenBloqueadas = new Set(
       (await this.integracion.bloqueosActivos()).flatMap((b) => b.zonaIds),
     );
 
     for (const zonaId of bloqueo.zonaIds) {
       if (!siguenBloqueadas.has(zonaId)) {
-        await this.zonas.cambiarBloqueo(zonaId, false);
+        await this.zonas.cambiarBloqueoPorIncidente(zonaId, false);
       }
     }
   }
