@@ -27,6 +27,7 @@ export default async function prepararBase(): Promise<void> {
   process.env.DB_SYNCHRONIZE = 'false';
   process.env.EVENT_BUS_DRIVER = 'inmemory';
   process.env.JWT_SECRET = process.env.JWT_SECRET ?? 'secreto-de-tests';
+  process.env.GATEWAY_WEBHOOK_TOKEN = process.env.GATEWAY_WEBHOOK_TOKEN ?? 'webhook-de-tests';
 
   const admin = new Client({
     host: process.env.DB_HOST,

@@ -48,9 +48,11 @@ describe('IntegracionService (CU-INT-01)', () => {
   let eventos: InMemoryEventPublisher;
   let service: IntegracionService;
   let bloqueos: BloqueoPorIncidente[];
+  let zonasBloqueadas: Set<string>;
 
   beforeEach(() => {
     bloqueos = [];
+    zonasBloqueadas = new Set();
     integracion = {
       registrarEvento: jest.fn().mockResolvedValue(true),
       guardarRefuerzo: jest.fn().mockImplementation(async (r) => r),
@@ -67,12 +69,25 @@ describe('IntegracionService (CU-INT-01)', () => {
       bloqueosActivos: jest.fn().mockImplementation(async () => bloqueos.filter((b) => b.activo)),
     };
     contenedores = { listar: jest.fn().mockResolvedValue([CERCA, LEJOS]) };
+    // Con estado, como la base: lo que bloquea una emergencia lo ve la siguiente.
+    // Un doble que siempre devuelve lo mismo esconde el caso de dos emergencias
+    // superpuestas en la misma zona.
     zonas = {
-      listar: jest.fn().mockResolvedValue([
-        { id: 'z-palermo', bloqueada: false },
-        { id: 'z-caballito', bloqueada: false },
-      ] as Zona[]),
-      cambiarBloqueo: jest.fn(),
+      listar: jest
+        .fn()
+        .mockImplementation(async () =>
+          ['z-palermo', 'z-caballito'].map(
+            (id) => ({ id, bloqueada: zonasBloqueadas.has(id) }) as Zona,
+          ),
+        ),
+      cambiarBloqueo: jest.fn().mockImplementation(async (id: string, bloqueada: boolean) => {
+        if (bloqueada) {
+          zonasBloqueadas.add(id);
+        } else {
+          zonasBloqueadas.delete(id);
+        }
+        return { id, bloqueada } as Zona;
+      }),
     };
     eventos = new InMemoryEventPublisher();
 
@@ -157,7 +172,7 @@ describe('IntegracionService (CU-INT-01)', () => {
     });
 
     it('no toma como suya una zona que ya estaba bloqueada a mano', async () => {
-      zonas.listar.mockResolvedValue([{ id: 'z-palermo', bloqueada: true }] as Zona[]);
+      zonasBloqueadas.add('z-palermo');
 
       await service.procesar(incendio);
       await service.procesar(
@@ -197,23 +212,34 @@ describe('IntegracionService (CU-INT-01)', () => {
       expect(zonas.cambiarBloqueo).toHaveBeenCalledTimes(1);
     });
 
-    it('si otra emergencia activa bloquea la misma zona, sigue bloqueada', async () => {
-      await service.procesar(incendio);
-      bloqueos.push({
-        emergenciaId: 'em-otra',
-        zonaIds: ['z-palermo'],
-        activo: true,
-      } as BloqueoPorIncidente);
-
-      await service.procesar(
+    it('con dos emergencias en la misma zona, sigue bloqueada hasta que terminan las dos', async () => {
+      const termina = (emergenciaId: string, eventId: string) =>
         sobre(
           'com.citypass.emergencias.EmergenciaActualizada',
-          { emergenciaId: 'em-1', estadoNuevo: 'CERRADA' },
+          { emergenciaId, estadoNuevo: 'RESUELTA' },
+          eventId,
+        );
+
+      await service.procesar(incendio);
+      await service.procesar(
+        sobre(
+          'com.citypass.emergencias.EmergenciaCreada',
+          {
+            emergenciaId: 'em-2',
+            categoria: 'DERRUMBE',
+            latitud: PLAZA_ITALIA.lat,
+            longitud: PLAZA_ITALIA.lng,
+            afectaCirculacion: true,
+          },
           'ev-2',
         ),
       );
 
-      expect(zonas.cambiarBloqueo).not.toHaveBeenCalledWith('z-palermo', false);
+      await service.procesar(termina('em-1', 'ev-3'));
+      expect(zonasBloqueadas.has('z-palermo')).toBe(true);
+
+      await service.procesar(termina('em-2', 'ev-4'));
+      expect(zonasBloqueadas.has('z-palermo')).toBe(false);
     });
   });
 

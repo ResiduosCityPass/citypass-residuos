@@ -149,19 +149,29 @@ export class IntegracionService {
       return;
     }
 
-    // Solo las que no estaban bloqueadas: las que bloqueo un operador no se tocan al cerrar.
+    // Una zona ya bloqueada puede estarlo por otra emergencia activa o por un
+    // operador. Las de otra emergencia se anotan tambien para esta: si no, al
+    // terminar la primera se desbloquean con esta todavia activa. Las que
+    // bloqueo un operador no se anotan, para no desbloquearlas al cerrar.
     const yaBloqueadas = new Set(
       (await this.zonas.listar()).filter((z) => z.bloqueada).map((z) => z.id),
     );
-    const nuevas = [...zonaIds].filter((id) => !yaBloqueadas.has(id));
+    const porOtraEmergencia = new Set(
+      (await this.integracion.bloqueosActivos()).flatMap((b) => b.zonaIds),
+    );
+    const afectadas = [...zonaIds].filter(
+      (id) => !yaBloqueadas.has(id) || porOtraEmergencia.has(id),
+    );
 
-    for (const zonaId of nuevas) {
-      await this.zonas.cambiarBloqueo(zonaId, true);
+    for (const zonaId of afectadas) {
+      if (!yaBloqueadas.has(zonaId)) {
+        await this.zonas.cambiarBloqueo(zonaId, true);
+      }
     }
 
     await this.integracion.guardarBloqueo({
       emergenciaId: texto(data, 'emergenciaId'),
-      zonaIds: nuevas,
+      zonaIds: afectadas,
       activo: true,
     });
   }
