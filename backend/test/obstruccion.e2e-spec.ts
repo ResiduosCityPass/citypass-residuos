@@ -91,6 +91,12 @@ describe('Obstrucciones por reclamo (e2e)', () => {
     expect(filas).toHaveLength(1);
   });
 
+  it('un reclamo que no tapa ningun contenedor no inserta nada', async () => {
+    await obstrucciones.guardarObstrucciones([]);
+
+    expect(await obstrucciones.contenedoresObstruidos(ahora)).toEqual([]);
+  });
+
   it('dos reclamos sobre el mismo contenedor: resolver uno no lo destapa', async () => {
     const id = await contenedor();
     await tapar('RC-1', id);
