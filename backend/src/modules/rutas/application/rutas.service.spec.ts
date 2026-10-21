@@ -79,12 +79,14 @@ describe('RutasService (CU-08, CU-09)', () => {
       buscarActivaDeChofer: jest.fn().mockResolvedValue(null),
       contenedoresEnRutasVivas: jest.fn().mockResolvedValue([]),
       avanceDeParadas: jest.fn().mockResolvedValue(new Map()),
+      rutasVivasConPendientes: jest.fn().mockResolvedValue([]),
     };
     paradas = {
       crearVarias: jest.fn().mockResolvedValue([]),
       guardar: jest.fn(),
       buscarPorId: jest.fn(),
       listarDeRuta: jest.fn().mockResolvedValue([]),
+      borrar: jest.fn(),
     };
     contenedores = {
       crear: jest.fn(),
