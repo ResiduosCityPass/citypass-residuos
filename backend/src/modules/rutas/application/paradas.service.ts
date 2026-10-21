@@ -206,6 +206,46 @@ export class ParadasService {
   ): Promise<ResultadoOmision> {
     const { parada, ruta } = await this.buscarParadaPendiente(paradaId, sub);
 
+    return this.cerrarComoOmitida(parada, ruta, dto.motivo, sub);
+  }
+
+  /**
+   * CU-INT-02 · El sistema omite una parada sin que el chofer haga nada: un
+   * reclamo avisa que un auto tapa el contenedor.
+   *
+   * Mismos efectos que la omision del chofer. Se suma a la transaccion en curso
+   * si la hay, porque quien la llama tambien guarda la obstruccion y las dos
+   * cosas tienen que quedar juntas; abrir otra aca la haria independiente.
+   */
+  async omitirPorSistema(paradaId: string, motivo: string): Promise<ResultadoOmision> {
+    const omitir = async () => {
+      const parada = await this.buscarParada(paradaId);
+      const ruta = await this.rutas.buscarPorId(parada.rutaId);
+
+      if (!ruta) {
+        throw new NotFoundException({
+          message: `No existe la ruta ${parada.rutaId}`,
+          code: 'RUTA_NO_ENCONTRADA',
+        });
+      }
+
+      validarAbierta(parada);
+      return this.cerrarComoOmitida(parada, ruta, motivo, ruta.choferId ?? 'sistema');
+    };
+
+    return this.transaccion.managerActual() ? omitir() : this.transaccion.ejecutar(omitir);
+  }
+
+  /**
+   * Lo comun a las dos omisiones: el contenedor queda como estaba, la parada
+   * pasa a OMITIDA, la ruta avanza y se publica el evento.
+   */
+  private async cerrarComoOmitida(
+    parada: Parada,
+    ruta: Ruta,
+    motivo: string,
+    choferPorDefecto: string,
+  ): Promise<ResultadoOmision> {
     const contenedor = await this.contenedores.buscarPorId(parada.contenedorId);
 
     if (!contenedor) {
@@ -219,7 +259,7 @@ export class ParadasService {
 
     parada.estado = EstadoParada.OMITIDA;
     parada.omitidaEn = omitidaEn;
-    parada.motivo = dto.motivo;
+    parada.motivo = motivo;
     await this.paradas.guardar(parada);
 
     const estadoRuta = await this.avanzarRuta(parada.rutaId);
@@ -232,8 +272,8 @@ export class ParadasService {
           rutaId: parada.rutaId,
           contenedorId: contenedor.codigo,
           camionId: ruta.camion?.patente ?? ruta.camionId,
-          choferId: ruta.chofer?.legajo ?? sub,
-          motivo: dto.motivo,
+          choferId: ruta.chofer?.legajo ?? choferPorDefecto,
+          motivo,
           nivelLlenadoPct: contenedor.nivelLlenadoPct,
           omitidaEn: omitidaEn.toISOString(),
         },
@@ -245,7 +285,7 @@ export class ParadasService {
       paradaId: parada.id,
       estado: parada.estado,
       omitidaEn,
-      motivo: dto.motivo,
+      motivo,
       contenedorId: contenedor.id,
       estadoContenedor: contenedor.estado,
       nivelLlenadoPct: contenedor.nivelLlenadoPct,
@@ -267,14 +307,7 @@ export class ParadasService {
     sub: string,
   ): Promise<{ parada: Parada; ruta: Ruta }> {
     const chofer = await this.choferes.buscarActivoPorUsuarioSub(sub);
-    const parada = await this.paradas.buscarPorId(paradaId);
-
-    if (!parada) {
-      throw new NotFoundException({
-        message: `No existe la parada ${paradaId}`,
-        code: 'PARADA_NO_ENCONTRADA',
-      });
-    }
+    const parada = await this.buscarParada(paradaId);
 
     const ruta = await this.rutas.buscarPorId(parada.rutaId);
 
@@ -288,21 +321,22 @@ export class ParadasService {
       });
     }
 
-    if (parada.estado === EstadoParada.CONFIRMADA) {
-      throw new ConflictException({
-        message: `La parada ${parada.orden} ya fue confirmada`,
-        code: 'PARADA_YA_CONFIRMADA',
-      });
-    }
-
-    if (parada.estado === EstadoParada.OMITIDA) {
-      throw new ConflictException({
-        message: `La parada ${parada.orden} ya fue omitida: ${parada.motivo}`,
-        code: 'PARADA_YA_OMITIDA',
-      });
-    }
+    validarAbierta(parada);
 
     return { parada, ruta };
+  }
+
+  private async buscarParada(paradaId: string): Promise<Parada> {
+    const parada = await this.paradas.buscarPorId(paradaId);
+
+    if (!parada) {
+      throw new NotFoundException({
+        message: `No existe la parada ${paradaId}`,
+        code: 'PARADA_NO_ENCONTRADA',
+      });
+    }
+
+    return parada;
   }
 
   /**
@@ -341,5 +375,22 @@ export class ParadasService {
     await this.flota.guardarEstado(camion);
 
     return ruta.estado;
+  }
+}
+
+/** Una parada cerrada no se reabre, ni confirmada ni omitida. */
+function validarAbierta(parada: Parada): void {
+  if (parada.estado === EstadoParada.CONFIRMADA) {
+    throw new ConflictException({
+      message: `La parada ${parada.orden} ya fue confirmada`,
+      code: 'PARADA_YA_CONFIRMADA',
+    });
+  }
+
+  if (parada.estado === EstadoParada.OMITIDA) {
+    throw new ConflictException({
+      message: `La parada ${parada.orden} ya fue omitida: ${parada.motivo}`,
+      code: 'PARADA_YA_OMITIDA',
+    });
   }
 }
