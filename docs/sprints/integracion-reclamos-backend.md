@@ -2,7 +2,7 @@
 
 > **Responsable:** Francisco (backend) · **Branch:** `feat/CU-INT-02-reclamo-obstruccion`
 > **Caso de uso integrador:** *"Reclamo ciudadano que desencadena una intervención urbana"*
-> **Estado:** paso 1 hecho (tabla, migración y repositorio). El resto, pendiente.
+> **Estado:** pasos 1 a 3 hechos (tabla, exclusión del ruteo y omisión por sistema). El resto, pendiente.
 
 Este documento separa **qué hago yo** de qué hace cada uno, para que no nos pisemos. Si algo de
 acá te toca y no estás de acuerdo, avisame antes de arrancar.
@@ -79,10 +79,12 @@ Archivos: `domain/obstruccion-por-reclamo.entity.ts`, `domain/integracion.reposi
 `infrastructure/integracion.typeorm.repository.ts`, `integracion.module.ts`,
 `migrations/1792540800000-ObstruccionPorReclamo.ts` y el e2e `test/obstruccion.e2e-spec.ts`.
 
-### 3.2 Excluir del ruteo
+### 3.2 Excluir del ruteo — ✅ hecho
 
 En `RutasService.buscarCandidatos` agrego un filtro más: se descartan los contenedores
 obstruidos. Va inyectado igual que `REFUERZOS_VIGENTES`, que `rutas` ya recibe de `integracion`.
+Un contenedor tapado queda afuera **aunque esté reforzado por un evento cultural**: el camión no
+puede llegar igual.
 
 ### 3.3 Recibir el reclamo
 
@@ -134,9 +136,10 @@ Para cada ruta viva que tenga como pendiente un contenedor afectado:
 
 - El contenedor **no se toca**: sigue lleno, en `CRITICO` y con su alerta abierta.
 - Si la omitida era la última pendiente, la ruta se cierra y el camión se libera (`avanzarRuta`).
-- **Refactor necesario:** hoy `omitir` exige la sesión del chofer. Separo el núcleo (marcar
-  `OMITIDA` + `avanzarRuta` + evento) para que también lo pueda llamar el sistema. El endpoint del
-  chofer queda igual.
+- ✅ **Omisión por sistema:** `ParadasService.omitirPorSistema(paradaId, motivo)`. Comparte el
+  núcleo con la omisión del chofer (marcar `OMITIDA` + `avanzarRuta` + evento), sin exigir sesión.
+  **Se suma a la transacción en curso** si la hay, para quedar atómica con la obstrucción que
+  guarda quien la llama; si no hay ninguna, abre una propia. El endpoint del chofer quedó igual.
 - **Dependencia circular a resolver:** `rutas` ya importa `integracion` (por los refuerzos), y
   ahora `integracion` necesita llamar a `rutas` para recalcular. Lo resuelvo cuando llegue a este
   paso; la opción más chica es que el recálculo viva en `rutas` y `integracion` lo invoque con
@@ -249,8 +252,8 @@ Cada respuesta que se cierre achica las listas de la sección 3.3.
 | # | Tarea | Estado | Depende de |
 |---|---|---|---|
 | 1 | Tabla, migración y repositorio de `obstruccion_por_reclamo` | ✅ | — |
-| 2 | Excluir obstruidos en `buscarCandidatos` + test | | 1 |
-| 3 | Refactor de `omitir` para que lo pueda llamar el sistema | | — |
+| 2 | Excluir obstruidos en `buscarCandidatos` + test | ✅ | 1 |
+| 3 | Refactor de `omitir` para que lo pueda llamar el sistema | ✅ | — |
 | 4 | Recalcular rutas vivas + `residuos.ruta.recalculada` + tests | | 1, 3 |
 | 5 | Los dos `case` en `IntegracionService` + `residuos.reclamo.evaluado` | | 1, 4 |
 | 6 | e2e completo por el webhook | | 5 |
