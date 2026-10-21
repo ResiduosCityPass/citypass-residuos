@@ -35,6 +35,6 @@ import { IntegracionTypeormRepository } from './infrastructure/integracion.typeo
     { provide: REFUERZOS_VIGENTES, useExisting: IntegracionTypeormRepository },
     { provide: OBSTRUCCION_REPOSITORY, useExisting: IntegracionTypeormRepository },
   ],
-  exports: [REFUERZOS_VIGENTES],
+  exports: [REFUERZOS_VIGENTES, OBSTRUCCION_REPOSITORY],
 })
 export class IntegracionModule {}

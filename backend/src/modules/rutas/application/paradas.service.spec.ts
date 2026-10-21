@@ -365,4 +365,73 @@ describe('ParadasService (CU-10)', () => {
       );
     });
   });
+
+  describe('omitirPorSistema · CU-INT-02, un reclamo avisa que un auto tapa el contenedor', () => {
+    const MOTIVO_RECLAMO = 'Acceso bloqueado por vehiculo (reclamo RC-123)';
+    let transaccion: { ejecutar: jest.Mock; managerActual: jest.Mock };
+    let sistema: ParadasService;
+
+    beforeEach(() => {
+      transaccion = {
+        ejecutar: jest.fn().mockImplementation(<T>(b: () => Promise<T>) => b()),
+        managerActual: jest.fn().mockReturnValue(null),
+      };
+      sistema = new ParadasService(
+        paradas,
+        rutas,
+        contenedores,
+        eventos,
+        alertas as unknown as AlertasService,
+        choferes as unknown as ChoferesService,
+        flota as unknown as FlotaService,
+        transaccion as unknown as ContextoTransaccional,
+        new ConfigService({}),
+      );
+    });
+
+    it('omite sin sesion de chofer, con los mismos efectos que la omision del chofer', async () => {
+      const resultado = await sistema.omitirPorSistema('pd-1', MOTIVO_RECLAMO);
+
+      expect(parada.estado).toBe(EstadoParada.OMITIDA);
+      expect(resultado.motivo).toBe(MOTIVO_RECLAMO);
+      expect(contenedores.guardar).not.toHaveBeenCalled();
+      expect(alertas.resolverAbiertasPorTipoConIds).not.toHaveBeenCalled();
+      expect(choferes.buscarActivoPorUsuarioSub).not.toHaveBeenCalled();
+
+      const [evento] = eventos.getPublished(EventTypes.PARADA_OMITIDA);
+      expect(evento.payload).toEqual(
+        expect.objectContaining({ motivo: MOTIVO_RECLAMO, choferId: CHOFER.legajo }),
+      );
+    });
+
+    it('se suma a la transaccion en curso en vez de abrir otra', async () => {
+      transaccion.managerActual.mockReturnValue({});
+
+      await sistema.omitirPorSistema('pd-1', MOTIVO_RECLAMO);
+
+      expect(transaccion.ejecutar).not.toHaveBeenCalled();
+    });
+
+    it('sin transaccion en curso, abre una propia', async () => {
+      await sistema.omitirPorSistema('pd-1', MOTIVO_RECLAMO);
+
+      expect(transaccion.ejecutar).toHaveBeenCalledTimes(1);
+    });
+
+    it('una parada ya cerrada no se vuelve a cerrar', async () => {
+      parada.estado = EstadoParada.CONFIRMADA;
+
+      await expect(sistema.omitirPorSistema('pd-1', MOTIVO_RECLAMO)).rejects.toThrow(
+        ConflictException,
+      );
+    });
+
+    it('falla con 404 si la parada no existe', async () => {
+      paradas.buscarPorId.mockResolvedValue(null);
+
+      await expect(sistema.omitirPorSistema('pd-1', MOTIVO_RECLAMO)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
 });
