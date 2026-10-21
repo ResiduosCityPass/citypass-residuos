@@ -38,6 +38,14 @@ import { GenerarRutaDto } from './dto/generar-ruta.dto';
 /** Deposito por defecto: el Obelisco. Configurable por entorno. */
 export const DEPOSITO_DEFAULT: Punto = { lat: -34.6037, lng: -58.3816 };
 
+/** Desde donde sale y adonde vuelve cada camion. */
+export function depositoConfigurado(config: ConfigService): Punto {
+  return {
+    lat: Number(config.get('DEPOSITO_LAT', DEPOSITO_DEFAULT.lat)),
+    lng: Number(config.get('DEPOSITO_LNG', DEPOSITO_DEFAULT.lng)),
+  };
+}
+
 /**
  * CU-08 y CU-09 · Generar y asignar rutas.
  *
@@ -72,10 +80,7 @@ export class RutasService {
     @Inject(OBSTRUCCION_REPOSITORY)
     private readonly obstrucciones?: Pick<ObstruccionRepository, 'contenedoresObstruidos'>,
   ) {
-    this.deposito = {
-      lat: Number(config.get('DEPOSITO_LAT', DEPOSITO_DEFAULT.lat)),
-      lng: Number(config.get('DEPOSITO_LNG', DEPOSITO_DEFAULT.lng)),
-    };
+    this.deposito = depositoConfigurado(config);
   }
 
   /** CU-08 · Arma una propuesta de recorrido. No toma el camion todavia. */

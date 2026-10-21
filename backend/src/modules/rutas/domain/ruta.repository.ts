@@ -41,6 +41,8 @@ export interface RutaRepository {
   buscarActivaDeChofer(choferId: string): Promise<Ruta | null>;
   /** Contenedores comprometidos en alguna ruta viva. */
   contenedoresEnRutasVivas(): Promise<string[]>;
+  /** Rutas vivas que todavia tienen pendiente alguno de estos contenedores. */
+  rutasVivasConPendientes(contenedorIds: string[]): Promise<string[]>;
   /** Avance de varias rutas en una sola consulta agrupada, sin N+1. */
   avanceDeParadas(rutaIds: string[]): Promise<Map<string, AvanceParadas>>;
 }

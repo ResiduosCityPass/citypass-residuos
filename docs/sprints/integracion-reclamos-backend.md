@@ -2,7 +2,7 @@
 
 > **Responsable:** Francisco (backend) · **Branch:** `feat/CU-INT-02-reclamo-obstruccion`
 > **Caso de uso integrador:** *"Reclamo ciudadano que desencadena una intervención urbana"*
-> **Estado:** pasos 1 a 3 hechos (tabla, exclusión del ruteo y omisión por sistema). El resto, pendiente.
+> **Estado:** pasos 1 a 4 hechos (tabla, exclusión del ruteo, omisión por sistema y recálculo de rutas). Falta recibir el evento (paso 5).
 
 Este documento separa **qué hago yo** de qué hace cada uno, para que no nos pisemos. Si algo de
 acá te toca y no estás de acuerdo, avisame antes de arrancar.
@@ -124,26 +124,35 @@ Reglas de la tolerancia:
   cierre el contrato, se recortan a los nombres reales.
 - Si el aviso no llega nunca, el vencimiento automático cubre el caso.
 
-### 3.4 Recalcular la ruta viva
+### 3.4 Recalcular la ruta viva — ✅ hecho
 
-Para cada ruta viva que tenga como pendiente un contenedor afectado:
+`ParadasService.quitarContenedores(contenedorIds, motivo, reclamoId?)`. Devuelve las rutas que
+cambiaron. Para cada ruta viva que tenga como pendiente un contenedor afectado:
 
 | Estado de la ruta | Qué pasa |
 |---|---|
-| `PROPUESTA` | Se borra la parada y se reordenan las restantes con `planificarRuta` desde el depósito |
-| `ASIGNADA` / `EN_CURSO` | La parada pasa a `OMITIDA` con motivo `"Acceso bloqueado por vehículo (reclamo RC-123)"`. Las pendientes se reordenan con `planificarRuta`, saliendo desde el último contenedor confirmado (o desde el depósito si no hay ninguno) |
+| `PROPUESTA` | Se borra la parada y se reordenan las restantes desde el depósito. Si no le queda ninguna, la propuesta pasa a `CANCELADA` |
+| `ASIGNADA` / `EN_CURSO` | La parada pasa a `OMITIDA` con el motivo del reclamo. Las pendientes se reordenan saliendo desde el último contenedor **confirmado** (o desde el depósito si no hay ninguno) |
 | `COMPLETADA` / `CANCELADA` | No se toca |
 
 - El contenedor **no se toca**: sigue lleno, en `CRITICO` y con su alerta abierta.
 - Si la omitida era la última pendiente, la ruta se cierra y el camión se libera (`avanzarRuta`).
+- Se actualiza `distanciaEstimadaKm` con el recorrido completo: depósito, confirmadas, pendientes
+  reordenadas y vuelta. `litrosEstimados` no se toca.
+- Las paradas omitidas **no cuentan como visitadas** al elegir desde dónde reordenar: no se sabe
+  si el camión llegó (las omitió el chofer) o si nunca fue (las omitió el sistema).
+- El reordenamiento es la función pura `reordenarPendientes` de `planificador.ts`, con la misma
+  heurística que generar.
+- Va en `ParadasService` y no en `RutasService` para no cambiar el constructor de este último, que
+  tiene parámetros opcionales posicionales y se usa en muchos tests. Se suma a la transacción en
+  curso, como `omitirPorSistema`.
 - ✅ **Omisión por sistema:** `ParadasService.omitirPorSistema(paradaId, motivo)`. Comparte el
   núcleo con la omisión del chofer (marcar `OMITIDA` + `avanzarRuta` + evento), sin exigir sesión.
   **Se suma a la transacción en curso** si la hay, para quedar atómica con la obstrucción que
   guarda quien la llama; si no hay ninguna, abre una propia. El endpoint del chofer quedó igual.
-- **Dependencia circular a resolver:** `rutas` ya importa `integracion` (por los refuerzos), y
-  ahora `integracion` necesita llamar a `rutas` para recalcular. Lo resuelvo cuando llegue a este
-  paso; la opción más chica es que el recálculo viva en `rutas` y `integracion` lo invoque con
-  `forwardRef`.
+- **Dependencia circular a resolver en el paso 5:** `rutas` ya importa `integracion` (por los
+  refuerzos y las obstrucciones), y `integracion` va a tener que llamar a
+  `ParadasService.quitarContenedores`. La opción más chica es `forwardRef` en los dos módulos.
 
 ### 3.5 Eventos que publicamos
 
@@ -163,7 +172,21 @@ Para cada ruta viva que tenga como pendiente un contenedor afectado:
   Con `afectaRecoleccion: false` también se publica: es la respuesta normal del caso "el auto no
   nos molesta".
 
-- **`residuos.ruta.recalculada`** (nuevo): para el front del chofer y el operador.
+- **`residuos.ruta.recalculada`** (nuevo, ✅): para el front del chofer y el operador.
+
+  ```json
+  {
+    "rutaId": "b1f0...",
+    "camionId": "AB123CD",
+    "estado": "EN_CURSO",
+    "motivo": "Acceso bloqueado por vehículo (reclamo RC-123)",
+    "reclamoId": "RC-123",
+    "paradasQuitadas": ["CT-0421"],
+    "paradasPendientes": 2,
+    "distanciaEstimadaKm": 12.3,
+    "recalculadaEn": "2026-10-21T18:00:00.000Z"
+  }
+  ```
 - **`residuos.parada.omitida`** (ya existe): por cada parada omitida en una ruta en curso. Lo
   consume Analítica (Squad 8), así que las omisiones por reclamo entran en sus métricas.
 
@@ -254,7 +277,7 @@ Cada respuesta que se cierre achica las listas de la sección 3.3.
 | 1 | Tabla, migración y repositorio de `obstruccion_por_reclamo` | ✅ | — |
 | 2 | Excluir obstruidos en `buscarCandidatos` + test | ✅ | 1 |
 | 3 | Refactor de `omitir` para que lo pueda llamar el sistema | ✅ | — |
-| 4 | Recalcular rutas vivas + `residuos.ruta.recalculada` + tests | | 1, 3 |
+| 4 | Recalcular rutas vivas + `residuos.ruta.recalculada` + tests | ✅ | 1, 3 |
 | 5 | Los dos `case` en `IntegracionService` + `residuos.reclamo.evaluado` | | 1, 4 |
 | 6 | e2e completo por el webhook | | 5 |
 | 7 | Docs | | 5 |
