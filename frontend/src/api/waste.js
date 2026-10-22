@@ -22,6 +22,9 @@ const source = USING_MOCKS ? mock : http;
 /* CU-07 · Mapa */
 export const fetchMapContainers = (...args) => source.fetchMapContainers(...args);
 
+/* Squad 3 · Actividades masivas */
+export const fetchMassEvents = (...args) => source.fetchMassEvents(...args);
+
 /* CU-01 · Contenedores */
 export const fetchContainers = (...args) => source.fetchContainers(...args);
 export const fetchContainer = (...args) => source.fetchContainer(...args);

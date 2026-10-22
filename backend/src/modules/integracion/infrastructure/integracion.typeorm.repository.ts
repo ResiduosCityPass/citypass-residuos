@@ -57,6 +57,12 @@ export class IntegracionTypeormRepository implements IntegracionRepository, Refu
     return repo.save(repo.create(actividad));
   }
 
+  actividadesQueTerminanDespuesDe(desde: Date): Promise<ActividadMasiva[]> {
+    return this.manager()
+      .getRepository(ActividadMasiva)
+      .find({ where: { fin: MoreThan(desde) }, order: { fin: 'ASC' } });
+  }
+
   vigentes(momento: Date): Promise<RefuerzoEvento[]> {
     return this.manager()
       .getRepository(RefuerzoEvento)

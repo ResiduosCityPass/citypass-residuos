@@ -14,6 +14,8 @@ export interface IntegracionRepository {
   bloqueosActivos(): Promise<BloqueoPorIncidente[]>;
 
   guardarActividad(actividad: Partial<ActividadMasiva>): Promise<ActividadMasiva>;
+  /** Actividades que terminan despues de `desde`, ordenadas por hora de fin. */
+  actividadesQueTerminanDespuesDe(desde: Date): Promise<ActividadMasiva[]>;
 }
 
 /** Lo que necesita el ruteo de CU-08: los refuerzos vigentes en un momento. */

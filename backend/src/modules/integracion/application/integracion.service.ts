@@ -45,6 +45,7 @@ export class IntegracionService {
   private readonly cupoMinimoRefuerzo: number;
   private readonly ventanaRefuerzoHoras: number;
   private readonly capacidadMasiva: number;
+  private readonly horasZonaEvento: number;
 
   constructor(
     @Inject(INTEGRACION_REPOSITORY)
@@ -61,6 +62,7 @@ export class IntegracionService {
     this.cupoMinimoRefuerzo = Number(config.get('INTEGRACION_CUPO_MINIMO_REFUERZO', 100));
     this.ventanaRefuerzoHoras = Number(config.get('INTEGRACION_VENTANA_REFUERZO_HORAS', 12));
     this.capacidadMasiva = Number(config.get('INTEGRACION_CAPACIDAD_MASIVA', 1000));
+    this.horasZonaEvento = Number(config.get('INTEGRACION_HORAS_ZONA_EVENTO', 6));
   }
 
   async procesar(sobre: SobreGateway): Promise<ResultadoProcesamiento> {
@@ -101,6 +103,28 @@ export class IntegracionService {
           return 'ignorado';
       }
     });
+  }
+
+  /**
+   * Zonas de actividades masivas para el mapa: las que no terminaron y las que
+   * terminaron hace menos de `INTEGRACION_HORAS_ZONA_EVENTO`, que es cuando la
+   * escuadrilla esta limpiando.
+   */
+  async actividadesParaMapa(ahora = new Date()) {
+    const desde = new Date(ahora.getTime() - this.horasZonaEvento * 3_600_000);
+    const actividades = await this.integracion.actividadesQueTerminanDespuesDe(desde);
+
+    return actividades.map((a) => ({
+      actividadId: a.actividadId,
+      titulo: a.titulo,
+      capacidad: a.capacidad,
+      lat: a.lat,
+      lng: a.lng,
+      radioMetros: this.radioMetros,
+      inicio: a.inicio.toISOString(),
+      fin: a.fin.toISOString(),
+      contenedores: a.contenedorIds.length,
+    }));
   }
 
   /** Refuerzo de recoleccion para despues de un evento masivo. */
@@ -200,6 +224,10 @@ export class IntegracionService {
    * cercanos para mandar la escuadrilla cuando termine. Usa los nombres de
    * campo de Espacios (en ingles) y su propio corte de capacidad, aparte del
    * cupo del refuerzo de CU-INT-01.
+   *
+   * La escuadrilla reusa el refuerzo de CU-INT-01: desde la hora de fin y
+   * durante `INTEGRACION_HORAS_ZONA_EVENTO`, los contenedores de la zona entran
+   * a la ruta que genera CU-08 aunque no esten criticos.
    */
   private async registrarActividad(data: Record<string, unknown>): Promise<void> {
     const punto = coordenadas(data, 'latitude', 'longitude');
@@ -209,18 +237,32 @@ export class IntegracionService {
       return;
     }
 
-    const cercanos = await this.contenedoresCerca(punto);
+    const actividadId = texto(data, 'communityEventId');
+    const fin = fecha(data, 'endDate');
+    const contenedorIds = (await this.contenedoresCerca(punto)).map((c) => c.id);
 
     await this.integracion.guardarActividad({
-      actividadId: texto(data, 'communityEventId'),
+      actividadId,
       titulo: typeof data.title === 'string' ? data.title : null,
       capacidad,
       lat: punto.lat,
       lng: punto.lng,
       inicio: fecha(data, 'startDate'),
-      fin: fecha(data, 'endDate'),
-      contenedorIds: cercanos.map((c) => c.id),
+      fin,
+      contenedorIds,
     });
+
+    if (contenedorIds.length > 0) {
+      await this.integracion.guardarRefuerzo({
+        // Prefijo propio: el id de Espacios podria coincidir con el de un
+        // EventoComunitarioPublicado y pisaria el refuerzo de CU-INT-01.
+        eventoId: `act-${actividadId}`,
+        zona: null,
+        contenedorIds,
+        desde: fin,
+        hasta: new Date(fin.getTime() + this.horasZonaEvento * 3_600_000),
+      });
+    }
   }
 
   private async contenedoresCerca(punto: { lat: number; lng: number }) {

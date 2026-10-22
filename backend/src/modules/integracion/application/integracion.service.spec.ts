@@ -70,6 +70,7 @@ describe('IntegracionService (CU-INT-01)', () => {
         ),
       bloqueosActivos: jest.fn().mockImplementation(async () => bloqueos.filter((b) => b.activo)),
       guardarActividad: jest.fn().mockImplementation(async (a) => a),
+      actividadesQueTerminanDespuesDe: jest.fn().mockResolvedValue([]),
     };
     contenedores = { listar: jest.fn().mockResolvedValue([CERCA, LEJOS]) };
     // ZonasService real sobre un repositorio en memoria, con estado como la base:
@@ -189,10 +190,64 @@ describe('IntegracionService (CU-INT-01)', () => {
       expect(integracion.guardarActividad).not.toHaveBeenCalled();
     });
 
-    it('no toca el refuerzo de CU-INT-01', async () => {
+    it('agenda la escuadrilla: los contenedores entran al ruteo desde el fin y por 6 h', async () => {
       await service.procesar(actividad());
 
+      expect(integracion.guardarRefuerzo).toHaveBeenCalledWith({
+        eventoId: 'act-act-1',
+        zona: null,
+        contenedorIds: ['c-cerca'],
+        desde: new Date('2026-11-01T20:00:00.000Z'),
+        hasta: new Date('2026-11-02T02:00:00.000Z'),
+      });
+      // El aviso de refuerzo es de CU-INT-01: la escuadrilla no lo publica.
+      expect(eventos.getPublished(EventTypes.REFUERZO_PROGRAMADO)).toHaveLength(0);
+    });
+
+    it('sin contenedores cerca guarda la actividad pero no agenda escuadrilla', async () => {
+      contenedores.listar.mockResolvedValue([LEJOS]);
+
+      await service.procesar(actividad());
+
+      expect(integracion.guardarActividad).toHaveBeenCalledWith(
+        expect.objectContaining({ contenedorIds: [] }),
+      );
       expect(integracion.guardarRefuerzo).not.toHaveBeenCalled();
+    });
+
+    it('para el mapa trae las que terminaron hace menos de 6 h, con su radio', async () => {
+      integracion.actividadesQueTerminanDespuesDe.mockResolvedValue([
+        {
+          actividadId: 'act-1',
+          titulo: 'Festival de Primavera',
+          capacidad: 5000,
+          lat: PLAZA_ITALIA.lat,
+          lng: PLAZA_ITALIA.lng,
+          inicio: new Date('2026-11-01T15:00:00.000Z'),
+          fin: new Date('2026-11-01T20:00:00.000Z'),
+          contenedorIds: ['c-cerca'],
+          creadaEn: new Date(),
+        },
+      ]);
+
+      const zonas = await service.actividadesParaMapa(new Date('2026-11-01T22:00:00.000Z'));
+
+      expect(integracion.actividadesQueTerminanDespuesDe).toHaveBeenCalledWith(
+        new Date('2026-11-01T16:00:00.000Z'),
+      );
+      expect(zonas).toEqual([
+        {
+          actividadId: 'act-1',
+          titulo: 'Festival de Primavera',
+          capacidad: 5000,
+          lat: PLAZA_ITALIA.lat,
+          lng: PLAZA_ITALIA.lng,
+          radioMetros: 300,
+          inicio: '2026-11-01T15:00:00.000Z',
+          fin: '2026-11-01T20:00:00.000Z',
+          contenedores: 1,
+        },
+      ]);
     });
 
     it('rechaza una fecha de fin invalida', async () => {
