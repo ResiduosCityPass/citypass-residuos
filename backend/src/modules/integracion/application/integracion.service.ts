@@ -10,6 +10,7 @@ import {
 } from '../../contenedores/domain/contenedor.repository';
 import { ZonasService } from '../../zonas/application/zonas.service';
 import { INTEGRACION_REPOSITORY, IntegracionRepository } from '../domain/integracion.repository';
+import { ActividadesMasivasService } from './actividades-masivas.service';
 
 /** Sobre con el que el gateway del Squad 1 entrega cada evento por webhook. */
 export interface SobreGateway {
@@ -32,7 +33,7 @@ const EMERGENCIA_TERMINADA = new Set(['RESUELTA', 'CERRADA', 'DESCARTADA', 'CANC
  *   EventoCancelado            -> se cancela el refuerzo
  *   EmergenciaCreada           -> se bloquean para el ruteo las zonas afectadas
  *   EmergenciaActualizada      -> al terminar la emergencia se desbloquean
- *   ActividadCreada            -> se guarda la actividad masiva con sus contenedores (squad 3)
+ *   ActividadCreada            -> zona del evento y escuadrilla (squad 3, ActividadesMasivasService)
  *
  * Todo corre en una transaccion: si algo falla tampoco queda registrado el
  * eventId, el webhook responde error y el dispatcher del Squad 1 reintenta.
@@ -44,8 +45,6 @@ export class IntegracionService {
   private readonly radioMetros: number;
   private readonly cupoMinimoRefuerzo: number;
   private readonly ventanaRefuerzoHoras: number;
-  private readonly capacidadMasiva: number;
-  private readonly horasZonaEvento: number;
 
   constructor(
     @Inject(INTEGRACION_REPOSITORY)
@@ -57,12 +56,11 @@ export class IntegracionService {
     private readonly zonas: ZonasService,
     private readonly transaccion: ContextoTransaccional,
     config: ConfigService,
+    private readonly actividades: ActividadesMasivasService,
   ) {
     this.radioMetros = Number(config.get('INTEGRACION_RADIO_METROS', 300));
     this.cupoMinimoRefuerzo = Number(config.get('INTEGRACION_CUPO_MINIMO_REFUERZO', 100));
     this.ventanaRefuerzoHoras = Number(config.get('INTEGRACION_VENTANA_REFUERZO_HORAS', 12));
-    this.capacidadMasiva = Number(config.get('INTEGRACION_CAPACIDAD_MASIVA', 1000));
-    this.horasZonaEvento = Number(config.get('INTEGRACION_HORAS_ZONA_EVENTO', 6));
   }
 
   async procesar(sobre: SobreGateway): Promise<ResultadoProcesamiento> {
@@ -96,35 +94,13 @@ export class IntegracionService {
           await this.desbloquearSiTermino(data);
           return 'procesado';
         case `${ESPACIOS}ActividadCreada`:
-          await this.registrarActividad(data);
+          await this.actividades.registrar(data);
           return 'procesado';
         default:
           this.logger.log(`Tipo de evento sin manejo en Residuos: ${eventType}`);
           return 'ignorado';
       }
     });
-  }
-
-  /**
-   * Zonas de actividades masivas para el mapa: las que no terminaron y las que
-   * terminaron hace menos de `INTEGRACION_HORAS_ZONA_EVENTO`, que es cuando la
-   * escuadrilla esta limpiando.
-   */
-  async actividadesParaMapa(ahora = new Date()) {
-    const desde = new Date(ahora.getTime() - this.horasZonaEvento * 3_600_000);
-    const actividades = await this.integracion.actividadesQueTerminanDespuesDe(desde);
-
-    return actividades.map((a) => ({
-      actividadId: a.actividadId,
-      titulo: a.titulo,
-      capacidad: a.capacidad,
-      lat: a.lat,
-      lng: a.lng,
-      radioMetros: this.radioMetros,
-      inicio: a.inicio.toISOString(),
-      fin: a.fin.toISOString(),
-      contenedores: a.contenedorIds.length,
-    }));
   }
 
   /** Refuerzo de recoleccion para despues de un evento masivo. */
@@ -219,52 +195,6 @@ export class IntegracionService {
     }
   }
 
-  /**
-   * Actividad masiva de Espacios (squad 3): se guarda con sus contenedores
-   * cercanos para mandar la escuadrilla cuando termine. Usa los nombres de
-   * campo de Espacios (en ingles) y su propio corte de capacidad, aparte del
-   * cupo del refuerzo de CU-INT-01.
-   *
-   * La escuadrilla reusa el refuerzo de CU-INT-01: desde la hora de fin y
-   * durante `INTEGRACION_HORAS_ZONA_EVENTO`, los contenedores de la zona entran
-   * a la ruta que genera CU-08 aunque no esten criticos.
-   */
-  private async registrarActividad(data: Record<string, unknown>): Promise<void> {
-    const punto = coordenadas(data, 'latitude', 'longitude');
-    const capacidad = Number(data.capacity ?? 0);
-
-    if (data.status === 'CANCELLED' || !punto || capacidad < this.capacidadMasiva) {
-      return;
-    }
-
-    const actividadId = texto(data, 'communityEventId');
-    const fin = fecha(data, 'endDate');
-    const contenedorIds = (await this.contenedoresCerca(punto)).map((c) => c.id);
-
-    await this.integracion.guardarActividad({
-      actividadId,
-      titulo: typeof data.title === 'string' ? data.title : null,
-      capacidad,
-      lat: punto.lat,
-      lng: punto.lng,
-      inicio: fecha(data, 'startDate'),
-      fin,
-      contenedorIds,
-    });
-
-    if (contenedorIds.length > 0) {
-      await this.integracion.guardarRefuerzo({
-        // Prefijo propio: el id de Espacios podria coincidir con el de un
-        // EventoComunitarioPublicado y pisaria el refuerzo de CU-INT-01.
-        eventoId: `act-${actividadId}`,
-        zona: null,
-        contenedorIds,
-        desde: fin,
-        hasta: new Date(fin.getTime() + this.horasZonaEvento * 3_600_000),
-      });
-    }
-  }
-
   private async contenedoresCerca(punto: { lat: number; lng: number }) {
     const activos = await this.contenedores.listar({ soloActivos: true });
     return activos.filter((c) => distanciaMetros(punto, c) <= this.radioMetros);
@@ -282,23 +212,8 @@ function texto(data: Record<string, unknown>, campo: string): string {
   return valor;
 }
 
-function fecha(data: Record<string, unknown>, campo: string): Date {
-  const valor = new Date(texto(data, campo));
-  if (Number.isNaN(valor.getTime())) {
-    throw new BadRequestException({
-      message: `El campo '${campo}' no es una fecha valida`,
-      code: 'EVENTO_MAL_FORMADO',
-    });
-  }
-  return valor;
-}
-
-function coordenadas(
-  data: Record<string, unknown>,
-  campoLat = 'latitud',
-  campoLng = 'longitud',
-): { lat: number; lng: number } | null {
-  const lat = data[campoLat];
-  const lng = data[campoLng];
-  return typeof lat === 'number' && typeof lng === 'number' ? { lat, lng } : null;
+function coordenadas(data: Record<string, unknown>): { lat: number; lng: number } | null {
+  return typeof data.latitud === 'number' && typeof data.longitud === 'number'
+    ? { lat: data.latitud, lng: data.longitud }
+    : null;
 }

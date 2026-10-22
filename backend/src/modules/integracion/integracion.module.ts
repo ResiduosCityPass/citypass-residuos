@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ContenedoresModule } from '../contenedores/contenedores.module';
 import { ZonasModule } from '../zonas/zonas.module';
 import { ActividadesMasivasController } from './actividades-masivas.controller';
+import { ActividadesMasivasService } from './application/actividades-masivas.service';
 import { IntegracionService } from './application/integracion.service';
 import { CitypassWebhookController } from './citypass-webhook.controller';
 import { ActividadMasiva } from './domain/actividad-masiva.entity';
@@ -27,6 +28,7 @@ import { IntegracionTypeormRepository } from './infrastructure/integracion.typeo
   controllers: [CitypassWebhookController, ActividadesMasivasController],
   providers: [
     IntegracionService,
+    ActividadesMasivasService,
     IntegracionTypeormRepository,
     { provide: INTEGRACION_REPOSITORY, useExisting: IntegracionTypeormRepository },
     { provide: REFUERZOS_VIGENTES, useExisting: IntegracionTypeormRepository },

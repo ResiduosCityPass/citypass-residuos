@@ -142,3 +142,48 @@ Adriel me pasó lo que planea para su caso: cuando se resuelve una emergencia re
 **Con esto se cumple el "listo cuando" de mi parte:** llega `ActividadCreada`, se ve la zona en el mapa, a la hora de fin la escuadrilla tiene los tachos de la plaza en su ruta y el chofer la cierra.
 
 **Próximo paso:** probarlo con el evento real que publique Rodrigo por el bus (paso 5). Para eso faltan el token de servicio y el namespace del Login, y las coordenadas en Espacios.
+
+## Jue 22/10 · PR #57 a `develop`
+
+Abrí el PR [#57](https://github.com/ResiduosCityPass/citypass-residuos/pull/57) con los pasos 1 a 4. Le pedí la revisión a Nico, porque el PR suma cosas al módulo `integracion`, que es de su caso.
+
+## Jue 22/10 · Documento de Fran con todos los casos del grupo 4
+
+Fran juntó en un documento los casos de integración de todos los del grupo 4, para no pisarnos en el repo:
+- **Fran:** un reclamo por un auto que tapa un contenedor.
+- **Yo:** el evento masivo.
+- **Tomás:** la reserva de una plaza más la limpieza a la salida.
+- **Adri:** una emergencia durante un viaje en bici.
+
+**Coincide con lo que hicimos:**
+- Todos entramos por el mismo webhook.
+- El refuerzo es el mecanismo común: lo usamos Nico, Tomás y yo.
+- La ruta la sigue generando el operador.
+
+**Lo que propone y me afecta:**
+- **Un service propio por caso** dentro de `integracion`, para que en el `switch` compartido haya solo una línea por caso.
+- **No responder 400** si el evento llega mal formado. Un 400 hace que el bus lo reintente para siempre: mejor ignorarlo y dejarlo en el log.
+- **Tomás trabaja sobre mi rama:** agrega el refuerzo desde 100 personas, publica `RefuerzoProgramado` para Analítica y maneja la cancelación.
+- **Orden de merge:** primero los PRs de Fran (#53 → #58) y después el mío (#57), resolviendo conflictos chicos en `integracion`.
+
+## Jue 22/10 · Ajustes al PR #57 según las reglas del grupo 4
+
+Apliqué las dos reglas que propuso Fran para que los casos no choquen en el módulo `integracion`.
+
+**1. Un service propio por caso.**
+- Todo lo de mi caso pasó a un archivo propio: `application/actividades-masivas.service.ts` (`ActividadesMasivasService`). Ahí está guardar la actividad, agendar la escuadrilla y dar las zonas para el mapa.
+- En el archivo que tocamos todos (`integracion.service.ts`) solo quedan 6 líneas agregadas: el `case` de `ActividadCreada`, que llama a mi service, y lo necesario para conectarlo. Volví a dejar el resto del archivo exactamente como en `develop`, sin tocar lo de Nico.
+- El endpoint del mapa (`GET /actividades-masivas`) ahora usa mi service.
+- **Por qué:** cuanto menos se toque el archivo compartido, menos conflictos hay al mergear los PRs de Fran, Tomás y Adri.
+
+**2. Un evento mal formado se ignora, no responde 400.**
+- Si a `ActividadCreada` le falta el id, las coordenadas o una fecha válida, Residuos lo ignora, deja un aviso en el log y responde 204.
+- **Por qué:** con un 400 el bus cree que falló y lo reintenta para siempre. Con 204 lo da por entregado.
+
+**Pruebas:**
+- Los tests de mi caso pasaron a su propio archivo, `actividades-masivas.service.spec.ts`: 11 tests, incluidos 4 de eventos mal formados (sin coordenadas, sin id, fecha de fin inválida, sin fecha de inicio).
+- En el test de Nico agregué uno solo: que `ActividadCreada` se manda a mi service.
+- Pasan los 108 tests de `integracion` y `rutas`.
+- En local:
+  - Un evento sin id respondió 204, quedó en el log ("ActividadCreada ignorada, mal formada") y no se guardó nada.
+  - Una "Feria en Plaza de Mayo" válida se guardó con su contenedor cercano.
