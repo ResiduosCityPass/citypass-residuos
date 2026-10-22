@@ -8,6 +8,7 @@
     "seed": "node seed.js",
     "start": "node simulador.js",
     "saturacion": "node simulador.js --escenario saturacion",
-    "incendio": "node simulador.js --escenario incendio"
+    "incendio": "node simulador.js --escenario incendio",
+    "actividad": "node actividad-masiva.js"
   }
 }

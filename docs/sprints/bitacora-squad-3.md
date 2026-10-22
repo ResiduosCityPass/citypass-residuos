@@ -187,3 +187,35 @@ Apliqué las dos reglas que propuso Fran para que los casos no choquen en el mó
 - En local:
   - Un evento sin id respondió 204, quedó en el log ("ActividadCreada ignorada, mal formada") y no se guardó nada.
   - Una "Feria en Plaza de Mayo" válida se guardó con su contenedor cercano.
+
+## Jue 22/10 · Documentación y script de demo
+
+Mientras espero a los demás (la aprobación de Nico, el token de Nicolas, las coordenadas de Rodrigo), avancé con lo que pide la consigna para el Hito 2 y no depende de nadie.
+
+**1. Contrato del evento** (`docs/arquitectura/contratos-de-eventos.md`, en "Eventos a los que nos suscribimos"):
+- Quién publica `ActividadCreada` y cómo llega (el webhook, con el sobre del bus).
+- Un JSON de ejemplo y una tabla con cada campo y para qué lo usa Residuos.
+- Qué hace Residuos paso a paso: el corte de 1.000 personas, los 300 m, la zona en el mapa y la escuadrilla.
+- Qué pasa con un evento mal formado (se ignora y responde 204) y que Residuos no publica nada en respuesta.
+
+**2. Diagrama de secuencia del caso** (`docs/arquitectura/diagramas.md`, sección 8):
+- El recorrido completo: Espacios → bus → API de Residuos → base de datos → operador → chofer.
+- Muestra los casos que se ignoran (repetido, mal formado, cancelada, chica) y que guardar la actividad y la escuadrilla van en una sola transacción.
+- Explica por qué la ruta no se arma sola y por qué se reusa el refuerzo de Nico.
+- Reemplaza al diagrama de flujo del squad, que tenía restos de la plantilla, y responde a lo que pide la consigna: "diagramas de interacción".
+- Lo verifiqué dibujándolo en el navegador: se ve bien.
+
+**3. Script de demo** (`simulator/actividad-masiva.js`, comando `npm run actividad`):
+- Hace de Espacios: manda `ActividadCreada` al webhook igual que el bus.
+- `--contenedor CT-0005` arma la actividad al lado de ese contenedor, así la escuadrilla seguro tiene algo que levantar.
+- `--termina-en 0` hace que ya haya terminado, para mostrar la escuadrilla sin esperar.
+- **Es el plan B de la exposición:** si el bus o Espacios se caen en vivo, la historia sigue con este comando.
+- Probado en local: con `--contenedor CT-0016` la zona apareció en el mapa con 2 contenedores. Sin token, avisa qué falta.
+- Lo expliqué en `simulator/README.md`.
+
+**Comando para la demo** (con el backend levantado):
+
+```bash
+cd simulator
+TOKEN=<token-de-administrador> npm run actividad -- --contenedor CT-0005
+```

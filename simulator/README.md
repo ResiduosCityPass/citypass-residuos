@@ -49,6 +49,31 @@ contenedor **verde** puede estar prendido fuego, porque el incendio se evalúa c
 y no contra el llenado. Si es el mismo que acabás de saturar, está rojo, y no se puede mostrar que
 las dos reglas son independientes.
 
+## Actividad masiva (caso transversal del squad 3)
+
+Simula a Espacios publicando `com.citypass.espacios.ActividadCreada`: le pega al webhook de
+Residuos igual que lo haría el bus. Sirve para la demo y como plan B si el bus o Espacios se caen
+en vivo.
+
+```bash
+TOKEN=<token-de-administrador> npm run actividad -- --contenedor CT-0005
+```
+
+Arma un "Festival de Primavera" de 5.000 personas al lado de CT-0005, que empezó hace 3 h y
+termina en 10 minutos. En el mapa aparece la zona con la cuenta regresiva y, cuando termina, los
+contenedores de la zona entran a la próxima ruta que se genere.
+
+| Opción | Qué hace |
+|---|---|
+| `--contenedor <codigo>` | Arma la actividad al lado de ese contenedor (necesita `TOKEN`) |
+| `--termina-en <minutos>` | Cuándo termina; `0` = ya terminó y la escuadrilla puede salir ya. Default 10 |
+| `--titulo`, `--capacidad` | Default "Festival de Primavera", 5000 |
+| `--lat`, `--lng` | Ubicación a mano, sin `--contenedor`. Default el Obelisco |
+
+Usa `WEBHOOK_TOKEN` (default `local-dev`), que tiene que coincidir con `GATEWAY_WEBHOOK_TOKEN` del
+backend. Sin `--contenedor` la actividad cae en el Obelisco, pero el seed reparte los contenedores
+hasta a 1 km, así que puede quedar sin ninguno dentro de los 300 m.
+
 ## El nivel sobrevive entre corridas
 
 Los niveles se guardan en `estado.json` al final de cada ciclo y se recuperan al arrancar. Sin eso

@@ -152,6 +152,70 @@ pierden y por qué. Es el dato que justifica cambiar un horario o una frecuencia
 > Hay que confirmarlos con cada squad durante el Sprint 3, que es la instancia donde la cátedra
 > planifica el diseño colaborativo de casos de uso transversales.
 
+### `com.citypass.espacios.ActividadCreada` — caso transversal del squad 3
+
+**Caso:** "Recolección inteligente después de un evento masivo". Termina un evento grande en una
+plaza y Residuos manda una escuadrilla a limpiar los contenedores de la zona.
+
+**Quién lo publica:** Espacios Públicos, cada vez que se crea una actividad o evento comunitario.
+Internamente lo emiten como `cultura.evento_comunitario_publicado` y lo mapean a este nombre al
+publicarlo en el bus. Nombre y campos acordados con Espacios el 22/10.
+
+**Cómo llega:** por el webhook `POST /webhooks/citypass?token=...` (CU-INT-01), con el sobre del
+gateway `{ metadata: { eventId, eventType }, data }`. Se descartan repetidos por
+`metadata.eventId`.
+
+```json
+{
+  "metadata": {
+    "eventId": "7c1e...",
+    "eventType": "com.citypass.espacios.ActividadCreada"
+  },
+  "data": {
+    "communityEventId": "3f1c2a9e-0000-4000-8000-000000000001",
+    "title": "Festival de Primavera",
+    "capacity": 5000,
+    "status": "ACTIVE",
+    "startDate": "2026-11-01T18:00:00Z",
+    "endDate": "2026-11-01T23:00:00Z",
+    "latitude": -34.6037,
+    "longitude": -58.3816
+  }
+}
+```
+
+| Campo | Tipo | Uso en Residuos |
+|---|---|---|
+| `communityEventId` | UUID | Id de la actividad |
+| `title` | string | Se muestra en el mapa |
+| `capacity` | entero | Corte de evento masivo |
+| `status` | `ACTIVE` \| `ACTIVE_FULL` \| `CANCELLED` | Las canceladas se ignoran |
+| `startDate`, `endDate` | ISO 8601, UTC | La zona se muestra hasta 6 h después del fin; la escuadrilla arranca en el fin |
+| `latitude`, `longitude` | decimal, WGS84 | Centro de la zona. **Espacios todavía no las tiene**: se agregan para este caso |
+
+Espacios manda además `publicSpaceId`, `category`, `tags`, `organizerName`,
+`requiresRegistration` e `imageUrl`, que Residuos no usa.
+
+**Qué hacemos al recibirlo** (`ActividadesMasivasService`):
+
+1. Si la capacidad es menor a 1.000 personas (`INTEGRACION_CAPACIDAD_MASIVA`) o el estado es
+   `CANCELLED`, no hace nada.
+2. Busca los contenedores activos a 300 m o menos (`INTEGRACION_RADIO_METROS`) y guarda la
+   actividad en `actividad_masiva`.
+3. **Zona en el mapa:** `GET /actividades-masivas` devuelve las actividades que no terminaron o
+   que terminaron hace menos de 6 h (`INTEGRACION_HORAS_ZONA_EVENTO`). El mapa de CU-07 las dibuja
+   como un círculo, con un aviso con la hora de fin.
+4. **Escuadrilla:** si hay contenedores cerca, crea un refuerzo `act-<communityEventId>` que va
+   desde `endDate` hasta 6 h después. En esa ventana, esos contenedores entran a la ruta que
+   genera CU-08 aunque no estén críticos. El operador genera y asigna la ruta, y el chofer la
+   cierra con CU-10.
+
+**Errores:** si falta el id, las coordenadas o una fecha válida, el evento se ignora, se deja un
+aviso en el log y se responde `204`. No se responde `400`, porque el bus lo reintentaría para
+siempre.
+
+**No publicamos nada en respuesta.** En el diagrama del squad, Residuos solo recibe.
+
 ## Política de errores y reintentos
 
 - **Publicación:** implementada con outbox transaccional. El evento se escribe en la tabla
