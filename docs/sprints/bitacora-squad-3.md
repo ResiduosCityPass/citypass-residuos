@@ -127,3 +127,18 @@ Adriel me pasó lo que planea para su caso: cuando se resuelve una emergencia re
   4. Después descarté la ruta de prueba.
 
 **Próximo paso:** el chofer confirma las paradas (paso 4). CU-10 ya existe: queda probarlo con una ruta de escuadrilla.
+
+## Jue 22/10 · Paso 4: el chofer cierra la ruta de la escuadrilla
+
+**No hizo falta código nuevo.** La confirmación del chofer (CU-10) ya existía y funciona igual con una ruta de escuadrilla: para el chofer es una ruta más.
+
+**Prueba de punta a punta en local, con el "Recital en Plaza Constitución" del paso 3:**
+1. El operador generó la ruta para el camión de reciclables (XY987ZW): 6 paradas, 5 contenedores críticos más CT-0005, el tacho de la plaza que entró por la escuadrilla.
+2. El operador se la asignó a la chofer Juana Perez.
+3. Juana la vio en su pantalla (`/chofer`): "0 de 6 vaciados". CT-0005 aparece en verde porque no estaba lleno.
+4. Juana confirmó las 6 paradas, cada una desde la posición del contenedor. El backend valida que esté a menos de 100 m.
+5. La ruta pasó a COMPLETADA, los contenedores quedaron vacíos (NORMAL, 0 %) y la pantalla de Juana volvió a "No tenés ninguna ruta asignada".
+
+**Con esto se cumple el "listo cuando" de mi parte:** llega `ActividadCreada`, se ve la zona en el mapa, a la hora de fin la escuadrilla tiene los tachos de la plaza en su ruta y el chofer la cierra.
+
+**Próximo paso:** probarlo con el evento real que publique Rodrigo por el bus (paso 5). Para eso faltan el token de servicio y el namespace del Login, y las coordenadas en Espacios.
