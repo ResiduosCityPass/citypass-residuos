@@ -105,7 +105,6 @@ export function traducirAGateway(evento: DomainEvent): EventoGateway | null {
           afectaRecoleccion: p.afectaRecoleccion,
           contenedoresAfectados: p.contenedoresAfectados,
           rutasRecalculadas: p.rutasRecalculadas,
-          bloqueadoHasta: p.bloqueadoHasta,
           correlationId,
           occurredAt: p.evaluadoEn ?? evento.occurredAt,
         },

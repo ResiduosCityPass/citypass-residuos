@@ -168,8 +168,7 @@ cambiaron. Para cada ruta viva que tenga como pendiente un contenedor afectado:
     "reclamoId": "RC-123",
     "afectaRecoleccion": true,
     "contenedoresAfectados": [{ "codigo": "CT-0421", "distanciaMetros": 8.4 }],
-    "rutasRecalculadas": ["b1f0..."],
-    "bloqueadoHasta": "2026-10-21T22:00:00.000Z"
+    "rutasRecalculadas": ["b1f0..."]
   }
   ```
 

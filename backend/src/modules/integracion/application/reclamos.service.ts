@@ -105,7 +105,6 @@ export class ReclamosService {
           distanciaMetros: Number(distancia.toFixed(1)),
         })),
         rutasRecalculadas,
-        bloqueadoHasta: tapados.length > 0 ? venceEn.toISOString() : null,
         evaluadoEn: ahora.toISOString(),
       }),
     );

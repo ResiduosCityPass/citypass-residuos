@@ -81,7 +81,6 @@ describe('ReclamosService (CU-INT-02)', () => {
           afectaRecoleccion: true,
           contenedoresAfectados: [{ codigo: 'CT-TAPADO', distanciaMetros: expect.any(Number) }],
           rutasRecalculadas: ['rt-1'],
-          bloqueadoHasta: expect.any(String),
         }),
       );
     });
@@ -115,7 +114,6 @@ describe('ReclamosService (CU-INT-02)', () => {
           afectaRecoleccion: false,
           contenedoresAfectados: [],
           rutasRecalculadas: [],
-          bloqueadoHasta: null,
         }),
       );
     });

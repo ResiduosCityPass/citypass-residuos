@@ -137,7 +137,6 @@ Reclamos y, a la vez, el dato de la métrica para BI.
   "afectaRecoleccion": true,
   "contenedoresAfectados": [{ "codigo": "CT-0421", "distanciaMetros": 8.4 }],
   "rutasRecalculadas": ["b1f0..."],
-  "bloqueadoHasta": "2026-10-22T22:00:00.000Z",
   "correlationId": null,
   "occurredAt": "2026-10-22T18:00:00.000Z"
 }
@@ -149,7 +148,6 @@ Reclamos y, a la vez, el dato de la métrica para BI.
 | `afectaRecoleccion` | `true` si el auto tapa al menos un contenedor (a `OBSTRUCCION_RADIO_METROS`, 15 m). `false` si no tapa ninguno |
 | `contenedoresAfectados` | Los contenedores tapados, con la distancia al auto. Vacío si `afectaRecoleccion` es `false` |
 | `rutasRecalculadas` | Rutas vivas que perdieron una parada por este reclamo. Vacío si ninguna ruta tenía esos contenedores |
-| `bloqueadoHasta` | Hasta cuándo queda bloqueado si nadie avisa que se resolvió. `null` si no afecta |
 | `occurredAt` | Momento de la decisión. Es la fecha para agrupar por período |
 
 **Consumidores esperados:**

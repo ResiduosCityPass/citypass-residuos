@@ -89,7 +89,6 @@ describe('traducirAGateway (CU-INT-01)', () => {
       afectaRecoleccion: true,
       contenedoresAfectados: [{ codigo: 'CT-0421', distanciaMetros: 8.4 }],
       rutasRecalculadas: ['rt-1'],
-      bloqueadoHasta: '2026-10-22T22:00:00.000Z',
       evaluadoEn: '2026-10-22T18:00:00.000Z',
     });
 
@@ -100,7 +99,6 @@ describe('traducirAGateway (CU-INT-01)', () => {
         afectaRecoleccion: true,
         contenedoresAfectados: [{ codigo: 'CT-0421', distanciaMetros: 8.4 }],
         rutasRecalculadas: ['rt-1'],
-        bloqueadoHasta: '2026-10-22T22:00:00.000Z',
         correlationId: null,
         occurredAt: '2026-10-22T18:00:00.000Z',
       },
