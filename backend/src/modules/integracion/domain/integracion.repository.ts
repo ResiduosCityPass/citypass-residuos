@@ -1,3 +1,4 @@
+import { ActividadMasiva } from './actividad-masiva.entity';
 import { BloqueoPorIncidente } from './bloqueo-por-incidente.entity';
 import { RefuerzoEvento } from './refuerzo-evento.entity';
 
@@ -11,6 +12,8 @@ export interface IntegracionRepository {
   guardarBloqueo(bloqueo: Partial<BloqueoPorIncidente>): Promise<BloqueoPorIncidente>;
   buscarBloqueo(emergenciaId: string): Promise<BloqueoPorIncidente | null>;
   bloqueosActivos(): Promise<BloqueoPorIncidente[]>;
+
+  guardarActividad(actividad: Partial<ActividadMasiva>): Promise<ActividadMasiva>;
 }
 
 /** Lo que necesita el ruteo de CU-08: los refuerzos vigentes en un momento. */

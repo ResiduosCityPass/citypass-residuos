@@ -4,6 +4,7 @@ import { ContenedoresModule } from '../contenedores/contenedores.module';
 import { ZonasModule } from '../zonas/zonas.module';
 import { IntegracionService } from './application/integracion.service';
 import { CitypassWebhookController } from './citypass-webhook.controller';
+import { ActividadMasiva } from './domain/actividad-masiva.entity';
 import { BloqueoPorIncidente } from './domain/bloqueo-por-incidente.entity';
 import { EventoRecibido } from './domain/evento-recibido.entity';
 import { INTEGRACION_REPOSITORY, REFUERZOS_VIGENTES } from './domain/integracion.repository';
@@ -13,7 +14,12 @@ import { IntegracionTypeormRepository } from './infrastructure/integracion.typeo
 /** Integracion con los otros modulos de CityPass+ via el bus del Squad 1 (CU-INT-01). */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([EventoRecibido, RefuerzoEvento, BloqueoPorIncidente]),
+    TypeOrmModule.forFeature([
+      EventoRecibido,
+      RefuerzoEvento,
+      BloqueoPorIncidente,
+      ActividadMasiva,
+    ]),
     ContenedoresModule,
     ZonasModule,
   ],

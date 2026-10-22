@@ -69,6 +69,7 @@ describe('IntegracionService (CU-INT-01)', () => {
           async (id: string) => bloqueos.find((b) => b.emergenciaId === id) ?? null,
         ),
       bloqueosActivos: jest.fn().mockImplementation(async () => bloqueos.filter((b) => b.activo)),
+      guardarActividad: jest.fn().mockImplementation(async (a) => a),
     };
     contenedores = { listar: jest.fn().mockResolvedValue([CERCA, LEJOS]) };
     // ZonasService real sobre un repositorio en memoria, con estado como la base:
@@ -137,6 +138,67 @@ describe('IntegracionService (CU-INT-01)', () => {
       );
 
       expect(integracion.borrarRefuerzo).toHaveBeenCalledWith('evt-1');
+    });
+  });
+
+  describe('actividad masiva (squad 3)', () => {
+    // Campos tal como los publica Espacios.
+    const actividad = (cambios: Record<string, unknown> = {}) =>
+      sobre('com.citypass.espacios.ActividadCreada', {
+        communityEventId: 'act-1',
+        title: 'Festival de Primavera',
+        capacity: 5000,
+        status: 'ACTIVE',
+        startDate: '2026-11-01T15:00:00.000Z',
+        endDate: '2026-11-01T20:00:00.000Z',
+        latitude: PLAZA_ITALIA.lat,
+        longitude: PLAZA_ITALIA.lng,
+        ...cambios,
+      });
+
+    it('guarda la actividad con los contenedores cercanos', async () => {
+      await expect(service.procesar(actividad())).resolves.toBe('procesado');
+
+      expect(integracion.guardarActividad).toHaveBeenCalledWith({
+        actividadId: 'act-1',
+        titulo: 'Festival de Primavera',
+        capacidad: 5000,
+        lat: PLAZA_ITALIA.lat,
+        lng: PLAZA_ITALIA.lng,
+        inicio: new Date('2026-11-01T15:00:00.000Z'),
+        fin: new Date('2026-11-01T20:00:00.000Z'),
+        contenedorIds: ['c-cerca'],
+      });
+    });
+
+    it('una actividad de menos de 1.000 personas no es masiva', async () => {
+      await service.procesar(actividad({ capacity: 300 }));
+
+      expect(integracion.guardarActividad).not.toHaveBeenCalled();
+    });
+
+    it('una actividad cancelada no se guarda', async () => {
+      await service.procesar(actividad({ status: 'CANCELLED' }));
+
+      expect(integracion.guardarActividad).not.toHaveBeenCalled();
+    });
+
+    it('sin coordenadas no se guarda', async () => {
+      await service.procesar(actividad({ latitude: undefined, longitude: undefined }));
+
+      expect(integracion.guardarActividad).not.toHaveBeenCalled();
+    });
+
+    it('no toca el refuerzo de CU-INT-01', async () => {
+      await service.procesar(actividad());
+
+      expect(integracion.guardarRefuerzo).not.toHaveBeenCalled();
+    });
+
+    it('rechaza una fecha de fin invalida', async () => {
+      await expect(service.procesar(actividad({ endDate: 'mañana' }))).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
     });
   });
 
