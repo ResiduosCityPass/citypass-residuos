@@ -38,7 +38,11 @@ describe('Recalculo de rutas por obstruccion (e2e)', () => {
   beforeEach(() => ctx.limpiar());
 
   /** Tres contenedores criticos en fila hacia el sur y una propuesta que los recorre. */
-  async function propuestaConTresParadas(): Promise<{ rutaId: string; contenedorIds: string[] }> {
+  async function propuestaConTresParadas(): Promise<{
+    rutaId: string;
+    camionId: string;
+    contenedorIds: string[];
+  }> {
     const zona = await http
       .post('/api/v1/zonas')
       .set(auth(admin))
@@ -90,7 +94,7 @@ describe('Recalculo de rutas por obstruccion (e2e)', () => {
       .send({ camionId: camion.body.id })
       .expect(201);
 
-    return { rutaId: ruta.body.id, contenedorIds };
+    return { rutaId: ruta.body.id, camionId: camion.body.id, contenedorIds };
   }
 
   async function detalle(rutaId: string) {
@@ -145,5 +149,94 @@ describe('Recalculo de rutas por obstruccion (e2e)', () => {
     expect(
       await paradas.quitarContenedores(['00000000-0000-0000-0000-000000000000'], MOTIVO),
     ).toEqual([]);
+  });
+
+  describe('por el webhook del bus', () => {
+    const webhook = `/api/v1/webhooks/citypass?token=${process.env.GATEWAY_WEBHOOK_TOKEN}`;
+    /** Frente al segundo contenedor de `propuestaConTresParadas`. */
+    const FRENTE_AL_SEGUNDO = { latitud: DEPOSITO.lat - 0.004, longitud: DEPOSITO.lng };
+
+    const enviar = (eventId: string, eventType: string, data: Record<string, unknown>) =>
+      http.post(webhook).send({ metadata: { eventId, eventType }, data }).expect(204);
+
+    const reclamoCreado = (eventId = 'ev-reclamo-1') =>
+      enviar(eventId, 'com.citypass.reclamos.ReclamoCreado', {
+        reclamoId: 'RC-E2E',
+        categoria: 'Vehiculo mal estacionado en bicisenda',
+        ...FRENTE_AL_SEGUNDO,
+      });
+
+    const generar = async (camionId: string) => {
+      const ruta = await http
+        .post('/api/v1/rutas/generar')
+        .set(auth(admin))
+        .send({ camionId })
+        .expect(201);
+      return (ruta.body.paradas as ParadaRespuesta[]).map((p) => p.contenedorId);
+    };
+
+    it('un auto frente a un contenedor de una ruta asignada omite esa parada', async () => {
+      const { rutaId, contenedorIds } = await propuestaConTresParadas();
+      const chofer = await http
+        .post('/api/v1/choferes')
+        .set(auth(admin))
+        .send({ nombre: 'Juana Perez', legajo: `CH-${Date.now().toString().slice(-8)}` })
+        .expect(201);
+      await http
+        .patch(`/api/v1/rutas/${rutaId}/asignar`)
+        .set(auth(admin))
+        .send({ choferId: chofer.body.id })
+        .expect(200);
+
+      await reclamoCreado();
+
+      const ruta = await detalle(rutaId);
+      expect(ruta.paradas.find((p) => p.contenedorId === contenedorIds[1])).toEqual(
+        expect.objectContaining({
+          estado: EstadoParada.OMITIDA,
+          motivo: 'Acceso bloqueado por vehiculo (reclamo RC-E2E)',
+        }),
+      );
+    });
+
+    it('queda afuera del ruteo hasta que otro squad avisa que el auto ya no esta', async () => {
+      const { rutaId, camionId, contenedorIds } = await propuestaConTresParadas();
+      const [primero, tapado, tercero] = contenedorIds;
+
+      await reclamoCreado();
+      await http.patch(`/api/v1/rutas/${rutaId}/descartar`).set(auth(admin)).expect(200);
+      const sinElTapado = await generar(camionId);
+      expect(sinElTapado.sort()).toEqual([primero, tercero].sort());
+
+      // Lo avisa Emergencias, no Reclamos: se acepta igual.
+      await enviar('ev-resuelto-1', 'com.citypass.emergencias.IntervencionFinalizada', {
+        reclamoId: 'RC-E2E',
+      });
+
+      const rutas = await http.get('/api/v1/rutas').set(auth(admin)).expect(200);
+      const viva = rutas.body.find(
+        (r: { estado: EstadoRuta }) => r.estado === EstadoRuta.PROPUESTA,
+      );
+      await http.patch(`/api/v1/rutas/${viva.id}/descartar`).set(auth(admin)).expect(200);
+      expect((await generar(camionId)).sort()).toEqual([primero, tapado, tercero].sort());
+    });
+
+    it('un reclamo de otra categoria se ignora sin tocar la ruta', async () => {
+      const { rutaId } = await propuestaConTresParadas();
+
+      await enviar('ev-luminaria', 'com.citypass.reclamos.ReclamoCreado', {
+        reclamoId: 'RC-LUZ',
+        categoria: 'Luminaria rota',
+        ...FRENTE_AL_SEGUNDO,
+      });
+
+      expect((await detalle(rutaId)).paradas).toHaveLength(3);
+    });
+
+    it('un reclamo sin coordenadas responde 204 igual: rechazarlo haria que el bus lo reintente', async () => {
+      await enviar('ev-sin-coordenadas', 'com.citypass.reclamos.ReclamoCreado', {
+        reclamoId: 'RC-SIN-UBICACION',
+      });
+    });
   });
 });

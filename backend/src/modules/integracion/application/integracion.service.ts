@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventTypes, buildEvent } from '../../../shared/domain/domain-event';
 import { distanciaMetros } from '../../../shared/domain/geo';
@@ -10,6 +10,7 @@ import {
 } from '../../contenedores/domain/contenedor.repository';
 import { ZonasService } from '../../zonas/application/zonas.service';
 import { INTEGRACION_REPOSITORY, IntegracionRepository } from '../domain/integracion.repository';
+import { ReclamosService } from './reclamos.service';
 
 /** Sobre con el que el gateway del Squad 1 entrega cada evento por webhook. */
 export interface SobreGateway {
@@ -32,6 +33,7 @@ const EMERGENCIA_TERMINADA = new Set(['RESUELTA', 'CERRADA', 'DESCARTADA', 'CANC
  *   EventoCancelado            -> se cancela el refuerzo
  *   EmergenciaCreada           -> se bloquean para el ruteo las zonas afectadas
  *   EmergenciaActualizada      -> al terminar la emergencia se desbloquean
+ *   Reclamos (CU-INT-02)       -> ver ReclamosService
  *
  * Todo corre en una transaccion: si algo falla tampoco queda registrado el
  * eventId, el webhook responde error y el dispatcher del Squad 1 reintenta.
@@ -54,6 +56,9 @@ export class IntegracionService {
     private readonly zonas: ZonasService,
     private readonly transaccion: ContextoTransaccional,
     config: ConfigService,
+    // Opcional para que los tests de CU-INT-01 no tengan que armarlo.
+    @Optional()
+    private readonly reclamos?: ReclamosService,
   ) {
     this.radioMetros = Number(config.get('INTEGRACION_RADIO_METROS', 300));
     this.cupoMinimoRefuerzo = Number(config.get('INTEGRACION_CUPO_MINIMO_REFUERZO', 100));
@@ -91,6 +96,9 @@ export class IntegracionService {
           await this.desbloquearSiTermino(data);
           return 'procesado';
         default:
+          if (await this.reclamos?.procesar(eventType, data)) {
+            return 'procesado';
+          }
           this.logger.log(`Tipo de evento sin manejo en Residuos: ${eventType}`);
           return 'ignorado';
       }

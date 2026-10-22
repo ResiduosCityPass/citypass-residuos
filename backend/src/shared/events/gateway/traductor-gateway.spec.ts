@@ -83,10 +83,37 @@ describe('traducirAGateway (CU-INT-01)', () => {
     expect(traducirAGateway(evento)?.datos.alertaId).toBeNull();
   });
 
+  it('la evaluacion de un reclamo sale como ReclamoEvaluado (CU-INT-02)', () => {
+    const evento = buildEvent(EventTypes.RECLAMO_EVALUADO, {
+      reclamoId: 'RC-123',
+      afectaRecoleccion: true,
+      contenedoresAfectados: [{ codigo: 'CT-0421', distanciaMetros: 8.4 }],
+      rutasRecalculadas: ['rt-1'],
+      bloqueadoHasta: '2026-10-22T22:00:00.000Z',
+      evaluadoEn: '2026-10-22T18:00:00.000Z',
+    });
+
+    expect(traducirAGateway(evento)).toEqual({
+      tipo: 'ReclamoEvaluado',
+      datos: {
+        reclamoId: 'RC-123',
+        afectaRecoleccion: true,
+        contenedoresAfectados: [{ codigo: 'CT-0421', distanciaMetros: 8.4 }],
+        rutasRecalculadas: ['rt-1'],
+        bloqueadoHasta: '2026-10-22T22:00:00.000Z',
+        correlationId: null,
+        occurredAt: '2026-10-22T18:00:00.000Z',
+      },
+    });
+  });
+
   it('los eventos sin consumidores fuera del modulo no salen', () => {
     expect(traducirAGateway(buildEvent(EventTypes.RUTA_GENERADA, { rutaId: 'rt-1' }))).toBeNull();
     expect(
       traducirAGateway(buildEvent(EventTypes.PARADA_OMITIDA, { paradaId: 'pa-1' })),
+    ).toBeNull();
+    expect(
+      traducirAGateway(buildEvent(EventTypes.RUTA_RECALCULADA, { rutaId: 'rt-1' })),
     ).toBeNull();
   });
 });

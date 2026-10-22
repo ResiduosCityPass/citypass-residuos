@@ -21,9 +21,13 @@ const ubicacion = (payload: Payload): { lat: number; lng: number } =>
  *   residuos.incendio.detectado   -> AlertaGenerada (tipoAlerta INCENDIO)
  *   residuos.contenedor.vaciado   -> RecoleccionCompletada
  *   residuos.refuerzo.programado  -> RefuerzoProgramado
+ *   residuos.reclamo.evaluado     -> ReclamoEvaluado (CU-INT-02, la respuesta a Reclamos)
  *
- * Los eventos sin consumidores fuera del modulo (ruta generada, asignada, parada
- * omitida) devuelven null: no salen del modulo.
+ * Los eventos sin consumidores fuera del modulo (ruta generada, asignada,
+ * recalculada, parada omitida) devuelven null: no salen del modulo.
+ *
+ * Un tipo nuevo tambien tiene que estar en el catalogo del gateway: si no, el
+ * gateway responde 404 y el evento queda FALLIDO en el outbox.
  */
 export function traducirAGateway(evento: DomainEvent): EventoGateway | null {
   const p = evento.payload as Payload;
@@ -90,6 +94,20 @@ export function traducirAGateway(evento: DomainEvent): EventoGateway | null {
           contenedores: p.contenedores,
           programadoPara: p.programadoPara,
           occurredAt: evento.occurredAt,
+        },
+      };
+
+    case EventTypes.RECLAMO_EVALUADO:
+      return {
+        tipo: 'ReclamoEvaluado',
+        datos: {
+          reclamoId: p.reclamoId,
+          afectaRecoleccion: p.afectaRecoleccion,
+          contenedoresAfectados: p.contenedoresAfectados,
+          rutasRecalculadas: p.rutasRecalculadas,
+          bloqueadoHasta: p.bloqueadoHasta,
+          correlationId,
+          occurredAt: p.evaluadoEn ?? evento.occurredAt,
         },
       };
 
