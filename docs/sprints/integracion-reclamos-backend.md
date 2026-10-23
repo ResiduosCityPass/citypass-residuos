@@ -2,7 +2,7 @@
 
 > **Responsable:** Francisco (backend) · **Branch:** `feat/CU-INT-02-reclamo-obstruccion`
 > **Caso de uso integrador:** *"Reclamo ciudadano que desencadena una intervención urbana"*
-> **Estado:** pasos 1 a 6 hechos. Falta que el Squad 1 registre `ReclamoEvaluado` en su catálogo y cerrar el contrato con Reclamos (sección 5).
+> **Estado:** pasos 1 a 7 hechos. Falta que el Squad 1 registre `ReclamoEvaluado` en su catálogo y cerrar el contrato con Reclamos (sección 5).
 
 Este documento separa **qué hago yo** de qué hace cada uno, para que no nos pisemos. Si algo de
 acá te toca y no estás de acuerdo, avisame antes de arrancar.
@@ -294,7 +294,7 @@ Cada respuesta que se cierre achica las listas de la sección 3.3.
 | 4 | Recalcular rutas vivas + `residuos.ruta.recalculada` + tests | ✅ | 1, 3 |
 | 5 | Recibir el reclamo y el aviso de resolución + `residuos.reclamo.evaluado` | ✅ | 1, 4 |
 | 6 | e2e completo por el webhook | ✅ | 5 |
-| 7 | Docs | | 5 |
+| 7 | Docs | ✅ | 5 |
 
 Del paso 1 al 6 no dependo de nadie. Si el contrato con Reclamos cambia, lo único que se ajusta es
 la lectura del evento en el paso 5.
