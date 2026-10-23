@@ -1,4 +1,9 @@
-import { CandidatoRuteo, litrosOcupados, planificarRuta } from './planificador';
+import {
+  CandidatoRuteo,
+  litrosOcupados,
+  planificarRuta,
+  reordenarPendientes,
+} from './planificador';
 
 const DEPOSITO = { lat: -34.6037, lng: -58.3816 };
 
@@ -139,5 +144,48 @@ describe('litrosOcupados', () => {
 
   it('un contenedor lleno ocupa su capacidad', () => {
     expect(litrosOcupados(1100, 100)).toBe(1100);
+  });
+});
+
+describe('reordenarPendientes (CU-INT-02)', () => {
+  const punto = (gradosAlSur: number) => ({ lat: DEPOSITO.lat - gradosAlSur, lng: DEPOSITO.lng });
+
+  it('sin paradas visitadas, sale desde el deposito', () => {
+    const { contenedorIds } = reordenarPendientes(
+      DEPOSITO,
+      [],
+      [candidato('lejos', 0.05), candidato('cerca', 0.01)],
+    );
+
+    expect(contenedorIds).toEqual(['cerca', 'lejos']);
+  });
+
+  it('sale desde la ultima visitada, que es donde esta el camion', () => {
+    const { contenedorIds } = reordenarPendientes(
+      DEPOSITO,
+      [punto(0.02), punto(0.04)],
+      [candidato('cerca-del-deposito', 0.01), candidato('cerca-del-camion', 0.05)],
+    );
+
+    expect(contenedorIds).toEqual(['cerca-del-camion', 'cerca-del-deposito']);
+  });
+
+  it('la distancia es el recorrido completo, con lo visitado y la vuelta', () => {
+    // Ida (~1 km) hasta la visitada y vuelta (~1 km), sin pendientes.
+    const { contenedorIds, distanciaKm } = reordenarPendientes(DEPOSITO, [punto(0.009)], []);
+
+    expect(contenedorIds).toEqual([]);
+    expect(distanciaKm).toBeGreaterThan(1.8);
+    expect(distanciaKm).toBeLessThan(2.2);
+  });
+
+  it('no deja afuera ninguna pendiente por capacidad: sacar paradas solo libera lugar', () => {
+    const { contenedorIds } = reordenarPendientes(
+      DEPOSITO,
+      [],
+      [candidato('a', 0.01, 1_000_000), candidato('b', 0.02, 1_000_000)],
+    );
+
+    expect(contenedorIds).toHaveLength(2);
   });
 });

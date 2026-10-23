@@ -125,6 +125,67 @@ pierden y por qué. Es el dato que justifica cambiar un horario o una frecuencia
 
 ---
 
+### `residuos.reclamo.evaluado` — CU-INT-02
+
+Sale al bus como **`com.citypass.residuos.ReclamoEvaluado`**. Se emite **cada vez que Residuos
+decide** si un auto denunciado en un reclamo tapa algún contenedor, afecte o no. Es la respuesta a
+Reclamos y, a la vez, el dato de la métrica para BI.
+
+```json
+{
+  "reclamoId": "RC-123",
+  "afectaRecoleccion": true,
+  "contenedoresAfectados": [{ "codigo": "CT-0421", "distanciaMetros": 8.4 }],
+  "rutasRecalculadas": ["b1f0..."],
+  "correlationId": "req-7c9e6679",
+  "occurredAt": "2026-10-22T18:00:00.000Z"
+}
+```
+
+| Campo | Qué es |
+|---|---|
+| `reclamoId` | Id del reclamo en el módulo de Reclamos. **Es la clave para contar** |
+| `afectaRecoleccion` | `true` si el auto tapa al menos un contenedor (a `OBSTRUCCION_RADIO_METROS`, 15 m). `false` si no tapa ninguno |
+| `contenedoresAfectados` | Los contenedores tapados, con la distancia al auto. Vacío si `afectaRecoleccion` es `false` |
+| `rutasRecalculadas` | Rutas vivas que perdieron una parada por este reclamo. Vacío si ninguna ruta tenía esos contenedores |
+| `correlationId` | El que mandó Reclamos en su evento, para seguir el reclamo de punta a punta. `null` si no vino |
+| `occurredAt` | Momento de la decisión. Es la fecha para agrupar por período |
+
+**Consumidores esperados:**
+- **Reclamos (Squad 5):** para saber si el reclamo afectó la recolección (por ahora no lo consumen).
+- **Analítica Urbana (Squad 8):** para la métrica de abajo.
+
+#### Métrica para BI: porcentaje de reclamos que bloquean un contenedor
+
+```
+% reclamos que bloquean = reclamos distintos con afectaRecoleccion = true
+                          ─────────────────────────────────────────────── × 100
+                                  reclamos distintos evaluados
+```
+
+- **Se cuenta por `reclamoId` distinto, no por evento.** El bus entrega *at least once*, y
+  Reclamos puede reenviar el mismo reclamo con otro `eventId`: en los dos casos llega más de un
+  `ReclamoEvaluado` con el mismo `reclamoId`. Si llegan dos decisiones distintas para el mismo
+  reclamo, vale la primera según `occurredAt`.
+- **El período se agrupa por `occurredAt`.**
+- **El universo son los reclamos que Residuos evalúa:** los de estacionamiento indebido (o sin
+  categoría) que traen una ubicación válida. Los que se ignoran por no ser de estacionamiento, o por
+  no traer coordenadas, no generan evento y no entran en el denominador.
+- **Lectura complementaria:** con `rutasRecalculadas` no vacío se puede sacar, además, el
+  porcentaje de reclamos que rompieron una ruta que ya estaba armada.
+
+> **Pendiente del Squad 1:** registrar `ReclamoEvaluado` en el catálogo del gateway. Mientras no
+> esté, el gateway responde 404 y el evento queda `FALLIDO` en el outbox.
+
+---
+
+### `residuos.ruta.recalculada` — CU-INT-02 · solo interno
+
+No sale al bus: lo usa nuestro front, que lo ve por la API. Ver
+`docs/sprints/integracion-reclamos-backend.md`.
+
+---
+
 ### `residuos.ruta.generada` — CU-08
 
 ```json
@@ -147,6 +208,9 @@ pierden y por qué. Es el dato que justifica cambiar un horario o una frecuencia
 | `emergencias.incidente.creado` | 6 — Emergencias | Si el incidente ocurre dentro de una zona, marcamos la zona como bloqueada y sus contenedores quedan excluidos del ruteo de CU-08. |
 | `movilidad.calle.cortada` | 3 — Movilidad Urbana | Se excluye el tramo del cálculo de ruta. Si la ruta ya estaba asignada, se marca para recálculo. |
 | `reclamos.creado` | 5 — Reclamos Ciudadanos | Si la categoría es residuos y referencia un contenedor nuestro, se le adjunta el reclamo y se eleva su prioridad en el ruteo. |
+| `com.citypass.reclamos.ReclamoCreado` (o variantes) | 5 — Reclamos Ciudadanos | **CU-INT-02, implementado.** Si es de estacionamiento indebido y el auto tapa un contenedor, lo sacamos del ruteo, recalculamos las rutas vivas y publicamos `ReclamoEvaluado`. Las variantes aceptadas están en `contrato-reclamos.ts` |
+| `com.citypass.reclamos.ReclamoActualizado` con `estadoNuevo: RESUELTO` (o variantes) | 5 — Reclamos Ciudadanos | **CU-INT-02, implementado.** Destapamos los contenedores del reclamo. También si queda rechazado o cancelado. Si nadie avisa, el bloqueo vence solo |
+| `com.citypass.reclamos.ReclamoReclasificado` (propuesto, no registrado) | 5 — Reclamos Ciudadanos | **CU-INT-02, implementado.** Si con la categoría nueva es un auto mal estacionado, se evalúa como un reclamo nuevo; si deja de serlo, se liberan sus contenedores. Necesitamos que traiga `categoriaNueva`, `latitud`, `longitud`, `titulo`, `descripcion` y `correlationId` |
 
 > Estos tres nombres son **supuestos**, derivados de la descripción de cada módulo en el enunciado.
 > Hay que confirmarlos con cada squad durante el Sprint 3, que es la instancia donde la cátedra

@@ -49,6 +49,28 @@ contenedor **verde** puede estar prendido fuego, porque el incendio se evalúa c
 y no contra el llenado. Si es el mismo que acabás de saturar, está rojo, y no se puede mostrar que
 las dos reglas son independientes.
 
+## Reclamo por un auto que bloquea la bicisenda (CU-INT-02)
+
+`reclamo.js` hace de módulo de Reclamos: le manda al webhook de Residuos los mismos eventos que
+mandaría el gateway, con el formato del contrato de Reclamos del 22/10. Sirve para la demo sin
+depender de que ellos estén publicando. Guion completo en `docs/sprints/guion-demo-reclamos.md`.
+
+Necesita una ruta `EN_CURSO` o `ASIGNADA`, el token de administrador y el
+`GATEWAY_WEBHOOK_TOKEN` del backend:
+
+```bash
+TOKEN=<jwt> WEBHOOK_TOKEN=webhook-local npm run reclamo
+```
+
+| Comando | Qué provoca |
+|---|---|
+| `npm run reclamo` | Un auto a ~5 m de la próxima parada pendiente: la parada se omite y la ruta se reordena |
+| `npm run reclamo -- --lejos` | El auto a ~100 m: no tapa nada, `afectaRecoleccion: false` |
+| `npm run reclamo -- --ruta <id>` | Elige la ruta en vez de tomar la primera activa |
+| `npm run reclamo:resuelto` | Reclamos avisa que se retiró el auto (usa el último reclamo enviado) |
+
+El id del último reclamo queda en `ultimo-reclamo.txt`, que no se versiona.
+
 ## El nivel sobrevive entre corridas
 
 Los niveles se guardan en `estado.json` al final de cada ciclo y se recuperan al arrancar. Sin eso
