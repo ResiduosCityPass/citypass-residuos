@@ -10,6 +10,7 @@ describe('interpretarReclamo (CU-INT-02)', () => {
         tipo: 'creado',
         reclamoId: 'RC-1',
         ubicacion: { lat: -34.6037, lng: -58.3816 },
+        correlationId: null,
       });
     });
 
@@ -114,6 +115,8 @@ describe('interpretarReclamo (CU-INT-02)', () => {
         tipo: 'creado',
         reclamoId: 'b1d4e8f2-6a30-4c99-8e71-0f5a2d6c3b84',
         ubicacion: { lat: -34.5955, lng: -58.4281 },
+        // El de Reclamos: se propaga a ReclamoEvaluado para la trazabilidad.
+        correlationId: 'req-7c9e6679',
       });
     });
 
@@ -164,6 +167,79 @@ describe('interpretarReclamo (CU-INT-02)', () => {
           estadoNuevo: 'RECHAZADO',
         })?.tipo,
       ).toBe('resuelto');
+    });
+  });
+
+  describe('reclasificacion (propuesta de Reclamos, 22/10)', () => {
+    const RECLASIFICADO = 'com.citypass.reclamos.ReclamoReclasificado';
+    const reclasificado = (categoriaNueva: string, cambios: Record<string, unknown> = {}) => ({
+      reclamoId: 'RC-9',
+      categoriaAnterior: 'RUIDOS',
+      categoriaNueva,
+      titulo: 'Auto estacionado sobre la ciclovia',
+      latitud: -34.6,
+      longitud: -58.38,
+      correlationId: 'req-9',
+      ...cambios,
+    });
+
+    it('si pasa a ser un auto mal estacionado, se evalua como un reclamo nuevo', () => {
+      expect(interpretarReclamo(RECLASIFICADO, reclasificado('TRANSITO'))).toEqual({
+        tipo: 'creado',
+        reclamoId: 'RC-9',
+        ubicacion: { lat: -34.6, lng: -58.38 },
+        correlationId: 'req-9',
+      });
+    });
+
+    it('si deja de serlo, se libera como si se hubiera resuelto', () => {
+      expect(
+        interpretarReclamo(
+          RECLASIFICADO,
+          reclasificado('RUIDOS', { categoriaAnterior: 'TRANSITO' }),
+        ),
+      ).toEqual({ tipo: 'resuelto', reclamoId: 'RC-9' });
+    });
+
+    it('acepta la categoria nueva en `categoria` si no viene `categoriaNueva`', () => {
+      expect(
+        interpretarReclamo(
+          RECLASIFICADO,
+          reclasificado('TRANSITO', { categoriaNueva: undefined, categoria: 'TRANSITO' }),
+        )?.tipo,
+      ).toBe('creado');
+    });
+
+    it('sin categoria nueva no hay como decidir: se ignora', () => {
+      expect(
+        interpretarReclamo(RECLASIFICADO, reclasificado('TRANSITO', { categoriaNueva: undefined })),
+      ).toBeNull();
+    });
+
+    it('pasar a TRANSITO sin ubicacion no se puede evaluar: se ignora', () => {
+      expect(
+        interpretarReclamo(
+          RECLASIFICADO,
+          reclasificado('TRANSITO', { latitud: undefined, longitud: undefined }),
+        ),
+      ).toBeNull();
+    });
+
+    it('solo se acepta del modulo de reclamos', () => {
+      expect(
+        interpretarReclamo('com.citypass.otro.ReclamoReclasificado', reclasificado('TRANSITO')),
+      ).toBeNull();
+    });
+  });
+
+  it('un correlationId vacio o demasiado largo se descarta, sin descartar el reclamo', () => {
+    expect(interpretarReclamo(CREADO, { ...AUTO, correlationId: '  ' })).toMatchObject({
+      tipo: 'creado',
+      correlationId: null,
+    });
+    expect(interpretarReclamo(CREADO, { ...AUTO, correlationId: 'x'.repeat(129) })).toMatchObject({
+      tipo: 'creado',
+      correlationId: null,
     });
   });
 });

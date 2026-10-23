@@ -63,11 +63,15 @@ export class ReclamosService {
       return true;
     }
 
-    await this.evaluar(reclamo.reclamoId, reclamo.ubicacion);
+    await this.evaluar(reclamo.reclamoId, reclamo.ubicacion, reclamo.correlationId);
     return true;
   }
 
-  private async evaluar(reclamoId: string, auto: Punto): Promise<void> {
+  private async evaluar(
+    reclamoId: string,
+    auto: Punto,
+    correlationId: string | null,
+  ): Promise<void> {
     const ahora = new Date();
     const venceEn = new Date(ahora.getTime() + this.vigenciaMs);
 
@@ -97,16 +101,21 @@ export class ReclamosService {
         : [];
 
     await this.eventos.publish(
-      buildEvent(EventTypes.RECLAMO_EVALUADO, {
-        reclamoId,
-        afectaRecoleccion: tapados.length > 0,
-        contenedoresAfectados: tapados.map(({ contenedor, distancia }) => ({
-          codigo: contenedor.codigo,
-          distanciaMetros: Number(distancia.toFixed(1)),
-        })),
-        rutasRecalculadas,
-        evaluadoEn: ahora.toISOString(),
-      }),
+      buildEvent(
+        EventTypes.RECLAMO_EVALUADO,
+        {
+          reclamoId,
+          afectaRecoleccion: tapados.length > 0,
+          contenedoresAfectados: tapados.map(({ contenedor, distancia }) => ({
+            codigo: contenedor.codigo,
+            distanciaMetros: Number(distancia.toFixed(1)),
+          })),
+          rutasRecalculadas,
+          evaluadoEn: ahora.toISOString(),
+        },
+        // El de Reclamos: deja seguir el reclamo de punta a punta entre modulos.
+        { correlationId: correlationId ?? undefined },
+      ),
     );
   }
 }

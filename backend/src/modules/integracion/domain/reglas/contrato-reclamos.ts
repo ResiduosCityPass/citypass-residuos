@@ -15,6 +15,12 @@ const PREFIJO_RECLAMOS = 'com.citypass.reclamos.';
 
 const EVENTOS_RECLAMO_CREADO = new Set(['ReclamoCreado', 'ReclamoRegistrado', 'ReclamoPublicado']);
 
+/**
+ * Un operador corrigio la categoria. Reclamos lo propuso el 22/10 como
+ * ReclamoReclasificado; todavia no esta en el catalogo.
+ */
+const EVENTOS_RECLAMO_RECLASIFICADO = new Set(['ReclamoReclasificado', 'ReclamoRecategorizado']);
+
 /** Avisos de que el auto ya no esta. Los puede mandar cualquier squad. */
 const EVENTOS_RECLAMO_RESUELTO = new Set([
   'ReclamoResuelto',
@@ -42,6 +48,9 @@ const ESTADOS_RESUELTO = new Set([
 /** Lo que entra en `obstruccion_por_reclamo.reclamoId`. Un id mas largo romperia la transaccion. */
 const LARGO_MAXIMO_ID = 64;
 
+/** Un correlationId mas largo se descarta: es para trazar, no puede romper nada. */
+const LARGO_MAXIMO_CORRELATION_ID = 128;
+
 /** Categorias que por si solas hablan de un vehiculo mal estacionado. */
 const CATEGORIAS_DE_ESTACIONAMIENTO = ['estacion', 'vehiculo', 'ciclovia', 'bicisenda'];
 
@@ -56,7 +65,8 @@ const MENCIONA_UN_VEHICULO =
   /\b(autos?|vehiculos?|estacionad[oa]s?|camionetas?|camion(es)?|motos?|ciclovias?|bicisendas?)\b/;
 
 export type ReclamoInterpretado =
-  { tipo: 'creado'; reclamoId: string; ubicacion: Punto } | { tipo: 'resuelto'; reclamoId: string };
+  | { tipo: 'creado'; reclamoId: string; ubicacion: Punto; correlationId: string | null }
+  | { tipo: 'resuelto'; reclamoId: string };
 
 /**
  * Devuelve null si el evento no es de reclamos, si no es de estacionamiento o
@@ -78,16 +88,55 @@ export function interpretarReclamo(
     return { tipo: 'resuelto', reclamoId };
   }
 
-  if (
-    eventType.startsWith(PREFIJO_RECLAMOS) &&
-    EVENTOS_RECLAMO_CREADO.has(nombre) &&
-    esDeEstacionamiento(data)
-  ) {
-    const ubicacion = ubicacionDe(data);
-    return ubicacion ? { tipo: 'creado', reclamoId, ubicacion } : null;
+  if (!eventType.startsWith(PREFIJO_RECLAMOS)) {
+    return null;
+  }
+
+  if (EVENTOS_RECLAMO_RECLASIFICADO.has(nombre)) {
+    return reclasificado(reclamoId, data);
+  }
+
+  if (EVENTOS_RECLAMO_CREADO.has(nombre) && esDeEstacionamiento(data)) {
+    return creado(reclamoId, data);
   }
 
   return null;
+}
+
+function creado(reclamoId: string, data: Record<string, unknown>): ReclamoInterpretado | null {
+  const ubicacion = ubicacionDe(data);
+
+  return ubicacion
+    ? { tipo: 'creado', reclamoId, ubicacion, correlationId: correlationDe(data) }
+    : null;
+}
+
+/**
+ * Si con la categoria nueva es un auto mal estacionado, se evalua como un
+ * reclamo recien creado. Si deja de serlo, se libera igual que si se hubiera
+ * resuelto: si no tapaba nada, liberarlo no hace nada.
+ */
+function reclasificado(
+  reclamoId: string,
+  data: Record<string, unknown>,
+): ReclamoInterpretado | null {
+  const categoria = data.categoriaNueva ?? data.categoria;
+
+  if (typeof categoria !== 'string') {
+    return null;
+  }
+
+  const conCategoriaNueva = { ...data, categoria };
+
+  return esDeEstacionamiento(conCategoriaNueva)
+    ? creado(reclamoId, conCategoriaNueva)
+    : { tipo: 'resuelto', reclamoId };
+}
+
+function correlationDe(data: Record<string, unknown>): string | null {
+  const valor = typeof data.correlationId === 'string' ? data.correlationId.trim() : '';
+
+  return valor.length > 0 && valor.length <= LARGO_MAXIMO_CORRELATION_ID ? valor : null;
 }
 
 function idDelReclamo(data: Record<string, unknown>): string | null {

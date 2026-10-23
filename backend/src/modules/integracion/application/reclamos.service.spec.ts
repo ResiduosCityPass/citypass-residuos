@@ -85,6 +85,29 @@ describe('ReclamosService (CU-INT-02)', () => {
       );
     });
 
+    it('propaga el correlationId de Reclamos al evento que publica', async () => {
+      await service.procesar(CREADO, reclamo({ correlationId: 'req-7c9e6679' }));
+
+      expect(eventos.getPublished(EventTypes.RECLAMO_EVALUADO)[0].correlationId).toBe(
+        'req-7c9e6679',
+      );
+    });
+
+    it('un reclamo reclasificado a TRANSITO se evalua y obstruye el contenedor', async () => {
+      await service.procesar('com.citypass.reclamos.ReclamoReclasificado', {
+        ...reclamo(),
+        categoriaAnterior: 'RUIDOS',
+        categoriaNueva: 'TRANSITO',
+        titulo: 'Auto sobre la bicisenda',
+      });
+
+      expect(paradas.quitarContenedores).toHaveBeenCalledWith(
+        ['ct-tapado'],
+        expect.any(String),
+        'RC-123',
+      );
+    });
+
     it('el bloqueo vence a las horas configuradas', async () => {
       const conDosHoras = new ReclamosService(
         obstrucciones,
