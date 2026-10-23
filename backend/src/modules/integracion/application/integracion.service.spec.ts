@@ -10,6 +10,7 @@ import { Zona } from '../../zonas/domain/zona.entity';
 import { ZonaRepository } from '../../zonas/domain/zona.repository';
 import { BloqueoPorIncidente } from '../domain/bloqueo-por-incidente.entity';
 import { IntegracionRepository } from '../domain/integracion.repository';
+import { ActividadesMasivasService } from './actividades-masivas.service';
 import { IntegracionService, SobreGateway } from './integracion.service';
 
 // Plaza Italia y un contenedor a ~100 m; otro en Caballito, a varios km.
@@ -50,6 +51,7 @@ describe('IntegracionService (CU-INT-01)', () => {
   let service: IntegracionService;
   let bloqueos: BloqueoPorIncidente[];
   let zonasGuardadas: Map<string, Zona>;
+  let actividades: jest.Mocked<Pick<ActividadesMasivasService, 'registrar'>>;
 
   const bloqueada = (zonaId: string) => zonasGuardadas.get(zonaId)?.bloqueada;
 
@@ -69,7 +71,10 @@ describe('IntegracionService (CU-INT-01)', () => {
           async (id: string) => bloqueos.find((b) => b.emergenciaId === id) ?? null,
         ),
       bloqueosActivos: jest.fn().mockImplementation(async () => bloqueos.filter((b) => b.activo)),
+      guardarActividad: jest.fn(),
+      actividadesQueTerminanDespuesDe: jest.fn(),
     };
+    actividades = { registrar: jest.fn() };
     contenedores = { listar: jest.fn().mockResolvedValue([CERCA, LEJOS]) };
     // ZonasService real sobre un repositorio en memoria, con estado como la base:
     // lo que bloquea una emergencia lo ve la siguiente, y el bloqueo de un
@@ -97,6 +102,7 @@ describe('IntegracionService (CU-INT-01)', () => {
       zonas,
       { ejecutar: <T>(b: () => Promise<T>) => b() } as unknown as ContextoTransaccional,
       new ConfigService({}),
+      actividades as unknown as ActividadesMasivasService,
     );
   });
 
@@ -138,6 +144,16 @@ describe('IntegracionService (CU-INT-01)', () => {
 
       expect(integracion.borrarRefuerzo).toHaveBeenCalledWith('evt-1');
     });
+  });
+
+  it('una ActividadCreada la maneja ActividadesMasivasService (squad 3)', async () => {
+    const data = { communityEventId: 'act-1', capacity: 5000 };
+
+    await expect(
+      service.procesar(sobre('com.citypass.espacios.ActividadCreada', data)),
+    ).resolves.toBe('procesado');
+
+    expect(actividades.registrar).toHaveBeenCalledWith(data);
   });
 
   describe('emergencias', () => {

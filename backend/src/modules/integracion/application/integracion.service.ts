@@ -10,6 +10,7 @@ import {
 } from '../../contenedores/domain/contenedor.repository';
 import { ZonasService } from '../../zonas/application/zonas.service';
 import { INTEGRACION_REPOSITORY, IntegracionRepository } from '../domain/integracion.repository';
+import { ActividadesMasivasService } from './actividades-masivas.service';
 
 /** Sobre con el que el gateway del Squad 1 entrega cada evento por webhook. */
 export interface SobreGateway {
@@ -32,6 +33,7 @@ const EMERGENCIA_TERMINADA = new Set(['RESUELTA', 'CERRADA', 'DESCARTADA', 'CANC
  *   EventoCancelado            -> se cancela el refuerzo
  *   EmergenciaCreada           -> se bloquean para el ruteo las zonas afectadas
  *   EmergenciaActualizada      -> al terminar la emergencia se desbloquean
+ *   ActividadCreada            -> zona del evento y escuadrilla (squad 3, ActividadesMasivasService)
  *
  * Todo corre en una transaccion: si algo falla tampoco queda registrado el
  * eventId, el webhook responde error y el dispatcher del Squad 1 reintenta.
@@ -54,6 +56,7 @@ export class IntegracionService {
     private readonly zonas: ZonasService,
     private readonly transaccion: ContextoTransaccional,
     config: ConfigService,
+    private readonly actividades: ActividadesMasivasService,
   ) {
     this.radioMetros = Number(config.get('INTEGRACION_RADIO_METROS', 300));
     this.cupoMinimoRefuerzo = Number(config.get('INTEGRACION_CUPO_MINIMO_REFUERZO', 100));
@@ -89,6 +92,9 @@ export class IntegracionService {
           return 'procesado';
         case `${EMERGENCIAS}EmergenciaActualizada`:
           await this.desbloquearSiTermino(data);
+          return 'procesado';
+        case `${ESPACIOS}ActividadCreada`:
+          await this.actividades.registrar(data);
           return 'procesado';
         default:
           this.logger.log(`Tipo de evento sin manejo en Residuos: ${eventType}`);
