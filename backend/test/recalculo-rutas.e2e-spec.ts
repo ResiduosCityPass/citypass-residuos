@@ -223,6 +223,49 @@ describe('Recalculo de rutas por obstruccion (e2e)', () => {
       expect((await generar(camionId)).sort()).toEqual([primero, tapado, tercero].sort());
     });
 
+    it('con la ruta original en curso, otro camion lo levanta apenas se resuelve', async () => {
+      // La parada omitida no compromete el contenedor: si no, quedaba afuera de
+      // toda otra ruta hasta que terminara la original.
+      const { rutaId, contenedorIds } = await propuestaConTresParadas();
+      const tapado = contenedorIds[1];
+      const chofer = await http
+        .post('/api/v1/choferes')
+        .set(auth(admin))
+        .send({ nombre: 'Juana Perez', legajo: `CH-${Date.now().toString().slice(-8)}` })
+        .expect(201);
+      await http
+        .patch(`/api/v1/rutas/${rutaId}/asignar`)
+        .set(auth(admin))
+        .send({ choferId: chofer.body.id })
+        .expect(200);
+      const otroCamion = await http
+        .post('/api/v1/camiones')
+        .set(auth(admin))
+        .send({
+          patente: `XY${Date.now().toString().slice(-3)}QW`,
+          capacidadLitros: 12_000,
+          tipoResiduoHabilitado: TipoResiduo.RECICLABLE,
+        })
+        .expect(201);
+
+      await reclamoCreado();
+
+      // Los otros dos siguen pendientes en la ruta original y el tapado esta obstruido.
+      const sinNada = await http
+        .post('/api/v1/rutas/generar')
+        .set(auth(admin))
+        .send({ camionId: otroCamion.body.id })
+        .expect(409);
+      expect(sinNada.body.code).toBe('RUTA_SIN_CONTENEDORES');
+
+      await enviar('ev-resuelto-2', 'com.citypass.reclamos.ReclamoActualizado', {
+        reclamoId: 'RC-E2E',
+        estadoNuevo: 'RESUELTO',
+      });
+
+      expect(await generar(otroCamion.body.id)).toEqual([tapado]);
+    });
+
     it('un reclamo de otra categoria se ignora sin tocar la ruta', async () => {
       const { rutaId } = await propuestaConTresParadas();
 
