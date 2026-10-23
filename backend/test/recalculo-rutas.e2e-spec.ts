@@ -161,8 +161,10 @@ describe('Recalculo de rutas por obstruccion (e2e)', () => {
 
     const reclamoCreado = (eventId = 'ev-reclamo-1') =>
       enviar(eventId, 'com.citypass.reclamos.ReclamoCreado', {
+        // Formato real de Reclamos (Grupo 5): categoria TRANSITO y el auto en el titulo.
         reclamoId: 'RC-E2E',
-        categoria: 'Vehiculo mal estacionado en bicisenda',
+        categoria: 'TRANSITO',
+        titulo: 'Auto estacionado sobre la ciclovia',
         ...FRENTE_AL_SEGUNDO,
       });
 

@@ -86,4 +86,84 @@ describe('interpretarReclamo (CU-INT-02)', () => {
   it('cualquier otro evento se ignora', () => {
     expect(interpretarReclamo('com.citypass.espacios.EventoCancelado', AUTO)).toBeNull();
   });
+
+  describe('contrato real de Reclamos (Grupo 5, 22/10)', () => {
+    // Payloads tal cual los publica Reclamos en el gateway.
+    const reclamoCreado = (cambios: Record<string, unknown> = {}) => ({
+      reclamoId: 'b1d4e8f2-6a30-4c99-8e71-0f5a2d6c3b84',
+      ciudadanoId: 'U000042',
+      canal: 'APP',
+      titulo: 'Auto estacionado sobre la ciclovia',
+      descripcion: 'Hay un auto arriba de la bicisenda y no se puede pasar',
+      categoria: 'TRANSITO',
+      prioridad: 'ALTA',
+      origenClasificacion: 'CIUDADANO',
+      confianzaClasificacion: null,
+      direccion: 'Av. Cordoba 4800',
+      barrio: 'Palermo',
+      latitud: -34.5955,
+      longitud: -58.4281,
+      afectaCirculacion: true,
+      correlationId: 'req-7c9e6679',
+      createdAt: 1792345678901,
+      ...cambios,
+    });
+
+    it('un auto sobre la ciclovia, en TRANSITO, se procesa', () => {
+      expect(interpretarReclamo(CREADO, reclamoCreado())).toEqual({
+        tipo: 'creado',
+        reclamoId: 'b1d4e8f2-6a30-4c99-8e71-0f5a2d6c3b84',
+        ubicacion: { lat: -34.5955, lng: -58.4281 },
+      });
+    });
+
+    it('un problema de TRANSITO que no habla de un vehiculo se ignora', () => {
+      expect(
+        interpretarReclamo(
+          CREADO,
+          reclamoCreado({ titulo: 'Semaforo roto', descripcion: 'No funciona desde ayer' }),
+        ),
+      ).toBeNull();
+    });
+
+    it('un TRANSITO sin titulo ni descripcion se procesa: no hay como descartarlo', () => {
+      expect(
+        interpretarReclamo(CREADO, reclamoCreado({ titulo: undefined, descripcion: undefined })),
+      ).not.toBeNull();
+    });
+
+    it('ignora los reclamos de RESIDUOS: los abre Reclamos con nuestras propias alertas', () => {
+      expect(
+        interpretarReclamo(
+          CREADO,
+          reclamoCreado({ categoria: 'RESIDUOS', titulo: 'Contenedor saturado CT-0421' }),
+        ),
+      ).toBeNull();
+    });
+
+    it('la resolucion llega en ReclamoActualizado con estadoNuevo RESUELTO', () => {
+      expect(
+        interpretarReclamo('com.citypass.reclamos.ReclamoActualizado', {
+          reclamoId: 'b1d4e8f2-6a30-4c99-8e71-0f5a2d6c3b84',
+          ciudadanoId: 'U000042',
+          estadoAnterior: 'EN_PROCESO',
+          estadoNuevo: 'RESUELTO',
+          motivo: 'Se retiro el vehiculo',
+          asignadoA: 'cuadrilla-3',
+          cambiadoPor: 'operador-1',
+          correlationId: 'req-7c9e6679',
+          updatedAt: 1792349999000,
+        }),
+      ).toEqual({ tipo: 'resuelto', reclamoId: 'b1d4e8f2-6a30-4c99-8e71-0f5a2d6c3b84' });
+    });
+
+    it('un reclamo rechazado tambien libera el contenedor', () => {
+      expect(
+        interpretarReclamo('com.citypass.reclamos.ReclamoActualizado', {
+          reclamoId: 'RC-1',
+          estadoNuevo: 'RECHAZADO',
+        })?.tipo,
+      ).toBe('resuelto');
+    });
+  });
 });

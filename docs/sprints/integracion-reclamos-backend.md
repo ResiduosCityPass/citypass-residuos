@@ -269,19 +269,21 @@ frente al contenedor.
 
 ## 5. Qué hay que cerrar con el squad de Reclamos
 
-1. **Nombre del evento de reclamo creado.** Siguiendo la convención de los otros squads
-   (`com.citypass.emergencias.EmergenciaCreada`), suponemos `com.citypass.reclamos.ReclamoCreado`.
-2. **Coordenadas** del auto en el evento (`latitud`, `longitud`, como Emergencias), no solo una
-   dirección. Sin coordenadas no podemos calcular qué contenedor está tapado.
-3. **Que filtren o nos digan la categoría**: solo nos interesan los reclamos de estacionamiento
-   indebido. Si nos mandan todos, necesitamos un campo `categoria` para ignorar el resto.
-4. **Quién avisa que el auto ya no está**, con qué evento, y que traiga el mismo `reclamoId`.
-   Lo resuelve otro squad (¿Emergencias? ¿Tránsito?), no nosotros. Si nadie avisa, el
-   vencimiento automático lo cubre, pero el bloqueo dura de más.
-5. **Que consuman `residuos.reclamo.evaluado`** si quieren saber si nos afectó.
+**Actualizado el 22/10 con el contrato de eventos que mandó Reclamos (Grupo 5):**
 
-Cada respuesta que se cierre achica las listas de la sección 3.3.
+| Tema | Lo que dijo Reclamos | Cómo quedó |
+|---|---|---|
+| Evento de alta | `com.citypass.reclamos.ReclamoCreado`, con `reclamoId`, `latitud`, `longitud` | ✅ Coincide |
+| Categoría | `TRANSITO` (también abarca otros problemas de tránsito) | ✅ Se acepta `TRANSITO` si el título o la descripción hablan de un vehículo |
+| Quién avisa la resolución | **Reclamos mismo**, en `ReclamoActualizado` con `estadoNuevo: RESUELTO` | ✅ Coincide. También se liberan los reclamos rechazados o cancelados |
+| Reclamos de `RESIDUOS` | Los abren ellos con nuestras alertas de saturación, en la ubicación del contenedor | ✅ Se ignoran: tomarlos como un auto bloquearía el contenedor que hay que vaciar |
+| `ReclamoEvaluado` | No figura entre lo que consumen | Lo consume BI para la métrica. Si Reclamos lo quiere, ya está publicado |
 
+Sigue pendiente:
+1. **Grupo 1:** registrar `ReclamoEvaluado` en el catálogo y suscribir nuestro webhook a
+   `ReclamoCreado` y `ReclamoActualizado`.
+2. **Avisarles a Reclamos** que Espacios publica `ActividadCreada`, no `EventoComunitarioPublicado`
+   (que es lo que ellos dicen consumir). Es un tema de Maxi y Tomás, pero conviene que se enteren.
 ---
 
 ## 6. Orden de trabajo

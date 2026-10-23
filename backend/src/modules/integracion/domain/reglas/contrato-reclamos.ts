@@ -25,13 +25,35 @@ const EVENTOS_RECLAMO_RESUELTO = new Set([
 ]);
 
 const EVENTO_RECLAMO_ACTUALIZADO = 'ReclamoActualizado';
-const ESTADOS_RESUELTO = new Set(['RESUELTO', 'CERRADO', 'FINALIZADO']);
+/**
+ * Estados en los que el auto ya no tapa nada. Reclamos (Grupo 5) confirmo
+ * RESUELTO; los demas cubren un reclamo cerrado sin resolverse (por ejemplo,
+ * una denuncia falsa), que tampoco tiene que dejar el contenedor bloqueado.
+ */
+const ESTADOS_RESUELTO = new Set([
+  'RESUELTO',
+  'CERRADO',
+  'FINALIZADO',
+  'RECHAZADO',
+  'CANCELADO',
+  'DESCARTADO',
+]);
 
 /** Lo que entra en `obstruccion_por_reclamo.reclamoId`. Un id mas largo romperia la transaccion. */
 const LARGO_MAXIMO_ID = 64;
 
-/** Si el reclamo trae categoria, tiene que ser de un vehiculo que bloquea. */
+/** Categorias que por si solas hablan de un vehiculo mal estacionado. */
 const CATEGORIAS_DE_ESTACIONAMIENTO = ['estacion', 'vehiculo', 'ciclovia', 'bicisenda'];
+
+/**
+ * La categoria real de Reclamos para un auto mal estacionado (contrato del
+ * Grupo 5, 22/10). Tambien abarca otros problemas de transito, como un semaforo
+ * roto, asi que en ese caso se pide que el titulo o la descripcion hablen de un
+ * vehiculo.
+ */
+const CATEGORIA_TRANSITO = 'transito';
+const MENCIONA_UN_VEHICULO =
+  /\b(autos?|vehiculos?|estacionad[oa]s?|camionetas?|camion(es)?|motos?|ciclovias?|bicisendas?)\b/;
 
 export type ReclamoInterpretado =
   { tipo: 'creado'; reclamoId: string; ubicacion: Punto } | { tipo: 'resuelto'; reclamoId: string };
@@ -95,10 +117,34 @@ function esDeEstacionamiento(data: Record<string, unknown>): boolean {
     return true;
   }
 
-  // Sin tildes y en minuscula: "Vehículo mal estacionado" y "VEHICULO_MAL_ESTACIONADO" valen igual.
-  const categoria = data.categoria.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const categoria = normalizar(data.categoria);
 
-  return CATEGORIAS_DE_ESTACIONAMIENTO.some((palabra) => categoria.includes(palabra));
+  if (CATEGORIAS_DE_ESTACIONAMIENTO.some((palabra) => categoria.includes(palabra))) {
+    return true;
+  }
+
+  if (!categoria.includes(CATEGORIA_TRANSITO)) {
+    // RESIDUOS incluido: Reclamos abre esos reclamos con nuestras propias alertas
+    // de saturacion, en la ubicacion del contenedor. Tomarlos como un auto
+    // bloquearia justo el contenedor que hay que vaciar.
+    return false;
+  }
+
+  const texto = normalizar(`${textoDe(data.titulo)} ${textoDe(data.descripcion)}`).trim();
+
+  return texto === '' || MENCIONA_UN_VEHICULO.test(texto);
+}
+
+/** Sin tildes y en minuscula: "Vehículo mal estacionado" y "VEHICULO_MAL_ESTACIONADO" valen igual. */
+function normalizar(texto: string): string {
+  return texto
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function textoDe(valor: unknown): string {
+  return typeof valor === 'string' ? valor : '';
 }
 
 function ubicacionDe(data: Record<string, unknown>): Punto | null {
