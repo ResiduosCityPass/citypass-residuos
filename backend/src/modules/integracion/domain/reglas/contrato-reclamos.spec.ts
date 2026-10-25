@@ -242,4 +242,61 @@ describe('interpretarReclamo (CU-INT-02)', () => {
       correlationId: null,
     });
   });
+
+  describe('objeto afectado: lo clasifica Reclamos y manda sobre el texto (24/10)', () => {
+    const transito = (cambios: Record<string, unknown>) => ({
+      reclamoId: 'RC-7',
+      categoria: 'TRANSITO',
+      latitud: -34.6,
+      longitud: -58.38,
+      ...cambios,
+    });
+
+    it('con objetoAfectado de vehiculo se procesa aunque el texto no lo nombre', () => {
+      expect(
+        interpretarReclamo(
+          CREADO,
+          transito({ objetoAfectado: 'VEHICULO', titulo: 'No se puede pasar por la bicisenda' }),
+        )?.tipo,
+      ).toBe('creado');
+    });
+
+    it('con objetoAfectado que no es un vehiculo se ignora aunque el texto hable de un auto', () => {
+      expect(
+        interpretarReclamo(
+          CREADO,
+          transito({ objetoAfectado: 'SEMAFORO', titulo: 'Semaforo roto, casi me choca un auto' }),
+        ),
+      ).toBeNull();
+    });
+
+    it('reconoce valores con guion bajo, como VEHICULO_MAL_ESTACIONADO', () => {
+      expect(
+        interpretarReclamo(CREADO, transito({ objetoAfectado: 'VEHICULO_MAL_ESTACIONADO' }))?.tipo,
+      ).toBe('creado');
+    });
+
+    it('sin objeto afectado, el texto acepta otras formas de nombrar el vehiculo', () => {
+      expect(
+        interpretarReclamo(CREADO, transito({ titulo: 'Un coche arriba de la bicisenda' }))?.tipo,
+      ).toBe('creado');
+      expect(
+        interpretarReclamo(CREADO, transito({ descripcion: 'Hay un taxi parado ahi' }))?.tipo,
+      ).toBe('creado');
+    });
+
+    it('en una reclasificacion usa objetoAfectadoNuevo', () => {
+      const reclasificado = (objetoAfectadoNuevo: string) =>
+        interpretarReclamo('com.citypass.reclamos.ReclamoReclasificado', {
+          ...transito({}),
+          categoriaAnterior: 'TRANSITO',
+          categoriaNueva: 'TRANSITO',
+          objetoAfectadoAnterior: 'SEMAFORO',
+          objetoAfectadoNuevo,
+        });
+
+      expect(reclasificado('VEHICULO')?.tipo).toBe('creado');
+      expect(reclasificado('BACHE')).toEqual({ tipo: 'resuelto', reclamoId: 'RC-7' });
+    });
+  });
 });

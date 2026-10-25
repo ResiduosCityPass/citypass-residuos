@@ -57,12 +57,12 @@ const CATEGORIAS_DE_ESTACIONAMIENTO = ['estacion', 'vehiculo', 'ciclovia', 'bici
 /**
  * La categoria real de Reclamos para un auto mal estacionado (contrato del
  * Grupo 5, 22/10). Tambien abarca otros problemas de transito, como un semaforo
- * roto, asi que en ese caso se pide que el titulo o la descripcion hablen de un
- * vehiculo.
+ * roto, asi que en ese caso se pide que el objeto afectado (o, si no viene, el
+ * titulo o la descripcion) sea un vehiculo.
  */
 const CATEGORIA_TRANSITO = 'transito';
 const MENCIONA_UN_VEHICULO =
-  /\b(autos?|vehiculos?|estacionad[oa]s?|camionetas?|camion(es)?|motos?|ciclovias?|bicisendas?)\b/;
+  /\b(autos?|coches?|carros?|vehiculos?|estacionad[oa]s?|camionetas?|camion(es)?|utilitarios?|taxis?|remises?|motos?|ciclovias?|bicisendas?)\b/;
 
 export type ReclamoInterpretado =
   | { tipo: 'creado'; reclamoId: string; ubicacion: Punto; correlationId: string | null }
@@ -126,7 +126,11 @@ function reclasificado(
     return null;
   }
 
-  const conCategoriaNueva = { ...data, categoria };
+  const conCategoriaNueva = {
+    ...data,
+    categoria,
+    objetoAfectado: data.objetoAfectadoNuevo ?? data.objetoAfectado,
+  };
 
   return esDeEstacionamiento(conCategoriaNueva)
     ? creado(reclamoId, conCategoriaNueva)
@@ -179,16 +183,27 @@ function esDeEstacionamiento(data: Record<string, unknown>): boolean {
     return false;
   }
 
+  // El objeto afectado lo clasifica Reclamos: es mas confiable que el texto del
+  // vecino, que puede decir "el coche" o no nombrar el vehiculo. Si viene, manda.
+  const objeto = textoDe(data.objetoAfectado).trim();
+  if (objeto !== '') {
+    return MENCIONA_UN_VEHICULO.test(normalizar(objeto));
+  }
+
   const texto = normalizar(`${textoDe(data.titulo)} ${textoDe(data.descripcion)}`).trim();
 
   return texto === '' || MENCIONA_UN_VEHICULO.test(texto);
 }
 
-/** Sin tildes y en minuscula: "Vehículo mal estacionado" y "VEHICULO_MAL_ESTACIONADO" valen igual. */
+/**
+ * Sin tildes, en minuscula y con guiones como espacios: "Vehículo mal
+ * estacionado" y "VEHICULO_MAL_ESTACIONADO" valen igual.
+ */
 function normalizar(texto: string): string {
   return texto
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[_-]/g, ' ')
     .toLowerCase();
 }
 

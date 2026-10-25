@@ -279,7 +279,7 @@ frente al contenedor.
 | Reclamos de `RESIDUOS` | Los abren ellos con nuestras alertas de saturación, en la ubicación del contenedor | ✅ Se ignoran: tomarlos como un auto bloquearía el contenedor que hay que vaciar |
 | `ReclamoEvaluado` | No figura entre lo que consumen | Lo consume BI para la métrica. Si Reclamos lo quiere, ya está publicado |
 | `correlationId` | Lo mandan en cada evento | ✅ Se copia en `ReclamoEvaluado`, para seguir el reclamo de punta a punta |
-| Reclasificación | Propusieron `ReclamoReclasificado`, todavía no registrado | ✅ Ya se acepta: si pasa a ser un auto, se evalúa; si deja de serlo, se libera |
+| Reclasificación | `ReclamoReclasificado` implementado de su lado (24/10), falta registrarlo en el catálogo. Mandan `objetoAfectadoAnterior`/`Nuevo` y `afectaCirculacionAnterior`/`Nueva` | ✅ Ya se acepta: si pasa a ser un auto, se evalúa; si deja de serlo, se libera |
 
 Sigue pendiente:
 1. **Grupo 1:** registrar `ReclamoEvaluado` en el catálogo y suscribir nuestro webhook a
