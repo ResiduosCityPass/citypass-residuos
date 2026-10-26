@@ -32,6 +32,7 @@ vi.mock('./api/waste.js', () => ({
   fetchNearbyContainers: vi.fn(),
   fetchTrucks: vi.fn(() => Promise.resolve([])),
   fetchDrivers: vi.fn(() => Promise.resolve([])),
+  fetchInterventions: vi.fn(() => Promise.resolve([])),
   fetchRoutes: vi.fn(() => Promise.resolve([])),
 }));
 
