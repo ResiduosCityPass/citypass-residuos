@@ -125,6 +125,34 @@ pierden y por qué. Es el dato que justifica cambiar un horario o una frecuencia
 
 ---
 
+### `residuos.intervencion.programada` — CU-01 de Emergencias (alternativa A7)
+
+Se emite cuando Emergencias resuelve un incidente y **`causasRelacionadas` incluye `RESIDUOS`**
+(un contenedor en la ciclovía, residuos en la calzada). Con cualquier otra causa (`VIA`,
+`ESPACIO_PUBLICO`) no se emite nada. Sale al bus como `IntervencionProgramada`.
+
+```json
+{
+  "intervencionId": "a3f1c2d4-7b5e-4a90-8c11-2e6d9f0b7a15",
+  "emergenciaId": "EMG-20261008-0091",
+  "contenedorId": "ct-01",
+  "latitud": -34.6037,
+  "longitud": -58.3816,
+  "programadaEn": "2026-10-08T19:05:21.000Z",
+  "correlationId": "EMG-20261008-0091"
+}
+```
+
+`contenedorId` es `null` si no había ningún contenedor a menos de 50 m (radio configurable con
+`INTEGRACION_RADIO_INTERVENCION_METROS`): la intervención se programa igual. Si había uno, además
+se crea un refuerzo para que entre en la próxima ruta, y se publica `RefuerzoProgramado`.
+
+`correlationId` es el `emergenciaId`, para que EDA pueda seguir la cadena completa.
+
+**Consumidores esperados:** EDA (Squad 1) para verificar el flujo; Analítica Urbana (Squad 8).
+
+---
+
 ### `residuos.ruta.generada` — CU-08
 
 ```json
@@ -145,6 +173,7 @@ pierden y por qué. Es el dato que justifica cambiar un horario o una frecuencia
 | Evento | Squad origen | Qué hacemos al recibirlo |
 |---|---|---|
 | `emergencias.incidente.creado` | 6 — Emergencias | Si el incidente ocurre dentro de una zona, marcamos la zona como bloqueada y sus contenedores quedan excluidos del ruteo de CU-08. |
+| `EmergenciaResuelta` (o `EmergenciaActualizada` con estado `RESUELTA`) | 6 — Emergencias | Además de desbloquear las zonas, si `causasRelacionadas` incluye `RESIDUOS` programamos una intervención en `ubicacion` y publicamos `residuos.intervencion.programada`. El nombre real del evento **no está confirmado** con Emergencias (su CU-01 documenta `emergencia.resuelta`): se aceptan las dos variantes. |
 | `movilidad.calle.cortada` | 3 — Movilidad Urbana | Se excluye el tramo del cálculo de ruta. Si la ruta ya estaba asignada, se marca para recálculo. |
 | `reclamos.creado` | 5 — Reclamos Ciudadanos | Si la categoría es residuos y referencia un contenedor nuestro, se le adjunta el reclamo y se eleva su prioridad en el ruteo. |
 

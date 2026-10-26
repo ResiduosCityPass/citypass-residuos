@@ -21,6 +21,7 @@ const ubicacion = (payload: Payload): { lat: number; lng: number } =>
  *   residuos.incendio.detectado   -> AlertaGenerada (tipoAlerta INCENDIO)
  *   residuos.contenedor.vaciado   -> RecoleccionCompletada
  *   residuos.refuerzo.programado  -> RefuerzoProgramado
+ *   residuos.intervencion.programada -> IntervencionProgramada
  *
  * Los eventos sin consumidores fuera del modulo (ruta generada, asignada, parada
  * omitida) devuelven null: no salen del modulo.
@@ -89,6 +90,21 @@ export function traducirAGateway(evento: DomainEvent): EventoGateway | null {
           zona: p.zona,
           contenedores: p.contenedores,
           programadoPara: p.programadoPara,
+          occurredAt: evento.occurredAt,
+        },
+      };
+
+    case EventTypes.INTERVENCION_PROGRAMADA:
+      return {
+        tipo: 'IntervencionProgramada',
+        datos: {
+          intervencionId: p.intervencionId,
+          emergenciaId: p.emergenciaId,
+          contenedorId: p.contenedorId ?? null,
+          latitud: ubicacion(p).lat,
+          longitud: ubicacion(p).lng,
+          programadaEn: p.programadaEn,
+          correlationId,
           occurredAt: evento.occurredAt,
         },
       };

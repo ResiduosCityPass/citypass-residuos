@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventTypes, buildEvent } from '../../../shared/domain/domain-event';
 import { distanciaMetros } from '../../../shared/domain/geo';
@@ -10,6 +10,7 @@ import {
 } from '../../contenedores/domain/contenedor.repository';
 import { ZonasService } from '../../zonas/application/zonas.service';
 import { INTEGRACION_REPOSITORY, IntegracionRepository } from '../domain/integracion.repository';
+import { IntervencionesService } from './intervenciones.service';
 
 /** Sobre con el que el gateway del Squad 1 entrega cada evento por webhook. */
 export interface SobreGateway {
@@ -54,6 +55,8 @@ export class IntegracionService {
     private readonly zonas: ZonasService,
     private readonly transaccion: ContextoTransaccional,
     config: ConfigService,
+    // Opcional y al final para no romper los specs que arman este servicio a mano.
+    @Optional() private readonly intervenciones?: IntervencionesService,
   ) {
     this.radioMetros = Number(config.get('INTEGRACION_RADIO_METROS', 300));
     this.cupoMinimoRefuerzo = Number(config.get('INTEGRACION_CUPO_MINIMO_REFUERZO', 100));
@@ -89,6 +92,15 @@ export class IntegracionService {
           return 'procesado';
         case `${EMERGENCIAS}EmergenciaActualizada`:
           await this.desbloquearSiTermino(data);
+          // Solo al resolverse: cancelada o descartada no deja nada por intervenir.
+          if (data.estadoNuevo === 'RESUELTA') {
+            await this.intervenciones?.programarSiCorresponde(data);
+          }
+          return 'procesado';
+        // Nombre sin confirmar con Emergencias (CU-01 documenta emergencia.resuelta).
+        case `${EMERGENCIAS}EmergenciaResuelta`:
+          await this.desbloquearSiTermino({ ...data, estadoNuevo: 'RESUELTA' });
+          await this.intervenciones?.programarSiCorresponde(data);
           return 'procesado';
         default:
           this.logger.log(`Tipo de evento sin manejo en Residuos: ${eventType}`);

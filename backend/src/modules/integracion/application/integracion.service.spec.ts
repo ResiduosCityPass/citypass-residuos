@@ -11,6 +11,7 @@ import { ZonaRepository } from '../../zonas/domain/zona.repository';
 import { BloqueoPorIncidente } from '../domain/bloqueo-por-incidente.entity';
 import { IntegracionRepository } from '../domain/integracion.repository';
 import { IntegracionService, SobreGateway } from './integracion.service';
+import { IntervencionesService } from './intervenciones.service';
 
 // Plaza Italia y un contenedor a ~100 m; otro en Caballito, a varios km.
 const PLAZA_ITALIA = { lat: -34.5811, lng: -58.421 };
@@ -48,6 +49,7 @@ describe('IntegracionService (CU-INT-01)', () => {
   let zonas: ZonasService;
   let eventos: InMemoryEventPublisher;
   let service: IntegracionService;
+  let intervenciones: { programarSiCorresponde: jest.Mock };
   let bloqueos: BloqueoPorIncidente[];
   let zonasGuardadas: Map<string, Zona>;
 
@@ -89,6 +91,7 @@ describe('IntegracionService (CU-INT-01)', () => {
       },
     } as unknown as ZonaRepository);
     eventos = new InMemoryEventPublisher();
+    intervenciones = { programarSiCorresponde: jest.fn().mockResolvedValue('programada') };
 
     service = new IntegracionService(
       integracion,
@@ -97,6 +100,7 @@ describe('IntegracionService (CU-INT-01)', () => {
       zonas,
       { ejecutar: <T>(b: () => Promise<T>) => b() } as unknown as ContextoTransaccional,
       new ConfigService({}),
+      intervenciones as unknown as IntervencionesService,
     );
   });
 
@@ -238,6 +242,100 @@ describe('IntegracionService (CU-INT-01)', () => {
 
         expect(bloqueada('z-palermo')).toBe(false);
       });
+    });
+  });
+
+  describe('intervencion por emergencia (CU-01, A7)', () => {
+    const resuelta = (tipo: string, cambios: Record<string, unknown> = {}) =>
+      sobre(`com.citypass.emergencias.${tipo}`, {
+        emergenciaId: 'EMG-1',
+        estadoNuevo: 'RESUELTA',
+        causasRelacionadas: ['RESIDUOS'],
+        ubicacion: { lat: PLAZA_ITALIA.lat, lng: PLAZA_ITALIA.lng },
+        ...cambios,
+      });
+
+    it.each(['EmergenciaActualizada', 'EmergenciaResuelta'])(
+      '%s le pasa los datos a las intervenciones',
+      async (tipo) => {
+        await expect(service.procesar(resuelta(tipo))).resolves.toBe('procesado');
+
+        expect(intervenciones.programarSiCorresponde).toHaveBeenCalledWith(
+          expect.objectContaining({ emergenciaId: 'EMG-1' }),
+        );
+      },
+    );
+
+    it('una emergencia que solo cambia de estado no programa intervencion', async () => {
+      await service.procesar(resuelta('EmergenciaActualizada', { estadoNuevo: 'EN_ATENCION' }));
+
+      expect(intervenciones.programarSiCorresponde).not.toHaveBeenCalled();
+    });
+
+    it('una emergencia cancelada no programa intervencion', async () => {
+      await service.procesar(resuelta('EmergenciaActualizada', { estadoNuevo: 'CANCELADA' }));
+
+      expect(intervenciones.programarSiCorresponde).not.toHaveBeenCalled();
+    });
+
+    it('con cualquiera de los dos eventos corren las dos reacciones: desbloqueo e intervencion', async () => {
+      for (const [tipo, eventId] of [
+        ['EmergenciaActualizada', 'ev-a'],
+        ['EmergenciaResuelta', 'ev-b'],
+      ]) {
+        await service.procesar(
+          sobre(
+            'com.citypass.emergencias.EmergenciaCreada',
+            {
+              emergenciaId: `EMG-${tipo}`,
+              afectaCirculacion: true,
+              latitud: PLAZA_ITALIA.lat,
+              longitud: PLAZA_ITALIA.lng,
+            },
+            `${eventId}-creada`,
+          ),
+        );
+        expect(bloqueada('z-palermo')).toBe(true);
+        intervenciones.programarSiCorresponde.mockClear();
+
+        await service.procesar(
+          sobre(
+            `com.citypass.emergencias.${tipo}`,
+            {
+              emergenciaId: `EMG-${tipo}`,
+              estadoNuevo: 'RESUELTA',
+              causasRelacionadas: ['RESIDUOS'],
+              ubicacion: PLAZA_ITALIA,
+            },
+            eventId,
+          ),
+        );
+
+        expect(bloqueada('z-palermo')).toBe(false);
+        expect(intervenciones.programarSiCorresponde).toHaveBeenCalledTimes(1);
+      }
+    });
+
+    it('EmergenciaResuelta desbloquea las zonas aunque no traiga estadoNuevo', async () => {
+      await service.procesar(
+        sobre('com.citypass.emergencias.EmergenciaCreada', {
+          emergenciaId: 'EMG-1',
+          afectaCirculacion: true,
+          latitud: PLAZA_ITALIA.lat,
+          longitud: PLAZA_ITALIA.lng,
+        }),
+      );
+      expect(bloqueada('z-palermo')).toBe(true);
+
+      await service.procesar(
+        sobre(
+          'com.citypass.emergencias.EmergenciaResuelta',
+          { emergenciaId: 'EMG-1', causasRelacionadas: [] },
+          'ev-2',
+        ),
+      );
+
+      expect(bloqueada('z-palermo')).toBe(false);
     });
   });
 

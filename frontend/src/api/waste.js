@@ -66,6 +66,9 @@ export const fetchAlerts = (...args) => source.fetchAlerts(...args);
 export const acknowledgeAlert = (...args) => source.acknowledgeAlert(...args);
 export const resolveAlert = (...args) => source.resolveAlert(...args);
 
+/* CU-01 de Emergencias (A7) · Intervenciones */
+export const fetchInterventions = (...args) => source.fetchInterventions(...args);
+
 /* CU-10 · Confirmar vaciado */
 export const fetchMyRoute = (...args) => source.fetchMyRoute(...args);
 export const confirmStop = (...args) => source.confirmStop(...args);

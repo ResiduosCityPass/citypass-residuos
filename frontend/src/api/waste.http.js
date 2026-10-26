@@ -90,6 +90,9 @@ export const deleteZone = (id) => api.delete(`/zonas/${id}`);
  */
 export const fetchAlerts = (filters) => api.get('/alertas', filters);
 
+/** Intervenciones programadas por emergencias con causa RESIDUOS. */
+export const fetchInterventions = () => api.get('/intervenciones');
+
 /** Pasa la alerta a EN_ATENCION. Sin cuerpo. Falla con ALERTA_NO_ABIERTA si ya no esta ABIERTA. */
 export const acknowledgeAlert = (id) => api.patch(`/alertas/${id}/atender`);
 

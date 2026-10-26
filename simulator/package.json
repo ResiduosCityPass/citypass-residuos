@@ -8,6 +8,8 @@
     "seed": "node seed.js",
     "start": "node simulador.js",
     "saturacion": "node simulador.js --escenario saturacion",
-    "incendio": "node simulador.js --escenario incendio"
+    "incendio": "node simulador.js --escenario incendio",
+    "emergencia-residuos": "node emergencia.js --causa RESIDUOS",
+    "emergencia-via": "node emergencia.js --causa VIA"
   }
 }

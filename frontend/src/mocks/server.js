@@ -1,5 +1,5 @@
 import { ApiError } from '../api/client.js';
-import { ZONES, CONTAINERS, SENSORS, ALERTS, TRUCKS, DRIVERS, ROUTES, STOPS } from './data.js';
+import { ZONES, CONTAINERS, SENSORS, ALERTS, TRUCKS, DRIVERS, ROUTES, STOPS, INTERVENTIONS } from './data.js';
 import { DEPOT, distanceKm, distanceMeters } from '../domain/geo.js';
 
 /**
@@ -30,6 +30,7 @@ const store = {
   drivers: DRIVERS.map((d) => ({ ...d })),
   routes: ROUTES.map((r) => ({ ...r })),
   stops: STOPS.map((s) => ({ ...s })),
+  interventions: INTERVENTIONS.map((i) => ({ ...i })),
 };
 
 /** Latencia falsa: sin ella los esqueletos de carga nunca se ven y no se pueden disenar. */
@@ -1100,4 +1101,9 @@ export function fetchNearbyContainers(filters = {}) {
         distanciaMetros: meters,
       })),
   );
+}
+
+/* CU-01 de Emergencias (A7) · Intervenciones, las mas recientes primero. */
+export function fetchInterventions() {
+  return respond([...store.interventions].sort((a, b) => b.programadaEn.localeCompare(a.programadaEn)));
 }
