@@ -50,7 +50,7 @@ del bus (Franco) y que Rodrigo tenga registrado `ActividadCreada` (con `ubicacio
 
    ```bash
    cd simulator
-   BUS_URL=<url-del-bus> CLIENT_ID=<id> CLIENT_SECRET=<secreto> WEBHOOK_TOKEN=<el-de-render> npm run bus -- suscribir
+   BUS_URL=https://test.citypass.mrfranco.net.ar CLIENT_ID=<id> CLIENT_SECRET=<secreto> WEBHOOK_TOKEN=<el-de-render> npm run bus -- suscribir
    ```
 
    Antes de registrar, el script prueba que el webhook de Render esté despierto y acepte el

@@ -267,3 +267,9 @@ Para no perder días cuando Nicolas y Rodrigo respondan, dejé todo armado. Cuan
 - Residuos todavía no figura en la tabla de namespaces del bus. Hay que pedirle el cliente a Nico Hernández (Login).
 - La URL pública del bus.
 - El README del bus dice que el servicio de webhooks puede no estar desplegado y Franco recomienda Kafka. Hay que preguntarle si el de webhooks está arriba.
+
+## Mar 27/10 · Respuestas del squad
+
+- **Franco (EDA):** el bus está en `https://test.citypass.mrfranco.net.ar` (mensaje fijado del grupo). Soporta webhooks, aunque él recomienda Kafka. Probé la URL: `/api/v1/subscriptions` existe y pide token, así que el webhook está desplegado.
+- **Nico Hernández (Login):** va a sumar a Residuos en la tabla de namespaces, en el lugar de `turismo` (`grupo6`), que no es ningún módulo de CityPass+.
+- Seguimos por webhook: ya está todo armado (`npm run bus`) y no hace falta cambiar nada.
