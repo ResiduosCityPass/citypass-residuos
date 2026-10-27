@@ -273,3 +273,12 @@ Para no perder días cuando Nicolas y Rodrigo respondan, dejé todo armado. Cuan
 - **Franco (EDA):** el bus está en `https://test.citypass.mrfranco.net.ar` (mensaje fijado del grupo). Soporta webhooks, aunque él recomienda Kafka. Probé la URL: `/api/v1/subscriptions` existe y pide token, así que el webhook está desplegado.
 - **Nico Hernández (Login):** cambia `turismo` (`grupo6`), que no es ningún módulo de CityPass+, por `com.citypass.residuos`. También cambia `transporte` por `com.citypass.espacios`, que es el namespace con el que Espacios publica `ActividadCreada`. Franco confirmó que al bus le da igual: toma el namespace tal cual viene en el token.
 - Seguimos por webhook: ya está todo armado (`npm run bus`) y no hace falta cambiar nada.
+
+## Mar 27/10 · Guion de la demo del Hito 2 (paso 6)
+
+Mientras espero el cliente del Login, adelanté el paso 6: el guion de mi parte de la demo, en `docs/sprints/guion-demo-hito-2.md`.
+
+- **Una sola historia en 4 pasos:** llega el evento, la zona aparece en el mapa, termina el evento y la escuadrilla entra a la ruta, y el chofer la cierra.
+- **Plan B:** si el bus o Espacios fallan en vivo, el script `npm run actividad` manda el mismo evento al webhook. En Render se usa con `--lat` y `--lng`, porque `--contenedor` pide un token de administrador.
+- **Qué fallas hay que tener en cuenta:** despertar la API antes, no dejar rutas en `PROPUESTA`, la escuadrilla arranca recién a la hora de fin y la ubicación del chofer tiene que ser la del contenedor.
+- **Ensayo en local por API:** con la actividad ya terminada al lado de CT-0005, la ruta del camión de reciclables salió con CT-0005 al 0 %. Descarté la ruta después.
