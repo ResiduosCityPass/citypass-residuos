@@ -271,5 +271,5 @@ Para no perder días cuando Nicolas y Rodrigo respondan, dejé todo armado. Cuan
 ## Mar 27/10 · Respuestas del squad
 
 - **Franco (EDA):** el bus está en `https://test.citypass.mrfranco.net.ar` (mensaje fijado del grupo). Soporta webhooks, aunque él recomienda Kafka. Probé la URL: `/api/v1/subscriptions` existe y pide token, así que el webhook está desplegado.
-- **Nico Hernández (Login):** va a sumar a Residuos en la tabla de namespaces, en el lugar de `turismo` (`grupo6`), que no es ningún módulo de CityPass+.
+- **Nico Hernández (Login):** cambia `turismo` (`grupo6`), que no es ningún módulo de CityPass+, por `com.citypass.residuos`. También cambia `transporte` por `com.citypass.espacios`, que es el namespace con el que Espacios publica `ActividadCreada`. Franco confirmó que al bus le da igual: toma el namespace tal cual viene en el token.
 - Seguimos por webhook: ya está todo armado (`npm run bus`) y no hace falta cambiar nada.
