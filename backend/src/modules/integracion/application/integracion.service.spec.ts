@@ -147,7 +147,7 @@ describe('IntegracionService (CU-INT-01)', () => {
   });
 
   it('una ActividadCreada la maneja ActividadesMasivasService (squad 3)', async () => {
-    const data = { communityEventId: 'act-1', capacity: 5000 };
+    const data = { actividadId: 'act-1', capacidad: 5000 };
 
     await expect(
       service.procesar(sobre('com.citypass.espacios.ActividadCreada', data)),

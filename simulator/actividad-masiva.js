@@ -71,15 +71,19 @@ const terminaEn = Number(leerArgumento('termina-en', 10));
 const fin = new Date(Date.now() + terminaEn * MINUTO);
 const inicio = new Date(Math.min(Date.now() - 3 * 60 * MINUTO, fin.getTime() - 60 * MINUTO));
 
+const actividadId = randomUUID();
 const data = {
-  communityEventId: randomUUID(),
-  title: leerArgumento('titulo', 'Festival de Primavera'),
-  capacity: Number(leerArgumento('capacidad', 5000)),
-  status: 'ACTIVE',
-  startDate: inicio.toISOString(),
-  endDate: fin.toISOString(),
-  latitude: punto.lat,
-  longitude: punto.lng,
+  correlationId: `act-${actividadId}`,
+  actividadId,
+  titulo: leerArgumento('titulo', 'Festival de Primavera'),
+  estado: 'PROGRAMADA',
+  capacidad: Number(leerArgumento('capacidad', 5000)),
+  fechaHoraInicio: inicio.getTime(),
+  fechaHoraFinalizacion: fin.getTime(),
+  ubicacion: { lat: punto.lat, lng: punto.lng },
+  direccion: 'Direccion de prueba',
+  espacioNombre: 'Espacio de prueba',
+  actorSub: null,
 };
 
 const respuesta = await fetch(`${API}/webhooks/citypass?token=${encodeURIComponent(TOKEN)}`, {
@@ -99,7 +103,7 @@ if (!respuesta.ok) {
   process.exit(1);
 }
 
-console.log(`Enviada: "${data.title}", ${data.capacity} personas.`);
+console.log(`Enviada: "${data.titulo}", ${data.capacidad} personas.`);
 const hora = fin.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 console.log(`Termina ${terminaEn > 0 ? `en ${terminaEn} min` : 'ya'} (a las ${hora}).`);
 console.log('Mira el mapa: la zona aparece con el proximo refresco (30 s) o con "Refrescar ahora".');

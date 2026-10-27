@@ -245,3 +245,25 @@ Para no perder días cuando Nicolas y Rodrigo respondan, dejé todo armado. Cuan
 - En `render.yaml` sumé `GATEWAY_WEBHOOK_TOKEN`, que se carga a mano en Render y nunca va al repo.
 - En `docs/sprints/plan-maximo-residuos.md` escribí los 5 pasos para cuando lleguen los datos. Uno importante: Render despliega `main`, así que mi código tiene que llegar a `main` antes de probar.
 - Lo probé contra un bus falso y el backend local: suscribir, listar, fallidos y baja funcionan, y avisa si el secreto está mal o falta un dato.
+
+## Mar 27/10 · Espacios publica con los campos del contrato del squad
+
+**Qué pasó en el grupo del squad:**
+- Wanda (Movilidad) le pidió a Rodrigo que `ActividadCreada` salga con los campos del contrato del squad (E1 en `plan-squad-3.md`), y Rodrigo confirmó: al publicar en el bus, Espacios traduce su evento interno a ese contrato. Así todos los módulos consumen lo mismo.
+- Franco (EDA) confirmó que el namespace sale de la tabla del README del bus y del token del Login.
+- Reclamos usa el mismo corte que nosotros: 1.000 personas, 300 m y 6 h.
+
+**Por qué nos tocaba:** Residuos esperaba los nombres viejos (`communityEventId`, `title`, `startDate` en ISO, `latitude`...). Con el evento real, lo habría ignorado por mal formado y la escuadrilla nunca salía.
+
+**Lo que cambié** (solo lo que lee Residuos, nada de lo que publica Espacios):
+- `ActividadesMasivasService` ahora lee `actividadId`, `titulo`, `capacidad`, `estado`, `fechaHoraInicio` y `fechaHoraFinalizacion` en milisegundos, y `ubicacion: { lat, lng }`.
+- La cancelada ahora es `estado = CANCELADA` (hoy siempre llega `PROGRAMADA`).
+- El script de demo (`npm run actividad`) manda el formato nuevo.
+- Contrato actualizado en `docs/arquitectura/contratos-de-eventos.md`.
+- Tests del módulo de integración, lint y tipos en verde.
+- Probado en local con `npm run actividad -- --contenedor CT-0005 --termina-en 0`: la zona apareció en `GET /actividades-masivas` con 1 contenedor.
+
+**Sigue pendiente:**
+- Residuos todavía no figura en la tabla de namespaces del bus. Hay que pedirle el cliente a Nico Hernández (Login).
+- La URL pública del bus.
+- El README del bus dice que el servicio de webhooks puede no estar desplegado y Franco recomienda Kafka. Hay que preguntarle si el de webhooks está arriba.

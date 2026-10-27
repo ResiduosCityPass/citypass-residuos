@@ -8,7 +8,7 @@ import { Column, CreateDateColumn, Entity, PrimaryColumn } from 'typeorm';
  */
 @Entity('actividad_masiva')
 export class ActividadMasiva {
-  /** `communityEventId` de Espacios. */
+  /** `actividadId` de Espacios. */
   @PrimaryColumn({ length: 64 })
   actividadId!: string;
 

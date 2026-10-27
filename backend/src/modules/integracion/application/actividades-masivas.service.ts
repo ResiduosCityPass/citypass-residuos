@@ -27,8 +27,9 @@ interface ActividadLeida {
  *     `INTEGRACION_HORAS_ZONA_EVENTO`, esos contenedores entran a la ruta que
  *     genera CU-08 aunque no esten criticos. Reusa el refuerzo de CU-INT-01.
  *
- * Usa los nombres de campo de Espacios (en ingles) y su propio corte de
- * capacidad, aparte del cupo del refuerzo de CU-INT-01.
+ * Lee los campos del contrato del squad (E1 en plan-squad-3.md), que es como
+ * Espacios lo publica en el bus. Tiene su propio corte de capacidad, aparte del
+ * cupo del refuerzo de CU-INT-01.
  *
  * Un evento mal formado se ignora y queda en el log, sin responder 400: un 400
  * hace que el bus lo reintente para siempre.
@@ -116,30 +117,37 @@ export class ActividadesMasivasService {
   }
 }
 
-/** null si falta el id, las coordenadas o una fecha valida. */
+/** null si falta el id, la ubicacion o una fecha valida. */
 function leerActividad(data: Record<string, unknown>): ActividadLeida | null {
-  const { communityEventId, title, capacity, status, latitude, longitude } = data;
-  const inicio = new Date(String(data.startDate));
-  const fin = new Date(String(data.endDate));
+  const { actividadId, titulo, capacidad, estado, ubicacion } = data;
+  const { lat, lng } = (ubicacion ?? {}) as Record<string, unknown>;
+  const inicio = leerFecha(data.fechaHoraInicio);
+  const fin = leerFecha(data.fechaHoraFinalizacion);
 
   if (
-    typeof communityEventId !== 'string' ||
-    communityEventId.length === 0 ||
-    typeof latitude !== 'number' ||
-    typeof longitude !== 'number' ||
-    Number.isNaN(inicio.getTime()) ||
-    Number.isNaN(fin.getTime())
+    typeof actividadId !== 'string' ||
+    actividadId.length === 0 ||
+    typeof lat !== 'number' ||
+    typeof lng !== 'number' ||
+    !inicio ||
+    !fin
   ) {
     return null;
   }
 
   return {
-    actividadId: communityEventId,
-    titulo: typeof title === 'string' ? title : null,
-    capacidad: Number(capacity ?? 0),
-    punto: { lat: latitude, lng: longitude },
+    actividadId,
+    titulo: typeof titulo === 'string' ? titulo : null,
+    capacidad: Number(capacidad ?? 0),
+    punto: { lat, lng },
     inicio,
     fin,
-    cancelada: status === 'CANCELLED',
+    // En el nucleo siempre llega PROGRAMADA; el contrato deja lugar a CANCELADA.
+    cancelada: estado === 'CANCELADA',
   };
+}
+
+/** Las fechas llegan en milisegundos (timestamp-millis de Avro). */
+function leerFecha(valor: unknown): Date | null {
+  return typeof valor === 'number' && Number.isFinite(valor) ? new Date(valor) : null;
 }

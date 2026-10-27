@@ -36,7 +36,7 @@ Mientras no lleguen, pruebo todo en local.
 ## Paso 5, cuando lleguen los datos
 
 Necesito tres cosas: el `CLIENT_ID` y el `CLIENT_SECRET` de Residuos (Nicolas), la URL pública
-del bus (Franco) y que Rodrigo tenga registrado `ActividadCreada` con `latitude` y `longitude`.
+del bus (Franco) y que Rodrigo tenga registrado `ActividadCreada` (con `ubicacion`, como en el contrato del squad).
 
 1. **Que mi código llegue a Render.** Render despliega `main`, no `develop`: el #57 tiene que
    estar en un release a `main`. La migración de `actividad_masiva` corre sola al desplegar

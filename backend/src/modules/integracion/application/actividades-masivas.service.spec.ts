@@ -11,16 +11,19 @@ const contenedor = (id: string, lat: number, lng: number): Contenedor =>
 const CERCA = contenedor('c-cerca', -34.5815, -58.4202);
 const LEJOS = contenedor('c-lejos', -34.6186, -58.4421);
 
-// Campos tal como los publica Espacios.
+// Campos tal como los publica Espacios en el bus (E1 del plan del squad).
 const actividad = (cambios: Record<string, unknown> = {}) => ({
-  communityEventId: 'act-1',
-  title: 'Festival de Primavera',
-  capacity: 5000,
-  status: 'ACTIVE',
-  startDate: '2026-11-01T15:00:00.000Z',
-  endDate: '2026-11-01T20:00:00.000Z',
-  latitude: PLAZA_ITALIA.lat,
-  longitude: PLAZA_ITALIA.lng,
+  correlationId: 'act-act-1',
+  actividadId: 'act-1',
+  titulo: 'Festival de Primavera',
+  estado: 'PROGRAMADA',
+  capacidad: 5000,
+  fechaHoraInicio: Date.parse('2026-11-01T15:00:00.000Z'),
+  fechaHoraFinalizacion: Date.parse('2026-11-01T20:00:00.000Z'),
+  ubicacion: PLAZA_ITALIA,
+  direccion: 'Av. Sarmiento 2601',
+  espacioNombre: 'Plaza Italia',
+  actorSub: null,
   ...cambios,
 });
 
@@ -87,24 +90,28 @@ describe('ActividadesMasivasService (squad 3)', () => {
   });
 
   it('una actividad de menos de 1.000 personas no es masiva', async () => {
-    await service.registrar(actividad({ capacity: 300 }));
+    await service.registrar(actividad({ capacidad: 300 }));
 
     expect(integracion.guardarActividad).not.toHaveBeenCalled();
     expect(integracion.guardarRefuerzo).not.toHaveBeenCalled();
   });
 
   it('una actividad cancelada no se guarda', async () => {
-    await service.registrar(actividad({ status: 'CANCELLED' }));
+    await service.registrar(actividad({ estado: 'CANCELADA' }));
 
     expect(integracion.guardarActividad).not.toHaveBeenCalled();
   });
 
   describe('un evento mal formado se ignora sin error, para que el bus no lo reintente', () => {
     it.each([
-      ['sin coordenadas', { latitude: undefined, longitude: undefined }],
-      ['sin id', { communityEventId: undefined }],
-      ['con la fecha de fin invalida', { endDate: 'mañana' }],
-      ['sin fecha de inicio', { startDate: undefined }],
+      ['sin ubicacion', { ubicacion: undefined }],
+      ['sin longitud', { ubicacion: { lat: PLAZA_ITALIA.lat } }],
+      ['sin id', { actividadId: undefined }],
+      [
+        'con la fecha de fin en ISO en vez de milisegundos',
+        { fechaHoraFinalizacion: '2026-11-01T20:00:00Z' },
+      ],
+      ['sin fecha de inicio', { fechaHoraInicio: undefined }],
     ])('%s', async (_caso, cambios) => {
       await expect(service.registrar(actividad(cambios))).resolves.toBeUndefined();
 
