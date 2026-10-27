@@ -74,6 +74,26 @@ Usa `WEBHOOK_TOKEN` (default `local-dev`), que tiene que coincidir con `GATEWAY_
 backend. Sin `--contenedor` la actividad cae en el Obelisco, pero el seed reparte los contenedores
 hasta a 1 km, así que puede quedar sin ninguno dentro de los 300 m.
 
+## Suscribirse al bus real
+
+`bus.js` da de alta el webhook de Residuos en Render para que el bus le mande `ActividadCreada`.
+No es un simulador: habla con el bus de verdad.
+
+```bash
+BUS_URL=<url-del-bus> CLIENT_ID=<id> CLIENT_SECRET=<secreto> WEBHOOK_TOKEN=<el-de-render> npm run bus -- suscribir
+```
+
+| Comando | Qué hace |
+|---|---|
+| `suscribir` | Prueba que el webhook de Render responda y lo registra. Devuelve el `id` |
+| `listar` | Las suscripciones de Residuos, y si el bus silenció alguna |
+| `fallidos` | Los eventos que el bus no pudo entregar, con el error |
+| `baja <id>` | Da de baja una suscripción |
+
+`--topico` cambia el tipo de evento (default `com.citypass.espacios.ActividadCreada`). En vez de
+`CLIENT_ID` y `CLIENT_SECRET` se puede pasar un token ya emitido en `BUS_TOKEN`. Los pasos completos
+para Render están en `docs/sprints/plan-maximo-residuos.md`.
+
 ## El nivel sobrevive entre corridas
 
 Los niveles se guardan en `estado.json` al final de cada ciclo y se recuperan al arrancar. Sin eso

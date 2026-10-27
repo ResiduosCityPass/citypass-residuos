@@ -219,3 +219,29 @@ Mientras espero a los demás (la aprobación de Nico, el token de Nicolas, las c
 cd simulator
 TOKEN=<token-de-administrador> npm run actividad -- --contenedor CT-0005
 ```
+
+## Mar 27/10 · Esperando respuestas
+
+Desde el 22/10 nadie respondió y no se movió nada:
+- #57 sigue esperando la aprobación de Nico. Antes van los PRs de Fran (#53 y #58), también sin aprobar.
+- Nicolas todavía no pasó el token de servicio ni el namespace `com.citypass.residuos`.
+- Rodrigo todavía no agregó `latitude` y `longitude` al evento.
+- Tomás todavía no abrió su PR sobre mi rama.
+
+Les mandé un recordatorio a los cuatro. Mientras tanto, el paso 5 (el bus real) sigue bloqueado.
+
+## Mar 27/10 · El paso 5 queda listo para cuando lleguen los datos
+
+Para no perder días cuando Nicolas y Rodrigo respondan, dejé todo armado. Cuando lleguen los datos, conectarse al bus es pegarlos y correr un comando.
+
+**Lo que aprendí leyendo el repo del bus:**
+- Para recibir eventos por webhook hay que darse de alta: `POST /api/v1/subscriptions` con el tipo de evento y la URL pública del webhook. El bus devuelve un `id`, que sirve para darse de baja.
+- El token sale del Login (Grupo 2) con un `client_id` y un secreto por grupo. La tabla de clientes del bus todavía no tiene a Residuos: `grupo4` figura como `com.citypass.reclamos`. Sigue haciendo falta lo de Nicolas.
+- Si el webhook no responde, el bus reintenta 3 veces y deja el evento en una cola de fallidos. Render gratis tarda más de 15 s en despertar, así que hay que despertar la API antes de probar.
+- Falta saber la URL pública del bus: en los documentos figura un dominio de ejemplo.
+
+**Lo que hice:**
+- `simulator/bus.js` (`npm run bus`): suscribe el webhook, lista las suscripciones, muestra los eventos que no llegaron y da de baja. Antes de suscribir, prueba que el webhook de Render esté despierto y que el secreto esté bien.
+- En `render.yaml` sumé `GATEWAY_WEBHOOK_TOKEN`, que se carga a mano en Render y nunca va al repo.
+- En `docs/sprints/plan-maximo-residuos.md` escribí los 5 pasos para cuando lleguen los datos. Uno importante: Render despliega `main`, así que mi código tiene que llegar a `main` antes de probar.
+- Lo probé contra un bus falso y el backend local: suscribir, listar, fallidos y baja funcionan, y avisa si el secreto está mal o falta un dato.

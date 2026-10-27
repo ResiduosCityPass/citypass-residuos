@@ -9,6 +9,7 @@
     "start": "node simulador.js",
     "saturacion": "node simulador.js --escenario saturacion",
     "incendio": "node simulador.js --escenario incendio",
-    "actividad": "node actividad-masiva.js"
+    "actividad": "node actividad-masiva.js",
+    "bus": "node bus.js"
   }
 }

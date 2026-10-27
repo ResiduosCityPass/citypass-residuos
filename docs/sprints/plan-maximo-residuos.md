@@ -32,3 +32,28 @@ Residuos reacciona: cuando termina el evento, manda una escuadrilla a limpiar lo
 - **Nicolas Hernandez (Login):** token de servicio (`client_credentials`)
 
 Mientras no lleguen, pruebo todo en local.
+
+## Paso 5, cuando lleguen los datos
+
+Necesito tres cosas: el `CLIENT_ID` y el `CLIENT_SECRET` de Residuos (Nicolas), la URL pública
+del bus (Franco) y que Rodrigo tenga registrado `ActividadCreada` con `latitude` y `longitude`.
+
+1. **Que mi código llegue a Render.** Render despliega `main`, no `develop`: el #57 tiene que
+   estar en un release a `main`. La migración de `actividad_masiva` corre sola al desplegar
+   (`DB_MIGRATIONS_RUN=true`).
+2. **El secreto del webhook en Render.** Inventar un valor largo (`openssl rand -hex 24`) y
+   cargarlo en el servicio `citypass-residuos-api` → Environment → `GATEWAY_WEBHOOK_TOKEN`.
+   Sin él, el webhook rechaza todo. No va en ningún archivo del repo.
+3. **Despertar la API** (`/api/v1/health`). Dormida tarda más de 15 s y el bus solo espera unos
+   segundos: el evento termina en la cola de fallidos.
+4. **Suscribirme:**
+
+   ```bash
+   cd simulator
+   BUS_URL=<url-del-bus> CLIENT_ID=<id> CLIENT_SECRET=<secreto> WEBHOOK_TOKEN=<el-de-render> npm run bus -- suscribir
+   ```
+
+   Antes de registrar, el script prueba que el webhook de Render esté despierto y acepte el
+   secreto. Guardar el `id` que devuelve.
+5. **Probar con un evento real** de Rodrigo y mirar el mapa en Render. Si no aparece:
+   `npm run bus -- listar` (¿está silenciada?) y `npm run bus -- fallidos` (¿por qué no llegó?).
