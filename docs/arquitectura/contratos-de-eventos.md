@@ -145,11 +145,13 @@ Se emite cuando Emergencias resuelve un incidente y **`causasRelacionadas` inclu
 
 `contenedorId` es `null` si no había ningún contenedor a menos de 50 m (radio configurable con
 `INTEGRACION_RADIO_INTERVENCION_METROS`): la intervención se programa igual. Si había uno, además
-se crea un refuerzo para que entre en la próxima ruta, y se publica `RefuerzoProgramado`.
+se crea un refuerzo interno para que entre en la próxima ruta. **No se publica `RefuerzoProgramado`**: ese evento alimenta el dashboard de eventos de Analítica y un refuerzo por emergencia no es de ningún evento comunitario.
 
 `correlationId` es el `emergenciaId`, para que EDA pueda seguir la cadena completa.
 
-**Consumidores esperados:** EDA (Squad 1) para verificar el flujo; Analítica Urbana (Squad 8).
+**Consumidores esperados:** EDA (Squad 1) para verificar el flujo; Analítica Urbana (Squad 8), que solo lee eventos y arma gráficos, no publica nada.
+
+El esquema Avro para registrarlo en la consola de EDA está en [`schemas/IntervencionProgramada.avsc`](schemas/IntervencionProgramada.avsc). **Lo registra Residuos, no EDA**; sin eso el gateway devuelve 404.
 
 ---
 

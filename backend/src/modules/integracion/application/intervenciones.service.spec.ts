@@ -96,13 +96,14 @@ describe('IntervencionesService (CU-01, A7)', () => {
     });
   });
 
-  it('refuerza el contenedor para que la proxima ruta pase por ahi', async () => {
+  it('refuerza el contenedor para que la proxima ruta pase por ahi, sin publicar el refuerzo', async () => {
     await service.programarSiCorresponde(datos());
 
     expect(integracion.guardarRefuerzo).toHaveBeenCalledWith(
       expect.objectContaining({ eventoId: 'emergencia-EMG-1', contenedorIds: ['c-10m'] }),
     );
-    expect(eventos.getPublished(EventTypes.REFUERZO_PROGRAMADO)).toHaveLength(1);
+    // Es solo ruteo interno: Analitica no lo necesita y ensuciaria su dashboard de eventos.
+    expect(eventos.getPublished(EventTypes.REFUERZO_PROGRAMADO)).toHaveLength(0);
   });
 
   it('sin contenedor a menos de 50 m la intervencion se guarda igual, sin refuerzo', async () => {

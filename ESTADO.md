@@ -543,13 +543,16 @@ una emergencia (`EmergenciaActualizada`/`EmergenciaResuelta`). **Consume:** `GET
   `FUERA_DE_SERVICIO`: uno roto en la ciclovía puede ser justamente la causa.
 - **Sin contenedor cerca la intervención se programa igual**, con `contenedorId: null`.
 - **Con contenedor cerca se crea un refuerzo**, para que la próxima ruta pase por ahí aunque no
-  esté crítico. Como siempre, la ruta la sigue generando el operador.
+  esté crítico. Como siempre, la ruta la sigue generando el operador. **El refuerzo no se publica**
+  como `RefuerzoProgramado`: ese evento es del dashboard de eventos de Analítica.
 - **Un evento sin ubicación o mal formado se ignora y se loguea**, no se responde 400.
 - **Pendiente de confirmar con Emergencias:** el nombre real del evento de resolución, y que traiga
   `causasRelacionadas` y `ubicacion`. Hasta entonces se aceptan las dos variantes de nombre y las
   dos formas de coordenadas.
-- **Para que el evento saliente llegue a EDA**, `IntervencionProgramada` tiene que estar en el
-  catálogo del gateway del Squad 1; si no, el gateway responde 404 y queda `FALLIDO` en el outbox.
+- **Para que el evento saliente llegue a EDA**, Residuos tiene que registrar `IntervencionProgramada`
+  en la consola de EDA, con su esquema Avro (`docs/arquitectura/schemas/`); si no, el gateway
+  responde 404 y queda `FALLIDO` en el outbox. La suscripción al evento de resolución de Emergencias
+  también se crea desde esa consola, con la URL del webhook.
 
 ---
 

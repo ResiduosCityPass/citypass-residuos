@@ -1,0 +1,16 @@
+{
+  "type": "record",
+  "name": "IntervencionProgramada",
+  "namespace": "com.citypass.residuos",
+  "doc": "Residuos programo una intervencion en el lugar de una emergencia cuya causa fue residuos (CU-01 de Emergencias, A7).",
+  "fields": [
+    { "name": "intervencionId", "type": "string" },
+    { "name": "emergenciaId", "type": "string" },
+    { "name": "contenedorId", "type": ["null", "string"], "default": null, "doc": "Contenedor a menos de 50 m, si habia alguno." },
+    { "name": "latitud", "type": "double" },
+    { "name": "longitud", "type": "double" },
+    { "name": "programadaEn", "type": "string", "doc": "Fecha ISO 8601." },
+    { "name": "correlationId", "type": ["null", "string"], "default": null, "doc": "Igual al emergenciaId." },
+    { "name": "occurredAt", "type": "string", "doc": "Fecha ISO 8601." }
+  ]
+}

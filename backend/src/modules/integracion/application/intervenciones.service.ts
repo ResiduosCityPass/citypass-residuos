@@ -121,6 +121,11 @@ export class IntervencionesService {
 
   /**
    * Hace que la proxima ruta pase por el contenedor aunque no este critico.
+   *
+   * No publica RefuerzoProgramado: ese evento alimenta el dashboard de eventos
+   * de Analitica con un `eventoId` de Espacios, y un refuerzo por emergencia no
+   * es de ningun evento comunitario. Para ellos alcanza con IntervencionProgramada.
+   *
    * No se filtran los FUERA_DE_SERVICIO al buscarlo: uno roto en la ciclovia
    * puede ser justamente la causa.
    */
@@ -135,20 +140,6 @@ export class IntervencionesService {
       desde,
       hasta,
     });
-
-    await this.eventos.publish(
-      buildEvent(
-        EventTypes.REFUERZO_PROGRAMADO,
-        {
-          refuerzoId: `refuerzo-${eventoId}`,
-          eventoId,
-          zona: '',
-          contenedores: 1,
-          programadoPara: desde.toISOString(),
-        },
-        { correlationId: emergenciaId },
-      ),
-    );
   }
 
   private async contenedorMasCercano(punto: { lat: number; lng: number }) {
