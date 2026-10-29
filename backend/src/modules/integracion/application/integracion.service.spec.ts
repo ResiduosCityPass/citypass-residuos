@@ -255,16 +255,53 @@ describe('IntegracionService (CU-INT-01)', () => {
         ...cambios,
       });
 
-    it.each(['EmergenciaActualizada', 'EmergenciaResuelta'])(
-      '%s le pasa los datos a las intervenciones',
-      async (tipo) => {
-        await expect(service.procesar(resuelta(tipo))).resolves.toBe('procesado');
+    it.each([
+      'EmergenciaActualizada',
+      'EmergenciaEstadoActualizado',
+      'EmergenciaResuelta',
+      'EmergenciaCerrada',
+    ])('%s le pasa los datos a las intervenciones', async (tipo) => {
+      await expect(service.procesar(resuelta(tipo))).resolves.toBe('procesado');
 
-        expect(intervenciones.programarSiCorresponde).toHaveBeenCalledWith(
-          expect.objectContaining({ emergenciaId: 'EMG-1' }),
-        );
-      },
-    );
+      expect(intervenciones.programarSiCorresponde).toHaveBeenCalledWith(
+        expect.objectContaining({ emergenciaId: 'EMG-1' }),
+      );
+    });
+
+    it('EmergenciaEstadoActualizado acepta el estado en el campo `estado`', async () => {
+      await service.procesar(
+        resuelta('EmergenciaEstadoActualizado', { estadoNuevo: undefined, estado: 'resuelta' }),
+      );
+
+      expect(intervenciones.programarSiCorresponde).toHaveBeenCalledTimes(1);
+    });
+
+    it('EmergenciaCerrada desbloquea las zonas aunque no traiga estado', async () => {
+      await service.procesar(
+        sobre('com.citypass.emergencias.EmergenciaCreada', {
+          emergenciaId: 'EMG-1',
+          afectaCirculacion: true,
+          latitud: PLAZA_ITALIA.lat,
+          longitud: PLAZA_ITALIA.lng,
+        }),
+      );
+
+      await service.procesar(
+        sobre(
+          'com.citypass.emergencias.EmergenciaCerrada',
+          { emergenciaId: 'EMG-1', causasRelacionadas: [] },
+          'ev-2',
+        ),
+      );
+
+      expect(bloqueada('z-palermo')).toBe(false);
+    });
+
+    it('un evento sin estado reconocible no programa intervencion', async () => {
+      await service.procesar(resuelta('EmergenciaEstadoActualizado', { estadoNuevo: undefined }));
+
+      expect(intervenciones.programarSiCorresponde).not.toHaveBeenCalled();
+    });
 
     it('una emergencia que solo cambia de estado no programa intervencion', async () => {
       await service.procesar(resuelta('EmergenciaActualizada', { estadoNuevo: 'EN_ATENCION' }));

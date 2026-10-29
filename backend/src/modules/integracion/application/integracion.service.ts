@@ -27,12 +27,33 @@ const EMERGENCIAS = 'com.citypass.emergencias.';
 const EMERGENCIA_TERMINADA = new Set(['RESUELTA', 'CERRADA', 'DESCARTADA', 'CANCELADA']);
 
 /**
+ * Estados en los que la emergencia ya se atendio y puede haber algo por
+ * intervenir. Cancelada o descartada no dejan nada.
+ */
+const EMERGENCIA_ATENDIDA = new Set(['RESUELTA', 'CERRADA']);
+
+/**
+ * Como se llama, segun Emergencias, el campo con el estado nuevo. El backend de
+ * Emergencias publica `EmergenciaEstadoActualizado` y el contrato nunca se cerro
+ * por escrito: se aceptan las variantes razonables, en un solo lugar, para
+ * recortarlas cuando se confirme.
+ */
+const CAMPOS_ESTADO = ['estadoNuevo', 'estado', 'nuevoEstado'] as const;
+
+function estadoDe(data: Record<string, unknown>): string {
+  const campo = CAMPOS_ESTADO.find((c) => typeof data[c] === 'string');
+  return campo ? String(data[campo]).toUpperCase() : '';
+}
+
+/**
  * Reacciones a eventos de otros modulos de CityPass+ (CU-INT-01).
  *
  *   EventoComunitarioPublicado -> refuerzo de recoleccion cerca del espacio
  *   EventoCancelado            -> se cancela el refuerzo
  *   EmergenciaCreada           -> se bloquean para el ruteo las zonas afectadas
  *   EmergenciaActualizada      -> al terminar la emergencia se desbloquean
+ *   EmergenciaEstadoActualizado-> igual: es como la publica Emergencias de verdad
+ *   EmergenciaCerrada          -> igual, y si trae causa RESIDUOS, intervencion
  *
  * Todo corre en una transaccion: si algo falla tampoco queda registrado el
  * eventId, el webhook responde error y el dispatcher del Squad 1 reintenta.
@@ -91,17 +112,27 @@ export class IntegracionService {
           await this.bloquearZonas(data);
           return 'procesado';
         case `${EMERGENCIAS}EmergenciaActualizada`:
-          await this.desbloquearSiTermino(data);
-          // Solo al resolverse: cancelada o descartada no deja nada por intervenir.
-          if (data.estadoNuevo === 'RESUELTA') {
+        case `${EMERGENCIAS}EmergenciaEstadoActualizado`: {
+          const estado = estadoDe(data);
+          await this.desbloquearSiTermino({ ...data, estadoNuevo: estado });
+          // Cancelada o descartada no deja nada por intervenir.
+          if (EMERGENCIA_ATENDIDA.has(estado)) {
             await this.intervenciones?.programarSiCorresponde(data);
           }
           return 'procesado';
-        // Nombre sin confirmar con Emergencias (CU-01 documenta emergencia.resuelta).
+        }
+        // Nombres de cierre sin confirmar: CU-01 documenta emergencia.resuelta y el
+        // backend de Emergencias publica EmergenciaCerrada.
         case `${EMERGENCIAS}EmergenciaResuelta`:
-          await this.desbloquearSiTermino({ ...data, estadoNuevo: 'RESUELTA' });
+        case `${EMERGENCIAS}EmergenciaCerrada`: {
+          const cerrada = eventType.endsWith('EmergenciaCerrada');
+          await this.desbloquearSiTermino({
+            ...data,
+            estadoNuevo: cerrada ? 'CERRADA' : 'RESUELTA',
+          });
           await this.intervenciones?.programarSiCorresponde(data);
           return 'procesado';
+        }
         default:
           this.logger.log(`Tipo de evento sin manejo en Residuos: ${eventType}`);
           return 'ignorado';
