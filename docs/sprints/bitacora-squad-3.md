@@ -282,3 +282,9 @@ Mientras espero el cliente del Login, adelanté el paso 6: el guion de mi parte 
 - **Plan B:** si el bus o Espacios fallan en vivo, el script `npm run actividad` manda el mismo evento al webhook. En Render se usa con `--lat` y `--lng`, porque `--contenedor` pide un token de administrador.
 - **Qué fallas hay que tener en cuenta:** despertar la API antes, no dejar rutas en `PROPUESTA`, la escuadrilla arranca recién a la hora de fin y la ubicación del chofer tiene que ser la del contenedor.
 - **Ensayo en local por API:** con la actividad ya terminada al lado de CT-0005, la ruta del camión de reciclables salió con CT-0005 al 0 %. Descarté la ruta después.
+
+## Jue 29/10 · El Login ya tiene los namespaces nuevos
+
+- **Nico Hernández (Login):** se mergeó su PR. Los namespaces ya son `com.citypass.residuos` y `com.citypass.espacios`.
+- **Lo que falta para el paso 5:** que Nico me pase el `client_id` y el secreto de Residuos.
+- **PRs:** ninguno se movió. La pila de Fran (#53 → #54 → #55 → #58), mi #57 y el #60 de Adriel siguen abiertos sin aprobar. Tomás todavía no abrió su PR.
