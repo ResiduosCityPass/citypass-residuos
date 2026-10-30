@@ -100,7 +100,8 @@ describe('traducirAGateway (CU-INT-01)', () => {
         contenedoresAfectados: [{ codigo: 'CT-0421', distanciaMetros: 8.4 }],
         rutasRecalculadas: ['rt-1'],
         correlationId: null,
-        occurredAt: '2026-10-22T18:00:00.000Z',
+        // En milisegundos desde epoch: es lo que lee Analitica.
+        occurredAt: 1792692000000,
       },
     });
   });

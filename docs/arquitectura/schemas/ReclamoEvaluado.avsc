@@ -1,0 +1,28 @@
+{
+  "type": "record",
+  "name": "ReclamoEvaluado",
+  "namespace": "com.citypass.residuos",
+  "doc": "Residuos decidio si el auto denunciado en un reclamo tapa algun contenedor (CU-INT-02). Se publica una vez por decision, afecte o no. Metrica para BI: reclamoId distintos con afectaRecoleccion=true / reclamoId distintos evaluados x 100, agrupando por occurredAt.",
+  "fields": [
+    { "name": "reclamoId", "type": "string", "doc": "Id del reclamo en Reclamos. Clave para contar: puede repetirse en mas de un evento." },
+    { "name": "afectaRecoleccion", "type": "boolean", "doc": "true si el auto tapa al menos un contenedor (a 15 m o menos)." },
+    {
+      "name": "contenedoresAfectados",
+      "doc": "Contenedores tapados. Vacio si afectaRecoleccion es false.",
+      "type": {
+        "type": "array",
+        "items": {
+          "type": "record",
+          "name": "ContenedorAfectado",
+          "fields": [
+            { "name": "codigo", "type": "string", "doc": "Codigo del contenedor, por ejemplo CT-0421." },
+            { "name": "distanciaMetros", "type": "double", "doc": "Distancia entre el auto y el contenedor, con un decimal." }
+          ]
+        }
+      }
+    },
+    { "name": "rutasRecalculadas", "type": { "type": "array", "items": "string" }, "doc": "Rutas vivas que perdieron una parada por este reclamo. Vacio si ninguna." },
+    { "name": "correlationId", "type": ["null", "string"], "default": null, "doc": "El que manda Reclamos, para seguir el reclamo de punta a punta." },
+    { "name": "occurredAt", "type": { "type": "long", "logicalType": "timestamp-millis" }, "doc": "Momento de la decision, en milisegundos desde epoch (UTC)." }
+  ]
+}

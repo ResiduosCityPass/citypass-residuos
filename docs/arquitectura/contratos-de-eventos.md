@@ -138,7 +138,7 @@ Reclamos y, a la vez, el dato de la métrica para BI.
   "contenedoresAfectados": [{ "codigo": "CT-0421", "distanciaMetros": 8.4 }],
   "rutasRecalculadas": ["b1f0..."],
   "correlationId": "req-7c9e6679",
-  "occurredAt": "2026-10-22T18:00:00.000Z"
+  "occurredAt": 1792692000000
 }
 ```
 
@@ -149,7 +149,7 @@ Reclamos y, a la vez, el dato de la métrica para BI.
 | `contenedoresAfectados` | Los contenedores tapados, con la distancia al auto. Vacío si `afectaRecoleccion` es `false` |
 | `rutasRecalculadas` | Rutas vivas que perdieron una parada por este reclamo. Vacío si ninguna ruta tenía esos contenedores |
 | `correlationId` | El que mandó Reclamos en su evento, para seguir el reclamo de punta a punta. `null` si no vino |
-| `occurredAt` | Momento de la decisión. Es la fecha para agrupar por período |
+| `occurredAt` | Momento de la decisión, **en milisegundos desde epoch** (no ISO, a diferencia de los eventos anteriores): es lo que lee Analítica y lo que recomendó EDA para los eventos nuevos. Es la fecha para agrupar por período |
 
 **Consumidores esperados:**
 - **Reclamos (Squad 5):** para saber si el reclamo afectó la recolección (por ahora no lo consumen).
@@ -174,8 +174,10 @@ Reclamos y, a la vez, el dato de la métrica para BI.
 - **Lectura complementaria:** con `rutasRecalculadas` no vacío se puede sacar, además, el
   porcentaje de reclamos que rompieron una ruta que ya estaba armada.
 
-> **Pendiente del Squad 1:** registrar `ReclamoEvaluado` en el catálogo del gateway. Mientras no
-> esté, el gateway responde 404 y el evento queda `FALLIDO` en el outbox.
+> **Lo registra Residuos, no EDA:** desde la consola del gateway, en el catálogo de tipos, con el
+> esquema Avro de [`schemas/ReclamoEvaluado.avsc`](schemas/ReclamoEvaluado.avsc). El namespace sale
+> del token del grupo. Mientras no esté registrado, el gateway responde 404 y el evento queda
+> `FALLIDO` en el outbox.
 
 ---
 

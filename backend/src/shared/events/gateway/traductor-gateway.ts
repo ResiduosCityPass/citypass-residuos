@@ -106,7 +106,9 @@ export function traducirAGateway(evento: DomainEvent): EventoGateway | null {
           contenedoresAfectados: p.contenedoresAfectados,
           rutasRecalculadas: p.rutasRecalculadas,
           correlationId,
-          occurredAt: p.evaluadoEn ?? evento.occurredAt,
+          // Milisegundos desde epoch, no ISO: es lo que lee Analitica, y EDA lo
+          // recomendo para los eventos nuevos (26/10). Los anteriores siguen en ISO.
+          occurredAt: Date.parse(String(p.evaluadoEn ?? evento.occurredAt)),
         },
       };
 
