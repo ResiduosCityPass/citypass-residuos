@@ -71,6 +71,43 @@ export function planificarRuta(
   };
 }
 
+export interface Reordenamiento {
+  /** Contenedores pendientes en el nuevo orden de visita. */
+  contenedorIds: string[];
+  /** Recorrido completo: deposito, visitadas, pendientes y vuelta. */
+  distanciaKm: number;
+}
+
+/**
+ * CU-INT-02 · Reordena lo que le queda a una ruta despues de sacarle paradas.
+ *
+ * Sale desde la ultima parada visitada, que es donde esta el camion, o desde el
+ * deposito si todavia no visito ninguna. Usa la misma heuristica que generar:
+ * sacar paradas solo libera capacidad, asi que no hace falta volver a mirarla.
+ */
+export function reordenarPendientes(
+  deposito: Punto,
+  visitadas: Punto[],
+  pendientes: (Punto & { contenedorId: string })[],
+): Reordenamiento {
+  const origen = visitadas[visitadas.length - 1] ?? deposito;
+  const plan = planificarRuta(
+    origen,
+    pendientes.map((p) => ({ ...p, litrosOcupados: 0 })),
+    Infinity,
+  );
+
+  const recorrido = [deposito, ...visitadas, ...plan.paradas, deposito];
+  const distancia = recorrido
+    .slice(1)
+    .reduce((km, punto, i) => km + distanciaKm(recorrido[i], punto), 0);
+
+  return {
+    contenedorIds: plan.paradas.map((p) => p.contenedorId),
+    distanciaKm: Number(distancia.toFixed(1)),
+  };
+}
+
 /** Litros que ocupa hoy un contenedor, segun su nivel de llenado. */
 export function litrosOcupados(capacidadLitros: number, nivelLlenadoPct: number): number {
   return (capacidadLitros * nivelLlenadoPct) / 100;

@@ -29,6 +29,10 @@ export const EventTypes = {
   PARADA_OMITIDA: 'residuos.parada.omitida',
   /** CU-INT-01: refuerzo de recoleccion cerca de un evento cultural. */
   REFUERZO_PROGRAMADO: 'residuos.refuerzo.programado',
+  /** CU-INT-02: una ruta viva perdio paradas porque un auto tapa sus contenedores. */
+  RUTA_RECALCULADA: 'residuos.ruta.recalculada',
+  /** CU-INT-02: la respuesta a Reclamos, si el auto denunciado tapa algun contenedor. */
+  RECLAMO_EVALUADO: 'residuos.reclamo.evaluado',
   INTERVENCION_PROGRAMADA: 'residuos.intervencion.programada',
   INTERVENCION_COMPLETADA: 'residuos.intervencion.completada',
 } as const;

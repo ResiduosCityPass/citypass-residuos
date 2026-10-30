@@ -100,6 +100,7 @@ describe('IntegracionService (CU-INT-01)', () => {
       zonas,
       { ejecutar: <T>(b: () => Promise<T>) => b() } as unknown as ContextoTransaccional,
       new ConfigService({}),
+      undefined,
       intervenciones as unknown as IntervencionesService,
     );
   });

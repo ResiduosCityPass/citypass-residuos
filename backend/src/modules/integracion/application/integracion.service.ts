@@ -11,6 +11,7 @@ import {
 import { ZonasService } from '../../zonas/application/zonas.service';
 import { INTEGRACION_REPOSITORY, IntegracionRepository } from '../domain/integracion.repository';
 import { IntervencionesService } from './intervenciones.service';
+import { ReclamosService } from './reclamos.service';
 
 /** Sobre con el que el gateway del Squad 1 entrega cada evento por webhook. */
 export interface SobreGateway {
@@ -61,6 +62,7 @@ function estadoDe(data: Record<string, unknown>): string {
  *   EmergenciaActualizada      -> al terminar la emergencia se desbloquean
  *   EmergenciaEstadoActualizado-> igual: es como la publica Emergencias de verdad
  *   EmergenciaCerrada          -> igual, y si trae causa RESIDUOS, intervencion
+ *   Reclamos (CU-INT-02)       -> ver ReclamosService
  *
  * Todo corre en una transaccion: si algo falla tampoco queda registrado el
  * eventId, el webhook responde error y el dispatcher del Squad 1 reintenta.
@@ -83,7 +85,9 @@ export class IntegracionService {
     private readonly zonas: ZonasService,
     private readonly transaccion: ContextoTransaccional,
     config: ConfigService,
-    // Opcional y al final para no romper los specs que arman este servicio a mano.
+    // Opcionales y al final, para no romper los specs que arman este servicio a mano.
+    @Optional()
+    private readonly reclamos?: ReclamosService,
     @Optional() private readonly intervenciones?: IntervencionesService,
   ) {
     this.radioMetros = Number(config.get('INTEGRACION_RADIO_METROS', 300));
@@ -143,6 +147,9 @@ export class IntegracionService {
           return 'procesado';
         }
         default:
+          if (await this.reclamos?.procesar(eventType, data)) {
+            return 'procesado';
+          }
           this.logger.log(`Tipo de evento sin manejo en Residuos: ${eventType}`);
           return 'ignorado';
       }
