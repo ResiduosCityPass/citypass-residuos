@@ -295,3 +295,10 @@ Mientras espero el cliente del Login, adelanté el paso 6: el guion de mi parte 
 - **Lo revisé y lo aprobé.** Ahora está en `APPROVED` y listo para mergear. Después siguen el #54, el #55 y el #58.
 - **Lo que me toca:** el #53 toca los mismos archivos del módulo `integracion` que mi #57 (`integracion.module.ts`, `integracion.repository.ts` y el repositorio TypeORM). Cuando entre, actualizo mi rama. Los conflictos son chicos: los dos suman elementos a las mismas listas.
 - **Para aclarar con Fran:** su documento (`integracion-reclamos-backend.md`, sección 4) me pone como responsable del front del chofer y del operador para su caso de Reclamos.
+
+## Vie 30/10 · Se mergeó el #53 y aprobé el #54 de Fran
+
+- **El #53 ya está en `develop`.** Fran pasó el #54 a `develop` y pidió otra aprobación.
+- **Qué hace el #54:** el ruteo saltea los contenedores tapados por un auto, aunque estén reforzados. Además, el sistema puede omitir una parada sin sesión de chofer. El endpoint del chofer queda igual.
+- **Lo revisé y lo aprobé.** CI y Sonar en verde. No choca con mi #57 en `rutas`: el único conflicto sigue siendo `integracion.module.ts`.
+- **Le dejé una observación que no bloquea:** si el sistema omite una parada de una ruta `ASIGNADA` y quedan otras pendientes, la ruta pasa a `EN_CURSO` aunque el chofer no haya arrancado. Hoy solo cambia lo que se ve en pantalla.
