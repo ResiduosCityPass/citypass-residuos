@@ -234,7 +234,8 @@ export class ParadasService {
       }
 
       validarAbierta(parada);
-      return this.cerrarComoOmitida(parada, ruta, motivo, ruta.choferId ?? 'sistema');
+      // El sistema no arranca la ruta: si el chofer no salio, sigue ASIGNADA.
+      return this.cerrarComoOmitida(parada, ruta, motivo, ruta.choferId ?? 'sistema', false);
     };
 
     return this.transaccion.managerActual() ? omitir() : this.transaccion.ejecutar(omitir);
@@ -347,6 +348,7 @@ export class ParadasService {
     ruta: Ruta,
     motivo: string,
     choferPorDefecto: string,
+    arrancaLaRuta = true,
   ): Promise<ResultadoOmision> {
     const contenedor = await this.contenedores.buscarPorId(parada.contenedorId);
 
@@ -364,7 +366,7 @@ export class ParadasService {
     parada.motivo = motivo;
     await this.paradas.guardar(parada);
 
-    const estadoRuta = await this.avanzarRuta(parada.rutaId);
+    const estadoRuta = await this.avanzarRuta(parada.rutaId, arrancaLaRuta);
 
     await this.eventos.publish(
       buildEvent(
@@ -446,7 +448,7 @@ export class ParadasService {
    * camion. Sin esto, un camion quedaria EN_RUTA para siempre y no se podria
    * volver a usar: es la trampa que CU-03 evita del otro lado.
    */
-  private async avanzarRuta(rutaId: string): Promise<EstadoRuta> {
+  private async avanzarRuta(rutaId: string, arranca = true): Promise<EstadoRuta> {
     const ruta = await this.rutas.buscarPorId(rutaId);
 
     if (!ruta) {
@@ -460,7 +462,7 @@ export class ParadasService {
     const quedanPendientes = paradas.some((p) => p.estado === EstadoParada.PENDIENTE);
 
     if (quedanPendientes) {
-      if (ruta.estado === EstadoRuta.ASIGNADA) {
+      if (arranca && ruta.estado === EstadoRuta.ASIGNADA) {
         ruta.estado = EstadoRuta.EN_CURSO;
         await this.rutas.guardar(ruta);
       }

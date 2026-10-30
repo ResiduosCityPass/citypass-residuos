@@ -406,6 +406,16 @@ describe('ParadasService (CU-10)', () => {
       );
     });
 
+    it('no arranca la ruta: si el chofer no salio, sigue ASIGNADA', async () => {
+      const otra = { ...parada, id: 'pd-2', estado: EstadoParada.PENDIENTE } as Parada;
+      paradas.listarDeRuta.mockResolvedValue([parada, otra]);
+
+      const resultado = await sistema.omitirPorSistema('pd-1', MOTIVO_RECLAMO);
+
+      expect(resultado.rutaEstado).toBe(EstadoRuta.ASIGNADA);
+      expect(rutas.guardar).not.toHaveBeenCalled();
+    });
+
     it('se suma a la transaccion en curso en vez de abrir otra', async () => {
       transaccion.managerActual.mockReturnValue({});
 
