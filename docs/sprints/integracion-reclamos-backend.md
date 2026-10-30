@@ -2,7 +2,7 @@
 
 > **Responsable:** Francisco (backend) · **Branch:** `feat/CU-INT-02-reclamo-obstruccion`
 > **Caso de uso integrador:** *"Reclamo ciudadano que desencadena una intervención urbana"*
-> **Estado:** pasos 1 a 4 hechos (tabla, exclusión del ruteo, omisión por sistema y recálculo de rutas). Falta recibir el evento (paso 5).
+> **Estado:** pasos 1 a 7 hechos. Falta que el Squad 1 registre `ReclamoEvaluado` en su catálogo y cerrar el contrato con Reclamos (sección 5).
 
 Este documento separa **qué hago yo** de qué hace cada uno, para que no nos pisemos. Si algo de
 acá te toca y no estás de acuerdo, avisame antes de arrancar.
@@ -86,7 +86,11 @@ obstruidos. Va inyectado igual que `REFUERZOS_VIGENTES`, que `rutas` ya recibe d
 Un contenedor tapado queda afuera **aunque esté reforzado por un evento cultural**: el camión no
 puede llegar igual.
 
-### 3.3 Recibir el reclamo
+### 3.3 Recibir el reclamo — ✅ hecho
+
+`ReclamosService` (en `integracion/application/`) y la lectura tolerante del contrato en
+`integracion/domain/reglas/contrato-reclamos.ts`. `IntegracionService.procesar` lo llama desde el
+`default` del switch: si no es un reclamo útil, el evento queda `ignorado` como antes.
 
 Dos reacciones nuevas en `IntegracionService.procesar`:
 
@@ -164,8 +168,7 @@ cambiaron. Para cada ruta viva que tenga como pendiente un contenedor afectado:
     "reclamoId": "RC-123",
     "afectaRecoleccion": true,
     "contenedoresAfectados": [{ "codigo": "CT-0421", "distanciaMetros": 8.4 }],
-    "rutasRecalculadas": ["b1f0..."],
-    "bloqueadoHasta": "2026-10-21T22:00:00.000Z"
+    "rutasRecalculadas": ["b1f0..."]
   }
   ```
 
@@ -190,7 +193,17 @@ cambiaron. Para cada ruta viva que tenga como pendiente un contenedor afectado:
 - **`residuos.parada.omitida`** (ya existe): por cada parada omitida en una ruta en curso. Lo
   consume Analítica (Squad 8), así que las omisiones por reclamo entran en sus métricas.
 
-Los tres salen por el outbox, que con `EVENT_BUS_DRIVER=platform` ya publica al bus real.
+Los tres pasan por el outbox, pero **solo sale al bus lo que traduce `traducirAGateway`**
+(`shared/events/gateway/traductor-gateway.ts`); el resto queda dentro del módulo:
+
+| Evento | ¿Sale al bus? |
+|---|---|
+| `residuos.reclamo.evaluado` | ✅ Sí, como `com.citypass.residuos.ReclamoEvaluado` |
+| `residuos.ruta.recalculada` | No: lo usa solo nuestro front, por la API |
+| `residuos.parada.omitida` | No (ya era así antes de este caso) |
+
+**Pendiente del Squad 1:** registrar `ReclamoEvaluado` en el catálogo del gateway. Mientras no
+esté, el gateway responde 404 y el evento queda `FALLIDO` en el outbox, sin romper nada más.
 
 ### 3.6 Configuración
 
@@ -243,7 +256,8 @@ frente al contenedor.
 - `backend/src/modules/rutas/application/rutas.service.ts` (`buscarCandidatos`) y
   `paradas.service.ts` (el refactor de `omitir`)
 - `backend/src/shared/domain/domain-event.ts` (`EventTypes`)
-- `backend/src/config/env.validation.ts` y `backend/.env.example`
+- `backend/.env.example` (no `env.validation.ts`: las reglas de negocio no se validan ahí)
+- `backend/src/shared/events/gateway/traductor-gateway.ts` (un `case` para `ReclamoEvaluado`)
 - `backend/src/migrations/` (una migración nueva)
 - `backend/test/helpers/app-de-prueba.ts` (la tabla nueva en el `TRUNCATE`)
 - Tests nuevos y los docs del punto 3.8
@@ -255,19 +269,23 @@ frente al contenedor.
 
 ## 5. Qué hay que cerrar con el squad de Reclamos
 
-1. **Nombre del evento de reclamo creado.** Siguiendo la convención de los otros squads
-   (`com.citypass.emergencias.EmergenciaCreada`), suponemos `com.citypass.reclamos.ReclamoCreado`.
-2. **Coordenadas** del auto en el evento (`latitud`, `longitud`, como Emergencias), no solo una
-   dirección. Sin coordenadas no podemos calcular qué contenedor está tapado.
-3. **Que filtren o nos digan la categoría**: solo nos interesan los reclamos de estacionamiento
-   indebido. Si nos mandan todos, necesitamos un campo `categoria` para ignorar el resto.
-4. **Quién avisa que el auto ya no está**, con qué evento, y que traiga el mismo `reclamoId`.
-   Lo resuelve otro squad (¿Emergencias? ¿Tránsito?), no nosotros. Si nadie avisa, el
-   vencimiento automático lo cubre, pero el bloqueo dura de más.
-5. **Que consuman `residuos.reclamo.evaluado`** si quieren saber si nos afectó.
+**Actualizado el 22/10 con el contrato de eventos que mandó Reclamos (Grupo 5):**
 
-Cada respuesta que se cierre achica las listas de la sección 3.3.
+| Tema | Lo que dijo Reclamos | Cómo quedó |
+|---|---|---|
+| Evento de alta | `com.citypass.reclamos.ReclamoCreado`, con `reclamoId`, `latitud`, `longitud` | ✅ Coincide |
+| Categoría | `TRANSITO` (también abarca otros problemas de tránsito) | ✅ Se acepta `TRANSITO` si el título o la descripción hablan de un vehículo |
+| Quién avisa la resolución | **Reclamos mismo**, en `ReclamoActualizado` con `estadoNuevo: RESUELTO` | ✅ Coincide. También se liberan los reclamos rechazados o cancelados |
+| Reclamos de `RESIDUOS` | Los abren ellos con nuestras alertas de saturación, en la ubicación del contenedor | ✅ Se ignoran: tomarlos como un auto bloquearía el contenedor que hay que vaciar |
+| `ReclamoEvaluado` | No figura entre lo que consumen | Lo consume BI para la métrica. Si Reclamos lo quiere, ya está publicado |
+| `correlationId` | Lo mandan en cada evento | ✅ Se copia en `ReclamoEvaluado`, para seguir el reclamo de punta a punta |
+| Reclasificación | `ReclamoReclasificado` implementado de su lado (24/10), falta registrarlo en el catálogo. Mandan `objetoAfectadoAnterior`/`Nuevo` y `afectaCirculacionAnterior`/`Nueva` | ✅ Ya se acepta: si pasa a ser un auto, se evalúa; si deja de serlo, se libera |
 
+Sigue pendiente:
+1. **Grupo 1:** registrar `ReclamoEvaluado` en el catálogo y suscribir nuestro webhook a
+   `ReclamoCreado`, `ReclamoActualizado` y, cuando exista, `ReclamoReclasificado`.
+2. **Avisarles a Reclamos** que Espacios publica `ActividadCreada`, no `EventoComunitarioPublicado`
+   (que es lo que ellos dicen consumir). Es un tema de Maxi y Tomás, pero conviene que se enteren.
 ---
 
 ## 6. Orden de trabajo
@@ -278,9 +296,9 @@ Cada respuesta que se cierre achica las listas de la sección 3.3.
 | 2 | Excluir obstruidos en `buscarCandidatos` + test | ✅ | 1 |
 | 3 | Refactor de `omitir` para que lo pueda llamar el sistema | ✅ | — |
 | 4 | Recalcular rutas vivas + `residuos.ruta.recalculada` + tests | ✅ | 1, 3 |
-| 5 | Los dos `case` en `IntegracionService` + `residuos.reclamo.evaluado` | | 1, 4 |
-| 6 | e2e completo por el webhook | | 5 |
-| 7 | Docs | | 5 |
+| 5 | Recibir el reclamo y el aviso de resolución + `residuos.reclamo.evaluado` | ✅ | 1, 4 |
+| 6 | e2e completo por el webhook | ✅ | 5 |
+| 7 | Docs | ✅ | 5 |
 
 Del paso 1 al 6 no dependo de nadie. Si el contrato con Reclamos cambia, lo único que se ajusta es
 la lectura del evento en el paso 5.

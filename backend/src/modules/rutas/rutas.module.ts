@@ -25,7 +25,7 @@ import { RutasController } from './rutas.controller';
     FlotaModule,
     ZonasModule,
     AlertasModule,
-    IntegracionModule,
+    forwardRef(() => IntegracionModule),
   ],
   controllers: [RutasController, ParadasController],
   providers: [

@@ -79,6 +79,10 @@ export class RutaTypeormRepository extends RepositorioTypeorm<Ruta> implements R
       .select('parada.contenedorId', 'contenedorId')
       .innerJoin('parada.ruta', 'ruta')
       .where('ruta.estado IN (:...estados)', { estados: ESTADOS_VIVOS })
+      // Solo lo que falta visitar: una parada omitida (por el chofer o por un
+      // reclamo) ya no la va a hacer nadie, y sin este filtro su contenedor
+      // quedaba afuera de toda otra ruta hasta que terminara esta.
+      .andWhere('parada.estado = :pendiente', { pendiente: EstadoParada.PENDIENTE })
       .getRawMany<{ contenedorId: string }>();
 
     return filas.map((f) => f.contenedorId);

@@ -309,7 +309,10 @@ export class ParadasService {
       pendientes.map((p) => ({ contenedorId: p.contenedorId, ...ubicacion(p) })),
     );
 
-    const ultimoOrden = Math.max(0, ...visitadas.map((p) => p.orden));
+    // Las pendientes siguen despues de todas las cerradas, omitidas incluidas:
+    // si no, una pendiente quedaba con el mismo numero que una omitida.
+    const cerradas = paradas.filter((p) => p.estado !== EstadoParada.PENDIENTE);
+    const ultimoOrden = Math.max(0, ...cerradas.map((p) => p.orden));
     for (const parada of pendientes) {
       parada.orden = ultimoOrden + nuevo.contenedorIds.indexOf(parada.contenedorId) + 1;
       await this.paradas.guardar(parada);

@@ -519,8 +519,11 @@ describe('ParadasService (CU-10)', () => {
       await sistema.quitarContenedores(['c-tapada'], MOTIVO_RECLAMO);
 
       // El camion quedo en "vaciada" (0,01): "cerca" (0,015) va antes que "lejos" (0,05).
-      expect(orden('cerca')).toBe(2);
-      expect(orden('lejos')).toBe(3);
+      // Las dos siguen despues de la omitida, que conserva su numero.
+      expect(orden('vaciada')).toBe(1);
+      expect(orden('tapada')).toBe(2);
+      expect(orden('cerca')).toBe(3);
+      expect(orden('lejos')).toBe(4);
     });
 
     it('actualiza la distancia y publica residuos.ruta.recalculada', async () => {
