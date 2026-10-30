@@ -136,7 +136,8 @@ describe('Recalculo de rutas por obstruccion (e2e)', () => {
       expect.objectContaining({ estado: EstadoParada.OMITIDA, motivo: MOTIVO }),
     );
     expect(ruta.paradas.filter((p) => p.estado === EstadoParada.PENDIENTE)).toHaveLength(2);
-    expect(ruta.estado).toBe(EstadoRuta.EN_CURSO);
+    // La omitio el sistema, no el chofer: la ruta no arranca.
+    expect(ruta.estado).toBe(EstadoRuta.ASIGNADA);
   });
 
   it('un contenedor que no esta en ninguna ruta viva no cambia nada', async () => {

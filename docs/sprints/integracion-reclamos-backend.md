@@ -132,7 +132,7 @@ cambiaron. Para cada ruta viva que tenga como pendiente un contenedor afectado:
 | Estado de la ruta | Qué pasa |
 |---|---|
 | `PROPUESTA` | Se borra la parada y se reordenan las restantes desde el depósito. Si no le queda ninguna, la propuesta pasa a `CANCELADA` |
-| `ASIGNADA` / `EN_CURSO` | La parada pasa a `OMITIDA` con el motivo del reclamo. Las pendientes se reordenan saliendo desde el último contenedor **confirmado** (o desde el depósito si no hay ninguno) |
+| `ASIGNADA` / `EN_CURSO` | La parada pasa a `OMITIDA` con el motivo del reclamo. Las pendientes se reordenan saliendo desde el último contenedor **confirmado** (o desde el depósito si no hay ninguno). La ruta no cambia de estado: una `ASIGNADA` sigue `ASIGNADA` hasta que el chofer confirme u omita algo |
 | `COMPLETADA` / `CANCELADA` | No se toca |
 
 - El contenedor **no se toca**: sigue lleno, en `CRITICO` y con su alerta abierta.
