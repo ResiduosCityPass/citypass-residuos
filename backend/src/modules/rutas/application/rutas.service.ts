@@ -17,6 +17,8 @@ import {
 import { ChoferesService } from '../../choferes/application/choferes.service';
 import { FlotaService } from '../../flota/application/flota.service';
 import {
+  OBSTRUCCION_REPOSITORY,
+  ObstruccionRepository,
   REFUERZOS_VIGENTES,
   RefuerzosVigentes,
 } from '../../integracion/domain/integracion.repository';
@@ -66,6 +68,9 @@ export class RutasService {
     @Optional()
     @Inject(REFUERZOS_VIGENTES)
     private readonly refuerzos?: RefuerzosVigentes,
+    @Optional()
+    @Inject(OBSTRUCCION_REPOSITORY)
+    private readonly obstrucciones?: Pick<ObstruccionRepository, 'contenedoresObstruidos'>,
   ) {
     this.deposito = {
       lat: Number(config.get('DEPOSITO_LAT', DEPOSITO_DEFAULT.lat)),
@@ -273,12 +278,15 @@ export class RutasService {
    * Contenedores criticos que este camion puede levantar y que todavia no
    * estan comprometidos en otra ruta viva. Se suman los de un refuerzo vigente
    * por evento cultural (CU-INT-01) aunque no esten criticos.
+   *
+   * Se descartan los tapados por un auto denunciado en un reclamo (CU-INT-02),
+   * aunque esten reforzados: el camion no puede llegar igual.
    */
   private async buscarCandidatos(
     tipoResiduo: TipoResiduo,
     zonaId?: string,
   ): Promise<CandidatoRuteo[]> {
-    const [criticos, reforzados, yaRuteados, zonas] = await Promise.all([
+    const [criticos, reforzados, yaRuteados, zonas, obstruidos] = await Promise.all([
       this.contenedores.listar({
         estado: EstadoContenedor.CRITICO,
         tipoResiduo,
@@ -288,15 +296,17 @@ export class RutasService {
       this.contenedoresReforzados(tipoResiduo, zonaId),
       this.rutas.contenedoresEnRutasVivas(),
       this.zonas.listar(),
+      this.obstrucciones?.contenedoresObstruidos(new Date()) ?? [],
     ]);
 
     const porId = new Map([...criticos, ...reforzados].map((c) => [c.id, c]));
     const contenedores = [...porId.values()];
     const comprometidos = new Set(yaRuteados);
     const bloqueadas = new Set(zonas.filter((z) => z.bloqueada).map((z) => z.id));
+    const tapados = new Set(obstruidos);
 
     return contenedores
-      .filter((c) => !comprometidos.has(c.id) && !bloqueadas.has(c.zonaId))
+      .filter((c) => !comprometidos.has(c.id) && !bloqueadas.has(c.zonaId) && !tapados.has(c.id))
       .map((c) => ({
         contenedorId: c.id,
         lat: c.lat,
