@@ -78,7 +78,8 @@ export function interpretarReclamo(
   data: Record<string, unknown>,
 ): ReclamoInterpretado | null {
   const nombre = eventType.slice(eventType.lastIndexOf('.') + 1);
-  const reclamoId = idDelReclamo(data);
+  const deReclamos = eventType.startsWith(PREFIJO_RECLAMOS);
+  const reclamoId = idDelReclamo(data, deReclamos);
 
   if (!reclamoId) {
     return null;
@@ -88,7 +89,7 @@ export function interpretarReclamo(
     return { tipo: 'resuelto', reclamoId };
   }
 
-  if (!eventType.startsWith(PREFIJO_RECLAMOS)) {
+  if (!deReclamos) {
     return null;
   }
 
@@ -143,8 +144,12 @@ function correlationDe(data: Record<string, unknown>): string | null {
   return valor.length > 0 && valor.length <= LARGO_MAXIMO_CORRELATION_ID ? valor : null;
 }
 
-function idDelReclamo(data: Record<string, unknown>): string | null {
-  const valor = data.reclamoId ?? data.idReclamo ?? data.id;
+/**
+ * `id` a secas solo vale si el evento es de Reclamos: en el de otro modulo es el
+ * id de otra cosa (una emergencia, un corte) y podria coincidir con un reclamo.
+ */
+function idDelReclamo(data: Record<string, unknown>, deReclamos: boolean): string | null {
+  const valor = data.reclamoId ?? data.idReclamo ?? (deReclamos ? data.id : undefined);
 
   if (typeof valor === 'number' && Number.isFinite(valor)) {
     return String(valor);

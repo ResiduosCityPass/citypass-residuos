@@ -71,6 +71,17 @@ describe('interpretarReclamo (CU-INT-02)', () => {
       });
     });
 
+    it('el id a secas solo vale en un evento de Reclamos', () => {
+      expect(interpretarReclamo('com.citypass.reclamos.ReclamoResuelto', { id: 'RC-1' })).toEqual({
+        tipo: 'resuelto',
+        reclamoId: 'RC-1',
+      });
+      // En otro modulo, `id` es el de su propia entidad, no el de un reclamo.
+      expect(
+        interpretarReclamo('com.citypass.emergencias.IntervencionFinalizada', { id: 'RC-1' }),
+      ).toBeNull();
+    });
+
     it('un ReclamoActualizado cuenta como resolucion solo si quedo resuelto', () => {
       const actualizado = 'com.citypass.reclamos.ReclamoActualizado';
 
