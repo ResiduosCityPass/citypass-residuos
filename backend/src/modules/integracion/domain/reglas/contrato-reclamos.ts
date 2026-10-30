@@ -57,10 +57,11 @@ const CATEGORIAS_DE_ESTACIONAMIENTO = ['estacion', 'vehiculo', 'ciclovia', 'bici
 /**
  * La categoria real de Reclamos para un auto mal estacionado (contrato del
  * Grupo 5, 22/10). Tambien abarca otros problemas de transito, como un semaforo
- * roto, asi que en ese caso se pide que el objeto afectado (o, si no viene, el
- * titulo o la descripcion) sea un vehiculo.
+ * roto, asi que en ese caso se pide que el objeto afectado sea la ciclovia o que
+ * el titulo o la descripcion nombren un vehiculo.
  */
 const CATEGORIA_TRANSITO = 'transito';
+const OBJETO_CICLOVIA = 'ciclovia';
 const MENCIONA_UN_VEHICULO =
   /\b(autos?|coches?|carros?|vehiculos?|estacionad[oa]s?|camionetas?|camion(es)?|utilitarios?|taxis?|remises?|motos?|ciclovias?|bicisendas?)\b/;
 
@@ -188,11 +189,12 @@ function esDeEstacionamiento(data: Record<string, unknown>): boolean {
     return false;
   }
 
-  // El objeto afectado lo clasifica Reclamos: es mas confiable que el texto del
-  // vecino, que puede decir "el coche" o no nombrar el vehiculo. Si viene, manda.
-  const objeto = textoDe(data.objetoAfectado).trim();
-  if (objeto !== '') {
-    return MENCIONA_UN_VEHICULO.test(normalizar(objeto));
+  // El objeto afectado nombra lo afectado, nunca al auto, y lo elige el vecino:
+  // un auto que tapa un contenedor puede venir como MOBILIARIO_URBANO, CALZADA o
+  // VEREDA, o sin valor (Reclamos, 30/10). Por eso nunca descarta. Solo CICLOVIA
+  // confirma por si solo: con TRANSITO es el auto arriba de la bicisenda.
+  if (normalizar(textoDe(data.objetoAfectado)).trim() === OBJETO_CICLOVIA) {
+    return true;
   }
 
   const texto = normalizar(`${textoDe(data.titulo)} ${textoDe(data.descripcion)}`).trim();

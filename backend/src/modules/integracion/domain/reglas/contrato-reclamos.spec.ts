@@ -254,7 +254,7 @@ describe('interpretarReclamo (CU-INT-02)', () => {
     });
   });
 
-  describe('objeto afectado: lo clasifica Reclamos y manda sobre el texto (24/10)', () => {
+  describe('objeto afectado: lo elige el vecino y nombra lo afectado, no al auto (30/10)', () => {
     const transito = (cambios: Record<string, unknown>) => ({
       reclamoId: 'RC-7',
       categoria: 'TRANSITO',
@@ -263,29 +263,29 @@ describe('interpretarReclamo (CU-INT-02)', () => {
       ...cambios,
     });
 
-    it('con objetoAfectado de vehiculo se procesa aunque el texto no lo nombre', () => {
+    it('CICLOVIA alcanza aunque el texto no nombre el vehiculo', () => {
       expect(
         interpretarReclamo(
           CREADO,
-          transito({ objetoAfectado: 'VEHICULO', titulo: 'No se puede pasar por la bicisenda' }),
+          transito({ objetoAfectado: 'CICLOVIA', titulo: 'No se puede pasar' }),
         )?.tipo,
       ).toBe('creado');
     });
 
-    it('con objetoAfectado que no es un vehiculo se ignora aunque el texto hable de un auto', () => {
-      expect(
-        interpretarReclamo(
-          CREADO,
-          transito({ objetoAfectado: 'SEMAFORO', titulo: 'Semaforo roto, casi me choca un auto' }),
-        ),
-      ).toBeNull();
-    });
-
-    it('reconoce valores con guion bajo, como VEHICULO_MAL_ESTACIONADO', () => {
-      expect(
-        interpretarReclamo(CREADO, transito({ objetoAfectado: 'VEHICULO_MAL_ESTACIONADO' }))?.tipo,
-      ).toBe('creado');
-    });
+    it.each(['MOBILIARIO_URBANO', 'CALZADA', 'VEREDA', 'OTRO'])(
+      'con %s no descarta: decide el texto',
+      (objetoAfectado) => {
+        expect(
+          interpretarReclamo(
+            CREADO,
+            transito({ objetoAfectado, titulo: 'Un auto tapa el contenedor' }),
+          )?.tipo,
+        ).toBe('creado');
+        expect(
+          interpretarReclamo(CREADO, transito({ objetoAfectado, titulo: 'Semaforo roto' })),
+        ).toBeNull();
+      },
+    );
 
     it('sin objeto afectado, el texto acepta otras formas de nombrar el vehiculo', () => {
       expect(
@@ -299,15 +299,15 @@ describe('interpretarReclamo (CU-INT-02)', () => {
     it('en una reclasificacion usa objetoAfectadoNuevo', () => {
       const reclasificado = (objetoAfectadoNuevo: string) =>
         interpretarReclamo('com.citypass.reclamos.ReclamoReclasificado', {
-          ...transito({}),
+          ...transito({ titulo: 'No se puede pasar' }),
           categoriaAnterior: 'TRANSITO',
           categoriaNueva: 'TRANSITO',
-          objetoAfectadoAnterior: 'SEMAFORO',
+          objetoAfectadoAnterior: 'CALZADA',
           objetoAfectadoNuevo,
         });
 
-      expect(reclasificado('VEHICULO')?.tipo).toBe('creado');
-      expect(reclasificado('BACHE')).toEqual({ tipo: 'resuelto', reclamoId: 'RC-7' });
+      expect(reclasificado('CICLOVIA')?.tipo).toBe('creado');
+      expect(reclasificado('OTRO')).toEqual({ tipo: 'resuelto', reclamoId: 'RC-7' });
     });
   });
 });
