@@ -1,4 +1,11 @@
-import { BadRequestException, Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Logger,
+  Optional,
+  forwardRef,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventTypes, buildEvent } from '../../../shared/domain/domain-event';
 import { distanciaMetros } from '../../../shared/domain/geo';
@@ -8,6 +15,7 @@ import {
   CONTENEDOR_REPOSITORY,
   ContenedorRepository,
 } from '../../contenedores/domain/contenedor.repository';
+import { CausaAfectacion, ParadasService } from '../../rutas/application/paradas.service';
 import { ZonasService } from '../../zonas/application/zonas.service';
 import { INTEGRACION_REPOSITORY, IntegracionRepository } from '../domain/integracion.repository';
 import { ReclamosService } from './reclamos.service';
@@ -31,8 +39,9 @@ const EMERGENCIA_TERMINADA = new Set(['RESUELTA', 'CERRADA', 'DESCARTADA', 'CANC
  *
  *   EventoComunitarioPublicado -> refuerzo de recoleccion cerca del espacio
  *   EventoCancelado            -> se cancela el refuerzo
- *   EmergenciaCreada           -> se bloquean para el ruteo las zonas afectadas
- *   EmergenciaActualizada      -> al terminar la emergencia se desbloquean
+ *   EmergenciaCreada           -> se bloquean para el ruteo las zonas afectadas y
+ *                                 se sacan los contenedores cercanos de las rutas vivas
+ *   EmergenciaActualizada     -> al terminar la emergencia se desbloquean
  *   Reclamos (CU-INT-02)       -> ver ReclamosService
  *
  * Todo corre en una transaccion: si algo falla tampoco queda registrado el
@@ -59,6 +68,10 @@ export class IntegracionService {
     // Opcional para que los tests de CU-INT-01 no tengan que armarlo.
     @Optional()
     private readonly reclamos?: ReclamosService,
+    // forwardRef: rutas ya depende de integracion por los refuerzos y las obstrucciones.
+    @Optional()
+    @Inject(forwardRef(() => ParadasService))
+    private readonly paradas?: Pick<ParadasService, 'quitarContenedores'>,
   ) {
     this.radioMetros = Number(config.get('INTEGRACION_RADIO_METROS', 300));
     this.cupoMinimoRefuerzo = Number(config.get('INTEGRACION_CUPO_MINIMO_REFUERZO', 100));
@@ -143,7 +156,13 @@ export class IntegracionService {
     );
   }
 
-  /** Bloquea para el ruteo las zonas de los contenedores cercanos a la emergencia. */
+  /**
+   * Bloquea para el ruteo las zonas de los contenedores cercanos a la emergencia
+   * y saca esos contenedores de las rutas vivas: el bloqueo solo frena las rutas
+   * que se generen despues, y la cuadrilla afectada es la que ya esta en la calle.
+   * De las rutas salen solo los cercanos y no toda la zona: una parada a varias
+   * cuadras del corte se puede seguir haciendo.
+   */
   private async bloquearZonas(data: Record<string, unknown>): Promise<void> {
     const punto = coordenadas(data);
 
@@ -155,7 +174,8 @@ export class IntegracionService {
     // Se anotan todas las zonas afectadas, esten o no bloqueadas ya: dos
     // emergencias en la misma zona la comparten, y el bloqueo de un operador
     // se guarda aparte en la zona (`bloqueoManual`), asi que no se pierde.
-    const afectadas = [...new Set((await this.contenedoresCerca(punto)).map((c) => c.zonaId))];
+    const cercanos = await this.contenedoresCerca(punto);
+    const afectadas = [...new Set(cercanos.map((c) => c.zonaId))];
     if (afectadas.length === 0) {
       return;
     }
@@ -164,11 +184,20 @@ export class IntegracionService {
       await this.zonas.cambiarBloqueoPorIncidente(zonaId, true);
     }
 
+    const emergenciaId = texto(data, 'emergenciaId');
+
     await this.integracion.guardarBloqueo({
-      emergenciaId: texto(data, 'emergenciaId'),
+      emergenciaId,
       zonaIds: afectadas,
       activo: true,
     });
+
+    await this.paradas?.quitarContenedores(
+      cercanos.map((c) => c.id),
+      `Zona bloqueada por la emergencia ${emergenciaId}`,
+      undefined,
+      causaDeLaEmergencia(data, emergenciaId),
+    );
   }
 
   private async desbloquearSiTermino(data: Record<string, unknown>): Promise<void> {
@@ -212,6 +241,22 @@ function texto(data: Record<string, unknown>, campo: string): string {
     });
   }
   return valor;
+}
+
+/**
+ * El contrato pide los dos campos juntos: `causaTipo` es null si y solo si
+ * `causaId` es null. Analitica no infiere causas, asi que una emergencia sin
+ * causa corta el camino igual, pero no suma a ninguna metrica por causa.
+ */
+function causaDeLaEmergencia(data: Record<string, unknown>, emergenciaId: string): CausaAfectacion {
+  const { causaId, causaTipo, correlationId } = data;
+  const completa = typeof causaId === 'string' && typeof causaTipo === 'string';
+
+  return {
+    causaId: completa ? causaId : null,
+    causaTipo: completa ? causaTipo : null,
+    correlationId: typeof correlationId === 'string' ? correlationId : emergenciaId,
+  };
 }
 
 function coordenadas(data: Record<string, unknown>): { lat: number; lng: number } | null {

@@ -1,6 +1,8 @@
 import * as request from 'supertest';
 import { ParadasService } from '../src/modules/rutas/application/paradas.service';
+import { EventTypes } from '../src/shared/domain/domain-event';
 import { EstadoParada, EstadoRuta, Rol, TipoResiduo } from '../src/shared/domain/enums';
+import { EventoPendiente } from '../src/shared/events/outbox/evento-pendiente.entity';
 import { AppDePrueba, crearAppDePrueba } from './helpers/app-de-prueba';
 
 /**
@@ -198,6 +200,55 @@ describe('Recalculo de rutas por obstruccion (e2e)', () => {
         expect.objectContaining({
           estado: EstadoParada.OMITIDA,
           motivo: 'Acceso bloqueado por vehiculo (reclamo RC-E2E)',
+        }),
+      );
+    });
+
+    it('una emergencia que corta el camino afecta a la cuadrilla, una sola vez (CU-INT-01)', async () => {
+      const { rutaId, contenedorIds } = await propuestaConTresParadas();
+      const [primero, segundo, tercero] = contenedorIds;
+      const chofer = await http
+        .post('/api/v1/choferes')
+        .set(auth(admin))
+        .send({ nombre: 'Juana Perez', legajo: `CH-${Date.now().toString().slice(-8)}` })
+        .expect(201);
+      await http
+        .patch(`/api/v1/rutas/${rutaId}/asignar`)
+        .set(auth(admin))
+        .send({ choferId: chofer.body.id })
+        .expect(200);
+
+      // A ~170 m del tercero y a mas de 300 m del segundo.
+      const incidente = () =>
+        enviar('ev-emergencia-1', 'com.citypass.emergencias.EmergenciaCreada', {
+          emergenciaId: 'EM-E2E',
+          latitud: DEPOSITO.lat - 0.0075,
+          longitud: DEPOSITO.lng,
+          afectaCirculacion: true,
+          causaId: 'IN-E2E',
+          causaTipo: 'INCIDENTE_VIAL',
+          correlationId: 'c-e2e',
+        });
+      await incidente();
+      await incidente();
+
+      const ruta = await detalle(rutaId);
+      const estadoDe = (id: string) => ruta.paradas.find((p) => p.contenedorId === id)?.estado;
+      expect(estadoDe(primero)).toBe(EstadoParada.PENDIENTE);
+      expect(estadoDe(segundo)).toBe(EstadoParada.PENDIENTE);
+      expect(estadoDe(tercero)).toBe(EstadoParada.OMITIDA);
+
+      const eventos = await ctx.dataSource
+        .getRepository(EventoPendiente)
+        .findBy({ eventType: EventTypes.INTERVENCION_ACTUALIZADA });
+      expect(eventos).toHaveLength(1);
+      expect(eventos[0].sobre.correlationId).toBe('c-e2e');
+      expect(eventos[0].sobre.payload).toEqual(
+        expect.objectContaining({
+          estadoNuevo: 'AFECTADA',
+          causaId: 'IN-E2E',
+          causaTipo: 'INCIDENTE_VIAL',
+          camionId: expect.stringMatching(/^AB\d{3}CD$/),
         }),
       );
     });
