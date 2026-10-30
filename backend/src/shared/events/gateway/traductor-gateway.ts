@@ -103,9 +103,10 @@ export function traducirAGateway(evento: DomainEvent): EventoGateway | null {
           contenedorId: p.contenedorId ?? null,
           latitud: ubicacion(p).lat,
           longitud: ubicacion(p).lng,
-          programadaEn: p.programadaEn,
+          // Epoch en milisegundos, que es lo que lee Analitica.
+          programadaEn: Date.parse(String(p.programadaEn)),
           correlationId,
-          occurredAt: evento.occurredAt,
+          occurredAt: Date.parse(evento.occurredAt),
         },
       };
 

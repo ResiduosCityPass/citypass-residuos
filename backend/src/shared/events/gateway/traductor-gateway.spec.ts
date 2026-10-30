@@ -25,9 +25,9 @@ describe('traducirAGateway (CU-INT-01)', () => {
         contenedorId: 'ct-1',
         latitud: ubicacion.lat,
         longitud: ubicacion.lng,
-        programadaEn: '2026-11-01T15:00:00.000Z',
+        programadaEn: Date.parse('2026-11-01T15:00:00.000Z'),
         correlationId: 'EMG-1',
-        occurredAt: evento.occurredAt,
+        occurredAt: Date.parse(evento.occurredAt),
       },
     });
   });

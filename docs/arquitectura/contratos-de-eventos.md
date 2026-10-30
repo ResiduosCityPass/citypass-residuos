@@ -138,12 +138,13 @@ Se emite cuando Emergencias resuelve un incidente y **`causasRelacionadas` inclu
   "contenedorId": "ct-01",
   "latitud": -34.6037,
   "longitud": -58.3816,
-  "programadaEn": "2026-10-08T19:05:21.000Z",
-  "correlationId": "EMG-20261008-0091"
+  "programadaEn": 1791486321000,
+  "correlationId": "EMG-20261008-0091",
+  "occurredAt": 1791486321000
 }
 ```
 
-`contenedorId` es `null` si no había ningún contenedor a menos de 50 m (radio configurable con
+`programadaEn` y `occurredAt` van en **epoch milisegundos** (lo que lee Analítica). `contenedorId` es `null` si no había ningún contenedor a menos de 50 m (radio configurable con
 `INTEGRACION_RADIO_INTERVENCION_METROS`): la intervención se programa igual. Si había uno, además
 se crea un refuerzo interno para que entre en la próxima ruta. **No se publica `RefuerzoProgramado`**: ese evento alimenta el dashboard de eventos de Analítica y un refuerzo por emergencia no es de ningún evento comunitario.
 
