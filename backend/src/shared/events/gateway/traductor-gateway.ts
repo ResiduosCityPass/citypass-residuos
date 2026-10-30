@@ -22,6 +22,7 @@ const ubicacion = (payload: Payload): { lat: number; lng: number } =>
  *   residuos.contenedor.vaciado   -> RecoleccionCompletada
  *   residuos.refuerzo.programado  -> RefuerzoProgramado
  *   residuos.intervencion.programada -> IntervencionProgramada
+ *   residuos.intervencion.completada -> IntervencionCompletada
  *
  * Los eventos sin consumidores fuera del modulo (ruta generada, asignada, parada
  * omitida) devuelven null: no salen del modulo.
@@ -105,6 +106,18 @@ export function traducirAGateway(evento: DomainEvent): EventoGateway | null {
           longitud: ubicacion(p).lng,
           // Epoch en milisegundos, que es lo que lee Analitica.
           programadaEn: Date.parse(String(p.programadaEn)),
+          correlationId,
+          occurredAt: Date.parse(evento.occurredAt),
+        },
+      };
+
+    case EventTypes.INTERVENCION_COMPLETADA:
+      return {
+        tipo: 'IntervencionCompletada',
+        datos: {
+          intervencionId: p.intervencionId,
+          emergenciaId: p.emergenciaId,
+          completadaEn: Date.parse(String(p.completadaEn)),
           correlationId,
           occurredAt: Date.parse(evento.occurredAt),
         },

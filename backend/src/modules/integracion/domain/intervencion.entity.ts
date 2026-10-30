@@ -3,6 +3,7 @@ import { columnaNumerica } from '../../../shared/persistence/columna-numerica';
 
 export enum EstadoIntervencion {
   PROGRAMADA = 'PROGRAMADA',
+  COMPLETADA = 'COMPLETADA',
 }
 
 /**
@@ -42,6 +43,10 @@ export class Intervencion {
 
   @Column({ type: 'timestamptz' })
   programadaEn!: Date;
+
+  /** Cuando el operador marco que la cuadrilla ya intervino. */
+  @Column({ type: 'timestamptz', nullable: true })
+  completadaEn!: Date | null;
 
   @CreateDateColumn({ type: 'timestamptz' })
   creadaEn!: Date;

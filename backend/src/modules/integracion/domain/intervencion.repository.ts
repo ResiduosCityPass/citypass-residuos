@@ -5,6 +5,7 @@ export interface IntervencionRepository {
   crearSiNoExiste(intervencion: Partial<Intervencion>): Promise<Intervencion | null>;
   listar(): Promise<Intervencion[]>;
   buscar(id: string): Promise<Intervencion | null>;
+  guardar(intervencion: Intervencion): Promise<Intervencion>;
 }
 
 export const INTERVENCION_REPOSITORY = Symbol('INTERVENCION_REPOSITORY');

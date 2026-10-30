@@ -1,11 +1,12 @@
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventTypes } from '../../../shared/domain/domain-event';
 import { InMemoryEventPublisher } from '../../../shared/events/in-memory.event-publisher';
 import { Contenedor } from '../../contenedores/domain/contenedor.entity';
 import { ContenedorRepository } from '../../contenedores/domain/contenedor.repository';
 import { IntegracionRepository } from '../domain/integracion.repository';
-import { Intervencion } from '../domain/intervencion.entity';
+import { ContextoTransaccional } from '../../../shared/persistence/contexto-transaccional';
+import { EstadoIntervencion, Intervencion } from '../domain/intervencion.entity';
 import { IntervencionRepository } from '../domain/intervencion.repository';
 import { IntervencionesService } from './intervenciones.service';
 
@@ -38,6 +39,7 @@ describe('IntervencionesService (CU-01, A7)', () => {
         .mockImplementation(async (i: Partial<Intervencion>) => ({ id: 'in-1', ...i })),
       listar: jest.fn(),
       buscar: jest.fn(),
+      guardar: jest.fn().mockImplementation(async (i: Intervencion) => i),
     };
     integracion = { guardarRefuerzo: jest.fn().mockImplementation(async (r) => r) };
     contenedores = { listar: jest.fn().mockResolvedValue([LEJOS, A_80M, MUY_CERCA]) };
@@ -49,6 +51,7 @@ describe('IntervencionesService (CU-01, A7)', () => {
       contenedores as unknown as ContenedorRepository,
       eventos,
       new ConfigService({}),
+      { ejecutar: <T>(b: () => Promise<T>) => b() } as unknown as ContextoTransaccional,
     );
   });
 
@@ -160,5 +163,43 @@ describe('IntervencionesService (CU-01, A7)', () => {
     repo.listar.mockResolvedValue([{ id: 'in-1' } as Intervencion]);
 
     await expect(service.listar()).resolves.toEqual([{ id: 'in-1' }]);
+  });
+
+  describe('completar', () => {
+    const programada = () =>
+      ({
+        id: 'in-1',
+        emergenciaId: 'EMG-1',
+        estado: EstadoIntervencion.PROGRAMADA,
+        completadaEn: null,
+      }) as Intervencion;
+
+    it('pasa a COMPLETADA, guarda la fecha y publica el evento con el correlationId', async () => {
+      repo.buscar.mockResolvedValue(programada());
+
+      const resultado = await service.completar('in-1');
+
+      expect(resultado.estado).toBe(EstadoIntervencion.COMPLETADA);
+      expect(resultado.completadaEn).toBeInstanceOf(Date);
+      const [evento] = eventos.getPublished(EventTypes.INTERVENCION_COMPLETADA);
+      expect(evento.correlationId).toBe('EMG-1');
+      expect(evento.payload).toMatchObject({ intervencionId: 'in-1', emergenciaId: 'EMG-1' });
+    });
+
+    it('una intervencion ya completada da 409 y no vuelve a publicar', async () => {
+      repo.buscar.mockResolvedValue({
+        ...programada(),
+        estado: EstadoIntervencion.COMPLETADA,
+      } as Intervencion);
+
+      await expect(service.completar('in-1')).rejects.toBeInstanceOf(ConflictException);
+      expect(eventos.getPublished()).toHaveLength(0);
+    });
+
+    it('una intervencion que no existe da 404', async () => {
+      repo.buscar.mockResolvedValue(null);
+
+      await expect(service.completar('x')).rejects.toBeInstanceOf(NotFoundException);
+    });
   });
 });

@@ -329,12 +329,12 @@ export const INTERVENTIONS = [
   {
     id: 'a3f1c2d4-7b5e-4a90-8c11-2e6d9f0b7a15', emergenciaId: 'EMG-20261008-0091',
     lat: -34.6045, lng: -58.3801, contenedorId: 'ct-01', distanciaMetros: 12,
-    estado: 'PROGRAMADA', programadaEn: minutesAgo(35), creadaEn: minutesAgo(35),
+    estado: 'PROGRAMADA', programadaEn: minutesAgo(35), completadaEn: null, creadaEn: minutesAgo(35),
   },
   {
     // Basura suelta en la calzada: no habia ningun contenedor a menos de 50 m.
     id: 'd8e2b7a1-3c64-4f59-9a07-5b1c8e4d2f60', emergenciaId: 'EMG-20261007-0044',
     lat: -34.5811, lng: -58.421, contenedorId: null, distanciaMetros: null,
-    estado: 'PROGRAMADA', programadaEn: hoursAgo(20), creadaEn: hoursAgo(20),
+    estado: 'COMPLETADA', programadaEn: hoursAgo(20), completadaEn: hoursAgo(15), creadaEn: hoursAgo(20),
   },
 ];

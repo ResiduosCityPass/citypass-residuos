@@ -255,6 +255,26 @@ describe('IntegracionService (CU-INT-01)', () => {
         ...cambios,
       });
 
+    it('acepta tambien los nombres sin prefijo que usa el CU-01', async () => {
+      for (const [tipo, eventId] of [
+        ['emergencia.resuelta', 'ev-cu1'],
+        ['emergencia.estado.actualizado', 'ev-cu2'],
+      ]) {
+        intervenciones.programarSiCorresponde.mockClear();
+        await service.procesar({
+          metadata: { eventId, eventType: tipo },
+          data: {
+            emergenciaId: 'EMG-1',
+            estado: 'RESUELTA',
+            causasRelacionadas: ['RESIDUOS'],
+            ubicacion: PLAZA_ITALIA,
+          },
+        });
+
+        expect(intervenciones.programarSiCorresponde).toHaveBeenCalledTimes(1);
+      }
+    });
+
     it.each([
       'EmergenciaActualizada',
       'EmergenciaEstadoActualizado',

@@ -152,6 +152,22 @@ se crea un refuerzo interno para que entre en la próxima ruta. **No se publica 
 
 **Consumidores esperados:** EDA (Squad 1) para verificar el flujo; Analítica Urbana (Squad 8), que solo lee eventos y arma gráficos, no publica nada.
 
+### `residuos.intervencion.completada` — CU-01 de Emergencias (A7)
+
+Se emite cuando el operador marca la intervención como completada (`PATCH /intervenciones/:id/completar`). Está en el catálogo del CU-01 (versión del 29/10). Sale al bus como `IntervencionCompletada`; esquema en [`schemas/IntervencionCompletada.avsc`](schemas/IntervencionCompletada.avsc).
+
+```json
+{
+  "intervencionId": "a3f1c2d4-7b5e-4a90-8c11-2e6d9f0b7a15",
+  "emergenciaId": "EMG-20261008-0091",
+  "completadaEn": 1791489600000,
+  "correlationId": "EMG-20261008-0091",
+  "occurredAt": 1791489600000
+}
+```
+
+Una intervención completada no se reabre (`409 INTERVENCION_YA_COMPLETADA`).
+
 El esquema Avro para registrarlo en la consola de EDA está en [`schemas/IntervencionProgramada.avsc`](schemas/IntervencionProgramada.avsc). **Lo registra Residuos, no EDA**; sin eso el gateway devuelve 404.
 
 ---
@@ -176,13 +192,13 @@ El esquema Avro para registrarlo en la consola de EDA está en [`schemas/Interve
 | Evento | Squad origen | Qué hacemos al recibirlo |
 |---|---|---|
 | `emergencias.incidente.creado` | 6 — Emergencias | Si el incidente ocurre dentro de una zona, marcamos la zona como bloqueada y sus contenedores quedan excluidos del ruteo de CU-08. |
-| `EmergenciaCerrada`, `EmergenciaResuelta`, y `EmergenciaEstadoActualizado` / `EmergenciaActualizada` con estado `RESUELTA` o `CERRADA` | 6 — Emergencias | Además de desbloquear las zonas, si `causasRelacionadas` incluye `RESIDUOS` programamos una intervención en `ubicacion` y publicamos `residuos.intervencion.programada`. El backend de Emergencias publica hoy `EmergenciaEstadoActualizado` y `EmergenciaCerrada`; su CU-01 documenta `emergencia.resuelta`. Se aceptan todas las variantes (el campo del estado puede llamarse `estadoNuevo`, `estado` o `nuevoEstado`). |
+| `emergencia.resuelta` (el del CU-01), `EmergenciaCerrada`, `EmergenciaResuelta`, y `EmergenciaEstadoActualizado` / `EmergenciaActualizada` con estado `RESUELTA` o `CERRADA` | 6 — Emergencias | Además de desbloquear las zonas, si `causasRelacionadas` incluye `RESIDUOS` programamos una intervención en `ubicacion` y publicamos `residuos.intervencion.programada`. El backend de Emergencias publica hoy `EmergenciaEstadoActualizado` y `EmergenciaCerrada`; su CU-01 documenta `emergencia.resuelta`. Se aceptan todas las variantes (el campo del estado puede llamarse `estadoNuevo`, `estado` o `nuevoEstado`). |
 | `movilidad.calle.cortada` | 3 — Movilidad Urbana | Se excluye el tramo del cálculo de ruta. Si la ruta ya estaba asignada, se marca para recálculo. |
 | `reclamos.creado` | 5 — Reclamos Ciudadanos | Si la categoría es residuos y referencia un contenedor nuestro, se le adjunta el reclamo y se eleva su prioridad en el ruteo. |
 
 ### Lo que necesitamos de Emergencias para el CU-01 (A7)
 
-Al 29/10 el backend de Emergencias publica `EmergenciaEstadoActualizado` y `EmergenciaCerrada`, y **ninguno trae `causasRelacionadas` ni `ubicacion`**: sin eso Residuos no puede saber si actuar ni dónde. Mínimo que pedimos, sin inventar un evento nuevo, en `EmergenciaCerrada` (o en `emergencia.resuelta`, como dice su CU-01):
+El CU-01 (versión del 29/10) define **`emergencia.resuelta`** con `causasRelacionadas` y `ubicacion`, y quitó las solicitudes con confirmación. Pero al 29/10 el backend de Emergencias publica `EmergenciaEstadoActualizado` y `EmergenciaCerrada`, y **ninguno trae `causasRelacionadas` ni `ubicacion`**: sin eso Residuos no puede saber si actuar ni dónde. Mínimo que pedimos, sin inventar un evento nuevo, en `EmergenciaCerrada` (o en `emergencia.resuelta`, como dice su CU-01):
 
 ```json
 {
@@ -192,7 +208,9 @@ Al 29/10 el backend de Emergencias publica `EmergenciaEstadoActualizado` y `Emer
 }
 ```
 
-El prototipo del caso muestra además un evento `emergencia.solicitud.residuos` con un `solicitudId`. Está sin confirmar y **no implementado**. Si es el que se usa, Residuos debería responder con ese `solicitudId`.
+El prototipo del caso mostraba un evento `emergencia.solicitud.residuos` con un `solicitudId`; la versión del 29/10 del CU-01 ya no lo menciona y se descartó.
+
+**Pendiente de decidir con Analítica y el dueño del doc:** el CU-01 dice que A7 también publica `RefuerzoProgramado`, pero Analítica (G8) dijo el 27/10 que no lo necesita (sale del mismo `contenedorId` de la intervención) y ese evento alimenta su dashboard de eventos de Espacios. Hoy **no se publica**.
 
 > Estos tres nombres son **supuestos**, derivados de la descripción de cada módulo en el enunciado.
 > Hay que confirmarlos con cada squad durante el Sprint 3, que es la instancia donde la cátedra

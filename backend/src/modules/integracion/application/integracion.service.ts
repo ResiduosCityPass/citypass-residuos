@@ -23,6 +23,13 @@ export type ResultadoProcesamiento = 'procesado' | 'duplicado' | 'ignorado';
 const ESPACIOS = 'com.citypass.espacios.';
 const EMERGENCIAS = 'com.citypass.emergencias.';
 
+/**
+ * Como figuran en el CU-01 (version del 29/10): sin prefijo y en minusculas con
+ * puntos. Emergencias todavia publica los de arriba; se aceptan los dos.
+ */
+const RESUELTA_SEGUN_CU01 = 'emergencia.resuelta';
+const ESTADO_ACTUALIZADO_SEGUN_CU01 = 'emergencia.estado.actualizado';
+
 /** Estados en los que una emergencia deja de cortar la circulacion. */
 const EMERGENCIA_TERMINADA = new Set(['RESUELTA', 'CERRADA', 'DESCARTADA', 'CANCELADA']);
 
@@ -112,7 +119,8 @@ export class IntegracionService {
           await this.bloquearZonas(data);
           return 'procesado';
         case `${EMERGENCIAS}EmergenciaActualizada`:
-        case `${EMERGENCIAS}EmergenciaEstadoActualizado`: {
+        case `${EMERGENCIAS}EmergenciaEstadoActualizado`:
+        case ESTADO_ACTUALIZADO_SEGUN_CU01: {
           const estado = estadoDe(data);
           await this.desbloquearSiTermino({ ...data, estadoNuevo: estado });
           // Cancelada o descartada no deja nada por intervenir.
@@ -124,7 +132,8 @@ export class IntegracionService {
         // Nombres de cierre sin confirmar: CU-01 documenta emergencia.resuelta y el
         // backend de Emergencias publica EmergenciaCerrada.
         case `${EMERGENCIAS}EmergenciaResuelta`:
-        case `${EMERGENCIAS}EmergenciaCerrada`: {
+        case `${EMERGENCIAS}EmergenciaCerrada`:
+        case RESUELTA_SEGUN_CU01: {
           const cerrada = eventType.endsWith('EmergenciaCerrada');
           await this.desbloquearSiTermino({
             ...data,

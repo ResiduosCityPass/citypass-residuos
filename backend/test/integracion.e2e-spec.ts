@@ -160,6 +160,23 @@ describe('Integracion CityPass+ (e2e)', () => {
       expect(await intervenciones()).toHaveLength(1);
     });
 
+    it('completar la intervencion la cierra, y una segunda vez da 409', async () => {
+      await resuelta('ev-1', ['RESIDUOS']);
+      const [creada] = await intervenciones();
+
+      const cerrada = await http
+        .patch(`/api/v1/intervenciones/${creada.id}/completar`)
+        .set(auth(admin))
+        .expect(200);
+      expect(cerrada.body).toMatchObject({ estado: 'COMPLETADA' });
+      expect(cerrada.body.completadaEn).not.toBeNull();
+
+      await http
+        .patch(`/api/v1/intervenciones/${creada.id}/completar`)
+        .set(auth(admin))
+        .expect(409);
+    });
+
     it('sin contenedores cerca la intervencion se programa igual', async () => {
       await resuelta('ev-1', ['RESIDUOS']);
 

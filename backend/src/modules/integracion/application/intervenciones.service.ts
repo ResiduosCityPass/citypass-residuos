@@ -1,14 +1,15 @@
-import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventTypes, buildEvent } from '../../../shared/domain/domain-event';
 import { distanciaMetros } from '../../../shared/domain/geo';
 import { EVENT_PUBLISHER, EventPublisher } from '../../../shared/events/event-publisher';
+import { ContextoTransaccional } from '../../../shared/persistence/contexto-transaccional';
 import {
   CONTENEDOR_REPOSITORY,
   ContenedorRepository,
 } from '../../contenedores/domain/contenedor.repository';
 import { INTEGRACION_REPOSITORY, IntegracionRepository } from '../domain/integracion.repository';
-import { Intervencion } from '../domain/intervencion.entity';
+import { EstadoIntervencion, Intervencion } from '../domain/intervencion.entity';
 import { INTERVENCION_REPOSITORY, IntervencionRepository } from '../domain/intervencion.repository';
 
 /** Causa que Emergencias marca cuando el accidente se relaciono con residuos. */
@@ -44,6 +45,7 @@ export class IntervencionesService {
     @Inject(EVENT_PUBLISHER)
     private readonly eventos: EventPublisher,
     config: ConfigService,
+    private readonly transaccion: ContextoTransaccional,
   ) {
     // Mas chico que el radio de las emergencias (300 m) a proposito: si la causa
     // es un contenedor en la ciclovia, esta a pocos metros; a 300 m agarraria
@@ -117,6 +119,42 @@ export class IntervencionesService {
       });
     }
     return intervencion;
+  }
+
+  /**
+   * El operador marca que la cuadrilla ya intervino en el lugar. Publica
+   * `residuos.intervencion.completada`, que el catalogo del caso lista como
+   * evento de Residuos.
+   */
+  async completar(id: string): Promise<Intervencion> {
+    return this.transaccion.ejecutar(async () => {
+      const intervencion = await this.obtener(id);
+
+      if (intervencion.estado === EstadoIntervencion.COMPLETADA) {
+        throw new ConflictException({
+          message: 'La intervencion ya esta completada',
+          code: 'INTERVENCION_YA_COMPLETADA',
+        });
+      }
+
+      intervencion.estado = EstadoIntervencion.COMPLETADA;
+      intervencion.completadaEn = new Date();
+      const guardada = await this.intervenciones.guardar(intervencion);
+
+      await this.eventos.publish(
+        buildEvent(
+          EventTypes.INTERVENCION_COMPLETADA,
+          {
+            intervencionId: guardada.id,
+            emergenciaId: guardada.emergenciaId,
+            completadaEn: intervencion.completadaEn.toISOString(),
+          },
+          { correlationId: guardada.emergenciaId },
+        ),
+      );
+
+      return guardada;
+    });
   }
 
   /**

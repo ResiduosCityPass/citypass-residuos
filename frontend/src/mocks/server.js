@@ -1103,6 +1103,18 @@ export function fetchNearbyContainers(filters = {}) {
   );
 }
 
+/* CU-01 de Emergencias (A7) · Completar una intervencion. */
+export function completeIntervention(id) {
+  const intervention = store.interventions.find((i) => i.id === id);
+  if (!intervention) return fail('INTERVENCION_NO_ENCONTRADA', 404, `No existe la intervencion ${id}`);
+  if (intervention.estado === 'COMPLETADA') {
+    return fail('INTERVENCION_YA_COMPLETADA', 409, 'La intervencion ya esta completada');
+  }
+  intervention.estado = 'COMPLETADA';
+  intervention.completadaEn = new Date().toISOString();
+  return respond(intervention);
+}
+
 /* CU-01 de Emergencias (A7) · Intervenciones, las mas recientes primero. */
 export function fetchInterventions() {
   return respond([...store.interventions].sort((a, b) => b.programadaEn.localeCompare(a.programadaEn)));

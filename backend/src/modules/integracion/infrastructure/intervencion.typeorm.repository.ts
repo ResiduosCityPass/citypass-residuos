@@ -44,4 +44,8 @@ export class IntervencionTypeormRepository implements IntervencionRepository {
   buscar(id: string): Promise<Intervencion | null> {
     return this.manager().getRepository(Intervencion).findOneBy({ id });
   }
+
+  guardar(intervencion: Intervencion): Promise<Intervencion> {
+    return this.manager().getRepository(Intervencion).save(intervencion);
+  }
 }

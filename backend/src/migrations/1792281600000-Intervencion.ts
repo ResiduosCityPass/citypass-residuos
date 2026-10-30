@@ -6,7 +6,7 @@ export class Intervencion1792281600000 implements MigrationInterface {
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
-      `CREATE TABLE "intervencion" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "emergenciaId" character varying(64) NOT NULL, "lat" numeric(10,7) NOT NULL, "lng" numeric(10,7) NOT NULL, "contenedorId" uuid, "distanciaMetros" integer, "estado" character varying(20) NOT NULL DEFAULT 'PROGRAMADA', "programadaEn" TIMESTAMP WITH TIME ZONE NOT NULL, "creadaEn" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_intervencion" PRIMARY KEY ("id"))`,
+      `CREATE TABLE "intervencion" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "emergenciaId" character varying(64) NOT NULL, "lat" numeric(10,7) NOT NULL, "lng" numeric(10,7) NOT NULL, "contenedorId" uuid, "distanciaMetros" integer, "estado" character varying(20) NOT NULL DEFAULT 'PROGRAMADA', "programadaEn" TIMESTAMP WITH TIME ZONE NOT NULL, "completadaEn" TIMESTAMP WITH TIME ZONE, "creadaEn" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_intervencion" PRIMARY KEY ("id"))`,
     );
     await queryRunner.query(
       `CREATE UNIQUE INDEX "IDX_intervencion_emergenciaId" ON "intervencion" ("emergenciaId") `,

@@ -32,6 +32,25 @@ describe('traducirAGateway (CU-INT-01)', () => {
     });
   });
 
+  it('la intervencion completada sale como IntervencionCompletada con fechas en ms', () => {
+    const evento = buildEvent(
+      EventTypes.INTERVENCION_COMPLETADA,
+      { intervencionId: 'in-1', emergenciaId: 'EMG-1', completadaEn: '2026-11-01T17:00:00.000Z' },
+      { correlationId: 'EMG-1' },
+    );
+
+    expect(traducirAGateway(evento)).toEqual({
+      tipo: 'IntervencionCompletada',
+      datos: {
+        intervencionId: 'in-1',
+        emergenciaId: 'EMG-1',
+        completadaEn: Date.parse('2026-11-01T17:00:00.000Z'),
+        correlationId: 'EMG-1',
+        occurredAt: Date.parse(evento.occurredAt),
+      },
+    });
+  });
+
   it('la saturacion sale como AlertaGenerada con su alertaId', () => {
     const evento = buildEvent(
       EventTypes.CONTENEDOR_CRITICO,

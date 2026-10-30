@@ -545,12 +545,14 @@ una emergencia (`EmergenciaActualizada`/`EmergenciaResuelta`). **Consume:** `GET
 - **Con contenedor cerca se crea un refuerzo**, para que la próxima ruta pase por ahí aunque no
   esté crítico. Como siempre, la ruta la sigue generando el operador. **El refuerzo no se publica**
   como `RefuerzoProgramado`: ese evento es del dashboard de eventos de Analítica.
+- **El operador la cierra con `PATCH /intervenciones/:id/completar`** (botón "Marcar completada"), y se publica `residuos.intervencion.completada`, que el CU-01 lista como evento de Residuos. No se reabre (`409 INTERVENCION_YA_COMPLETADA`).
+- **Las tarjetas de la pantalla** son el dashboard del módulo que pide el caso (intervenciones, con refuerzo, sin contenedor cerca, completadas). Salen de la misma lista, sin un segundo endpoint. Los "motivos" que muestra el prototipo no existen: ningún evento los trae.
 - **Un evento sin ubicación o mal formado se ignora y se loguea**, no se responde 400.
 - **Pendiente de confirmar con Emergencias.** Su backend publica `EmergenciaEstadoActualizado` y
   `EmergenciaCerrada`, y **ninguno trae `causasRelacionadas` ni `ubicacion`**: hasta que lo agreguen,
   la intervención no se puede disparar con sus eventos reales (sí con el simulador). Se aceptan
   todas las variantes de nombre, del campo del estado y de las coordenadas. El prototipo del caso
-  muestra otro evento, `emergencia.solicitud.residuos`, con un `solicitudId`: sin confirmar.
+  mostraba otro evento, `emergencia.solicitud.residuos`; la versión del 29/10 del CU-01 lo descartó y define `emergencia.resuelta`, que también se acepta.
 - **Para que el evento saliente llegue a EDA**, Residuos tiene que registrar `IntervencionProgramada`
   en la consola de EDA, con su esquema Avro (`docs/arquitectura/schemas/`); si no, el gateway
   responde 404 y queda `FALLIDO` en el outbox. La suscripción al evento de resolución de Emergencias

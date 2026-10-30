@@ -1,4 +1,4 @@
-import { Controller, Get, Param, ParseUUIDPipe } from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe, Patch } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../../shared/auth/roles.decorator';
 import { Rol } from '../../shared/domain/enums';
@@ -23,5 +23,12 @@ export class IntervencionesController {
   @ApiOperation({ summary: 'Detalle de una intervencion' })
   obtener(@Param('id', ParseUUIDPipe) id: string) {
     return this.intervenciones.obtener(id);
+  }
+
+  @Patch(':id/completar')
+  @Roles(Rol.ADMINISTRADOR, Rol.OPERADOR)
+  @ApiOperation({ summary: 'Marcar la intervencion como completada' })
+  completar(@Param('id', ParseUUIDPipe) id: string) {
+    return this.intervenciones.completar(id);
   }
 }

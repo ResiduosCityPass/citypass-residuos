@@ -68,6 +68,7 @@ export const resolveAlert = (...args) => source.resolveAlert(...args);
 
 /* CU-01 de Emergencias (A7) · Intervenciones */
 export const fetchInterventions = (...args) => source.fetchInterventions(...args);
+export const completeIntervention = (...args) => source.completeIntervention(...args);
 
 /* CU-10 · Confirmar vaciado */
 export const fetchMyRoute = (...args) => source.fetchMyRoute(...args);

@@ -93,6 +93,9 @@ export const fetchAlerts = (filters) => api.get('/alertas', filters);
 /** Intervenciones programadas por emergencias con causa RESIDUOS. */
 export const fetchInterventions = () => api.get('/intervenciones');
 
+/** El operador marca que la cuadrilla ya intervino. 409 INTERVENCION_YA_COMPLETADA si ya estaba. */
+export const completeIntervention = (id) => api.patch(`/intervenciones/${id}/completar`);
+
 /** Pasa la alerta a EN_ATENCION. Sin cuerpo. Falla con ALERTA_NO_ABIERTA si ya no esta ABIERTA. */
 export const acknowledgeAlert = (id) => api.patch(`/alertas/${id}/atender`);
 

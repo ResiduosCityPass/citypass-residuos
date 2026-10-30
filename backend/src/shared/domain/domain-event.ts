@@ -30,6 +30,7 @@ export const EventTypes = {
   /** CU-INT-01: refuerzo de recoleccion cerca de un evento cultural. */
   REFUERZO_PROGRAMADO: 'residuos.refuerzo.programado',
   INTERVENCION_PROGRAMADA: 'residuos.intervencion.programada',
+  INTERVENCION_COMPLETADA: 'residuos.intervencion.completada',
 } as const;
 
 export type EventType = (typeof EventTypes)[keyof typeof EventTypes];
