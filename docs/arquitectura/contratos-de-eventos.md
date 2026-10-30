@@ -210,7 +210,7 @@ El CU-01 (versión del 29/10) define **`emergencia.resuelta`** con `causasRelaci
 
 El prototipo del caso mostraba un evento `emergencia.solicitud.residuos` con un `solicitudId`; la versión del 29/10 del CU-01 ya no lo menciona y se descartó.
 
-**Pendiente de decidir con Analítica y el dueño del doc:** el CU-01 dice que A7 también publica `RefuerzoProgramado`, pero Analítica (G8) dijo el 27/10 que no lo necesita (sale del mismo `contenedorId` de la intervención) y ese evento alimenta su dashboard de eventos de Espacios. Hoy **no se publica**.
+**Decidido el 30/10 con Analítica:** `RefuerzoProgramado` **no se publica** desde la intervención. El CU-01 lo listaba para A7, pero Analítica (G8) no lo necesita —sale del mismo `contenedorId` de la intervención— y ese evento alimenta su dashboard de eventos de Espacios. Se saca del doc del caso. El refuerzo sigue existiendo como mecanismo interno de ruteo.
 
 > Estos tres nombres son **supuestos**, derivados de la descripción de cada módulo en el enunciado.
 > Hay que confirmarlos con cada squad durante el Sprint 3, que es la instancia donde la cátedra
