@@ -288,3 +288,10 @@ Mientras espero el cliente del Login, adelanté el paso 6: el guion de mi parte 
 - **Nico Hernández (Login):** se mergeó su PR. Los namespaces ya son `com.citypass.residuos` y `com.citypass.espacios`.
 - **Lo que falta para el paso 5:** que Nico me pase el `client_id` y el secreto de Residuos.
 - **PRs:** ninguno se movió. La pila de Fran (#53 → #54 → #55 → #58), mi #57 y el #60 de Adriel siguen abiertos sin aprobar. Tomás todavía no abrió su PR.
+
+## Vie 30/10 · Aprobé el #53 de Fran
+
+- **Fran** pidió una aprobación para el #53, el primero de su pila: agrega la tabla `obstruccion_por_reclamo` (qué contenedor tapó un auto, por qué reclamo y hasta cuándo), con su migración, el repositorio y tests e2e. CI y Sonar en verde.
+- **Lo revisé y lo aprobé.** Ahora está en `APPROVED` y listo para mergear. Después siguen el #54, el #55 y el #58.
+- **Lo que me toca:** el #53 toca los mismos archivos del módulo `integracion` que mi #57 (`integracion.module.ts`, `integracion.repository.ts` y el repositorio TypeORM). Cuando entre, actualizo mi rama. Los conflictos son chicos: los dos suman elementos a las mismas listas.
+- **Para aclarar con Fran:** su documento (`integracion-reclamos-backend.md`, sección 4) me pone como responsable del front del chofer y del operador para su caso de Reclamos.
