@@ -57,10 +57,11 @@ const CATEGORIAS_DE_ESTACIONAMIENTO = ['estacion', 'vehiculo', 'ciclovia', 'bici
 /**
  * La categoria real de Reclamos para un auto mal estacionado (contrato del
  * Grupo 5, 22/10). Tambien abarca otros problemas de transito, como un semaforo
- * roto, asi que en ese caso se pide que el objeto afectado (o, si no viene, el
- * titulo o la descripcion) sea un vehiculo.
+ * roto, asi que en ese caso se pide que el objeto afectado sea la ciclovia o que
+ * el titulo o la descripcion nombren un vehiculo.
  */
 const CATEGORIA_TRANSITO = 'transito';
+const OBJETO_CICLOVIA = 'ciclovia';
 const MENCIONA_UN_VEHICULO =
   /\b(autos?|coches?|carros?|vehiculos?|estacionad[oa]s?|camionetas?|camion(es)?|utilitarios?|taxis?|remises?|motos?|ciclovias?|bicisendas?)\b/;
 
@@ -78,7 +79,8 @@ export function interpretarReclamo(
   data: Record<string, unknown>,
 ): ReclamoInterpretado | null {
   const nombre = eventType.slice(eventType.lastIndexOf('.') + 1);
-  const reclamoId = idDelReclamo(data);
+  const deReclamos = eventType.startsWith(PREFIJO_RECLAMOS);
+  const reclamoId = idDelReclamo(data, deReclamos);
 
   if (!reclamoId) {
     return null;
@@ -88,7 +90,7 @@ export function interpretarReclamo(
     return { tipo: 'resuelto', reclamoId };
   }
 
-  if (!eventType.startsWith(PREFIJO_RECLAMOS)) {
+  if (!deReclamos) {
     return null;
   }
 
@@ -143,8 +145,12 @@ function correlationDe(data: Record<string, unknown>): string | null {
   return valor.length > 0 && valor.length <= LARGO_MAXIMO_CORRELATION_ID ? valor : null;
 }
 
-function idDelReclamo(data: Record<string, unknown>): string | null {
-  const valor = data.reclamoId ?? data.idReclamo ?? data.id;
+/**
+ * `id` a secas solo vale si el evento es de Reclamos: en el de otro modulo es el
+ * id de otra cosa (una emergencia, un corte) y podria coincidir con un reclamo.
+ */
+function idDelReclamo(data: Record<string, unknown>, deReclamos: boolean): string | null {
+  const valor = data.reclamoId ?? data.idReclamo ?? (deReclamos ? data.id : undefined);
 
   if (typeof valor === 'number' && Number.isFinite(valor)) {
     return String(valor);
@@ -183,11 +189,12 @@ function esDeEstacionamiento(data: Record<string, unknown>): boolean {
     return false;
   }
 
-  // El objeto afectado lo clasifica Reclamos: es mas confiable que el texto del
-  // vecino, que puede decir "el coche" o no nombrar el vehiculo. Si viene, manda.
-  const objeto = textoDe(data.objetoAfectado).trim();
-  if (objeto !== '') {
-    return MENCIONA_UN_VEHICULO.test(normalizar(objeto));
+  // El objeto afectado nombra lo afectado, nunca al auto, y lo elige el vecino:
+  // un auto que tapa un contenedor puede venir como MOBILIARIO_URBANO, CALZADA o
+  // VEREDA, o sin valor (Reclamos, 30/10). Por eso nunca descarta. Solo CICLOVIA
+  // confirma por si solo: con TRANSITO es el auto arriba de la bicisenda.
+  if (normalizar(textoDe(data.objetoAfectado)).trim() === OBJETO_CICLOVIA) {
+    return true;
   }
 
   const texto = normalizar(`${textoDe(data.titulo)} ${textoDe(data.descripcion)}`).trim();
