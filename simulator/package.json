@@ -9,6 +9,8 @@
     "start": "node simulador.js",
     "saturacion": "node simulador.js --escenario saturacion",
     "incendio": "node simulador.js --escenario incendio",
+    "actividad": "node actividad-masiva.js",
+    "bus": "node bus.js",
     "reclamo": "node reclamo.js",
     "reclamo:resuelto": "node reclamo.js resuelto"
   }

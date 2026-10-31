@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager, IsNull, LessThanOrEqual, MoreThan } from 'typeorm';
 import { ContextoTransaccional } from '../../../shared/persistence/contexto-transaccional';
+import { ActividadMasiva } from '../domain/actividad-masiva.entity';
 import { BloqueoPorIncidente } from '../domain/bloqueo-por-incidente.entity';
 import {
   IntegracionRepository,
@@ -56,6 +57,17 @@ export class IntegracionTypeormRepository
 
   bloqueosActivos(): Promise<BloqueoPorIncidente[]> {
     return this.manager().getRepository(BloqueoPorIncidente).findBy({ activo: true });
+  }
+
+  guardarActividad(actividad: Partial<ActividadMasiva>): Promise<ActividadMasiva> {
+    const repo = this.manager().getRepository(ActividadMasiva);
+    return repo.save(repo.create(actividad));
+  }
+
+  actividadesQueTerminanDespuesDe(desde: Date): Promise<ActividadMasiva[]> {
+    return this.manager()
+      .getRepository(ActividadMasiva)
+      .find({ where: { fin: MoreThan(desde) }, order: { fin: 'ASC' } });
   }
 
   vigentes(momento: Date): Promise<RefuerzoEvento[]> {

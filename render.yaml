@@ -51,6 +51,9 @@ services:
           envVarKey: RENDER_EXTERNAL_URL
       - key: EVENT_BUS_DRIVER
         value: inmemory
+      # Secreto de la URL del webhook del bus (?token=...). Se carga a mano.
+      - key: GATEWAY_WEBHOOK_TOKEN
+        sync: false
 
   - type: web
     name: citypass-residuos-frontend
