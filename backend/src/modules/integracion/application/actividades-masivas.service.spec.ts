@@ -1,4 +1,6 @@
 import { ConfigService } from '@nestjs/config';
+import { EventTypes } from '../../../shared/domain/domain-event';
+import { EventPublisher } from '../../../shared/events/event-publisher';
 import { Contenedor } from '../../contenedores/domain/contenedor.entity';
 import { ContenedorRepository } from '../../contenedores/domain/contenedor.repository';
 import { IntegracionRepository } from '../domain/integracion.repository';
@@ -35,6 +37,7 @@ describe('ActividadesMasivasService (squad 3)', () => {
     >
   >;
   let contenedores: jest.Mocked<Pick<ContenedorRepository, 'listar'>>;
+  let eventos: jest.Mocked<EventPublisher>;
   let service: ActividadesMasivasService;
 
   beforeEach(() => {
@@ -44,9 +47,11 @@ describe('ActividadesMasivasService (squad 3)', () => {
       actividadesQueTerminanDespuesDe: jest.fn().mockResolvedValue([]),
     };
     contenedores = { listar: jest.fn().mockResolvedValue([CERCA, LEJOS]) };
+    eventos = { publish: jest.fn().mockResolvedValue(undefined) };
     service = new ActividadesMasivasService(
       integracion as unknown as IntegracionRepository,
       contenedores as unknown as ContenedorRepository,
+      eventos,
       new ConfigService({}),
     );
   });
@@ -78,6 +83,24 @@ describe('ActividadesMasivasService (squad 3)', () => {
     });
   });
 
+  it('publica RefuerzoProgramado para la metrica de Analitica', async () => {
+    await service.registrar(actividad());
+
+    expect(eventos.publish).toHaveBeenCalledTimes(1);
+    expect(eventos.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: EventTypes.REFUERZO_PROGRAMADO,
+        payload: {
+          refuerzoId: 'refuerzo-act-act-1',
+          eventoId: 'act-act-1',
+          zona: '',
+          contenedores: 1,
+          programadoPara: '2026-11-01T20:00:00.000Z',
+        },
+      }),
+    );
+  });
+
   it('sin contenedores cerca guarda la actividad pero no agenda escuadrilla', async () => {
     contenedores.listar.mockResolvedValue([LEJOS]);
 
@@ -87,6 +110,7 @@ describe('ActividadesMasivasService (squad 3)', () => {
       expect.objectContaining({ contenedorIds: [] }),
     );
     expect(integracion.guardarRefuerzo).not.toHaveBeenCalled();
+    expect(eventos.publish).not.toHaveBeenCalled();
   });
 
   it('una actividad de menos de 1.000 personas no es masiva', async () => {
@@ -94,12 +118,14 @@ describe('ActividadesMasivasService (squad 3)', () => {
 
     expect(integracion.guardarActividad).not.toHaveBeenCalled();
     expect(integracion.guardarRefuerzo).not.toHaveBeenCalled();
+    expect(eventos.publish).not.toHaveBeenCalled();
   });
 
   it('una actividad cancelada no se guarda', async () => {
     await service.registrar(actividad({ estado: 'CANCELADA' }));
 
     expect(integracion.guardarActividad).not.toHaveBeenCalled();
+    expect(eventos.publish).not.toHaveBeenCalled();
   });
 
   describe('un evento mal formado se ignora sin error, para que el bus no lo reintente', () => {
@@ -117,6 +143,7 @@ describe('ActividadesMasivasService (squad 3)', () => {
 
       expect(integracion.guardarActividad).not.toHaveBeenCalled();
       expect(integracion.guardarRefuerzo).not.toHaveBeenCalled();
+      expect(eventos.publish).not.toHaveBeenCalled();
     });
   });
 

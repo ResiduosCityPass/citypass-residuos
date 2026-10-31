@@ -1,6 +1,8 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { EventTypes, buildEvent } from '../../../shared/domain/domain-event';
 import { distanciaMetros } from '../../../shared/domain/geo';
+import { EVENT_PUBLISHER, EventPublisher } from '../../../shared/events/event-publisher';
 import {
   CONTENEDOR_REPOSITORY,
   ContenedorRepository,
@@ -25,7 +27,8 @@ interface ActividadLeida {
  *   - la guarda con sus contenedores cercanos, para mostrar la zona en el mapa;
  *   - agenda la escuadrilla: desde la hora de fin y durante
  *     `INTEGRACION_HORAS_ZONA_EVENTO`, esos contenedores entran a la ruta que
- *     genera CU-08 aunque no esten criticos. Reusa el refuerzo de CU-INT-01.
+ *     genera CU-08 aunque no esten criticos. Reusa el refuerzo de CU-INT-01;
+ *   - publica `RefuerzoProgramado`, del que Analitica saca la metrica del caso.
  *
  * Lee los campos del contrato del squad (E1 en plan-squad-3.md), que es como
  * Espacios lo publica en el bus. Tiene su propio corte de capacidad, aparte del
@@ -47,6 +50,8 @@ export class ActividadesMasivasService {
     private readonly integracion: IntegracionRepository,
     @Inject(CONTENEDOR_REPOSITORY)
     private readonly contenedores: ContenedorRepository,
+    @Inject(EVENT_PUBLISHER)
+    private readonly eventos: EventPublisher,
     config: ConfigService,
   ) {
     this.radioMetros = Number(config.get('INTEGRACION_RADIO_METROS', 300));
@@ -82,15 +87,27 @@ export class ActividadesMasivasService {
     });
 
     if (contenedorIds.length > 0) {
+      // Prefijo propio: el id de Espacios podria coincidir con el de un
+      // EventoComunitarioPublicado y pisaria el refuerzo de CU-INT-01.
+      const eventoId = `act-${actividad.actividadId}`;
+
       await this.integracion.guardarRefuerzo({
-        // Prefijo propio: el id de Espacios podria coincidir con el de un
-        // EventoComunitarioPublicado y pisaria el refuerzo de CU-INT-01.
-        eventoId: `act-${actividad.actividadId}`,
+        eventoId,
         zona: null,
         contenedorIds,
         desde: actividad.fin,
         hasta: new Date(actividad.fin.getTime() + this.horasZonaEvento * 3_600_000),
       });
+
+      await this.eventos.publish(
+        buildEvent(EventTypes.REFUERZO_PROGRAMADO, {
+          refuerzoId: `refuerzo-${eventoId}`,
+          eventoId,
+          zona: '',
+          contenedores: contenedorIds.length,
+          programadoPara: actividad.fin.toISOString(),
+        }),
+      );
     }
   }
 

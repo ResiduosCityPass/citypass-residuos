@@ -181,6 +181,51 @@ Reclamos y, a la vez, el dato de la métrica para BI.
 
 ---
 
+### `residuos.refuerzo.programado` — CU-INT-01 y squad 3
+
+Se publica cuando se programa un refuerzo de recolección. En el bus sale como
+`com.citypass.residuos.RefuerzoProgramado`.
+
+```json
+{
+  "refuerzoId": "refuerzo-act-3f1c2a9e",
+  "eventoId": "act-3f1c2a9e",
+  "zona": "",
+  "contenedores": 2,
+  "programadoPara": "2026-11-01T20:00:00.000Z",
+  "occurredAt": "2026-11-01T14:30:00.000Z"
+}
+```
+
+| Campo | Para qué sirve |
+|---|---|
+| `refuerzoId` | Id del refuerzo. Clave para contar: puede repetirse en más de un evento |
+| `eventoId` | Evento que lo originó. Con el prefijo `act-` viene de una actividad masiva del squad 3 |
+| `zona` | Zona del evento. Vacía en las actividades masivas, porque `ActividadCreada` no la trae |
+| `contenedores` | Cantidad de contenedores reforzados |
+| `programadoPara` | Cuándo arranca el refuerzo. En el squad 3 es la hora de fin de la actividad |
+| `occurredAt` | Cuándo se programó, en ISO-8601 |
+
+**Consumidores esperados:** Analítica Urbana (Squad 8), para la métrica de abajo.
+
+#### Métrica para BI: actividades masivas con refuerzo (a confirmar con Analítica)
+
+```
+actividades masivas con refuerzo = refuerzoId distintos con eventoId que empieza con "act-"
+contenedores reforzados por actividad = contenedores de cada uno de esos refuerzos
+```
+
+- **Se cuenta por `refuerzoId` distinto, no por evento:** una actividad entregada de nuevo con otro
+  `eventId` publica otro `RefuerzoProgramado` con el mismo `refuerzoId`.
+- **Una actividad sin contenedores a 300 m no publica nada:** no se puede sacar un porcentaje sobre
+  el total de actividades masivas con este evento.
+
+> **Lo registra Residuos:** desde la consola del gateway, con el esquema Avro de
+> [`schemas/RefuerzoProgramado.avsc`](schemas/RefuerzoProgramado.avsc). Mientras no esté registrado,
+> el gateway responde 404 y el evento queda `FALLIDO` en el outbox.
+
+---
+
 ### `residuos.ruta.recalculada` — CU-INT-02 · solo interno
 
 No sale al bus: lo usa nuestro front, que lo ve por la API. Ver
@@ -286,7 +331,8 @@ el log.
 aviso en el log y se responde `204`. No se responde `400`, porque el bus lo reintentaría para
 siempre.
 
-**No publicamos nada en respuesta.** En el diagrama del squad, Residuos solo recibe.
+5. **Métrica:** al agendar la escuadrilla publica `residuos.refuerzo.programado`, para Analítica.
+   Es lo único que publicamos en respuesta.
 
 ## Política de errores y reintentos
 
