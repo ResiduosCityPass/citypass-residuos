@@ -10,6 +10,7 @@ import {
 } from '../../contenedores/domain/contenedor.repository';
 import { ZonasService } from '../../zonas/application/zonas.service';
 import { INTEGRACION_REPOSITORY, IntegracionRepository } from '../domain/integracion.repository';
+import { ActividadesMasivasService } from './actividades-masivas.service';
 import { ReclamosService } from './reclamos.service';
 
 /** Sobre con el que el gateway del Squad 1 entrega cada evento por webhook. */
@@ -33,6 +34,7 @@ const EMERGENCIA_TERMINADA = new Set(['RESUELTA', 'CERRADA', 'DESCARTADA', 'CANC
  *   EventoCancelado            -> se cancela el refuerzo
  *   EmergenciaCreada           -> se bloquean para el ruteo las zonas afectadas
  *   EmergenciaActualizada      -> al terminar la emergencia se desbloquean
+ *   ActividadCreada            -> zona del evento y escuadrilla (squad 3, ActividadesMasivasService)
  *   Reclamos (CU-INT-02)       -> ver ReclamosService
  *
  * Todo corre en una transaccion: si algo falla tampoco queda registrado el
@@ -56,6 +58,7 @@ export class IntegracionService {
     private readonly zonas: ZonasService,
     private readonly transaccion: ContextoTransaccional,
     config: ConfigService,
+    private readonly actividades: ActividadesMasivasService,
     // Opcional para que los tests de CU-INT-01 no tengan que armarlo.
     @Optional()
     private readonly reclamos?: ReclamosService,
@@ -94,6 +97,9 @@ export class IntegracionService {
           return 'procesado';
         case `${EMERGENCIAS}EmergenciaActualizada`:
           await this.desbloquearSiTermino(data);
+          return 'procesado';
+        case `${ESPACIOS}ActividadCreada`:
+          await this.actividades.registrar(data);
           return 'procesado';
         default:
           if (await this.reclamos?.procesar(eventType, data)) {

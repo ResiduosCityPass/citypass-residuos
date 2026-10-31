@@ -218,6 +218,76 @@ No sale al bus: lo usa nuestro front, que lo ve por la API. Ver
 > Hay que confirmarlos con cada squad durante el Sprint 3, que es la instancia donde la cátedra
 > planifica el diseño colaborativo de casos de uso transversales.
 
+### `com.citypass.espacios.ActividadCreada` — caso transversal del squad 3
+
+**Caso:** "Recolección inteligente después de un evento masivo". Termina un evento grande en una
+plaza y Residuos manda una escuadrilla a limpiar los contenedores de la zona.
+
+**Quién lo publica:** Espacios Públicos, cada vez que se crea una actividad o evento comunitario.
+Internamente lo emiten como `cultura.evento_comunitario_publicado` y, al publicarlo en el bus, lo
+mapean a este nombre y a los campos del contrato del squad (E1 en
+[plan-squad-3.md](../sprints/plan-squad-3.md)). Rodrigo lo confirmó en el grupo del squad: así
+Residuos, Reclamos, Emergencias y Movilidad consumen todos lo mismo.
+
+**Cómo llega:** por el webhook `POST /webhooks/citypass?token=...` (CU-INT-01), con el sobre del
+gateway `{ metadata: { eventId, eventType }, data }`. Se descartan repetidos por
+`metadata.eventId`.
+
+```json
+{
+  "metadata": {
+    "eventId": "7c1e...",
+    "eventType": "com.citypass.espacios.ActividadCreada"
+  },
+  "data": {
+    "correlationId": "act-3f1c2a9e-0000-4000-8000-000000000001",
+    "actividadId": "3f1c2a9e-0000-4000-8000-000000000001",
+    "titulo": "Festival de Primavera",
+    "estado": "PROGRAMADA",
+    "capacidad": 5000,
+    "fechaHoraInicio": 1793559600000,
+    "fechaHoraFinalizacion": 1793577600000,
+    "ubicacion": { "lat": -34.6037, "lng": -58.3816 },
+    "direccion": "Av. 9 de Julio 1000",
+    "espacioNombre": "Plaza de la República",
+    "actorSub": null
+  }
+}
+```
+
+| Campo | Tipo | Uso en Residuos |
+|---|---|---|
+| `actividadId` | UUID | Id de la actividad |
+| `titulo` | string | Se muestra en el mapa |
+| `capacidad` | entero | Corte de evento masivo |
+| `estado` | string | Siempre `PROGRAMADA`. Si algún día llega `CANCELADA`, se ignora |
+| `fechaHoraInicio`, `fechaHoraFinalizacion` | milisegundos (epoch, UTC) | La zona se muestra hasta 6 h después del fin; la escuadrilla arranca en el fin |
+| `ubicacion` | `{ lat, lng }`, WGS84 | Centro de la zona |
+
+`correlationId`, `direccion`, `espacioNombre` y `actorSub` vienen en el evento, pero Residuos no
+los usa. Si falta el id, la ubicación o una fecha en milisegundos, el evento se ignora y queda en
+el log.
+
+**Qué hacemos al recibirlo** (`ActividadesMasivasService`):
+
+1. Si la capacidad es menor a 1.000 personas (`INTEGRACION_CAPACIDAD_MASIVA`) o el estado es
+   `CANCELADA`, no hace nada.
+2. Busca los contenedores activos a 300 m o menos (`INTEGRACION_RADIO_METROS`) y guarda la
+   actividad en `actividad_masiva`.
+3. **Zona en el mapa:** `GET /actividades-masivas` devuelve las actividades que no terminaron o
+   que terminaron hace menos de 6 h (`INTEGRACION_HORAS_ZONA_EVENTO`). El mapa de CU-07 las dibuja
+   como un círculo, con un aviso con la hora de fin.
+4. **Escuadrilla:** si hay contenedores cerca, crea un refuerzo `act-<actividadId>` que va
+   desde `fechaHoraFinalizacion` hasta 6 h después. En esa ventana, esos contenedores entran a la ruta que
+   genera CU-08 aunque no estén críticos. El operador genera y asigna la ruta, y el chofer la
+   cierra con CU-10.
+
+**Errores:** si falta el id, las coordenadas o una fecha válida, el evento se ignora, se deja un
+aviso en el log y se responde `204`. No se responde `400`, porque el bus lo reintentaría para
+siempre.
+
+**No publicamos nada en respuesta.** En el diagrama del squad, Residuos solo recibe.
+
 ## Política de errores y reintentos
 
 - **Publicación:** implementada con outbox transaccional. El evento se escribe en la tabla

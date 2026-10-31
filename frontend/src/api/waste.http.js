@@ -38,6 +38,13 @@ import { api, apiPublic } from './client.js';
  */
 export const fetchMapContainers = (filters) => api.get('/mapa/contenedores', filters);
 
+/**
+ * Squad 3 · Actividades masivas de Espacios en curso o recien terminadas.
+ * Cada una trae: actividadId, titulo, capacidad, lat, lng, radioMetros,
+ * inicio, fin (ISO) y contenedores (cuantos hay en la zona).
+ */
+export const fetchMassEvents = () => api.get('/actividades-masivas');
+
 /* --- CU-01 · Contenedores ----------------------------------------------- */
 
 /** Listado completo. Mismos filtros que el mapa: zonaId, tipoResiduo, estado. */

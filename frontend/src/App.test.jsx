@@ -13,6 +13,7 @@ import {
 vi.mock('./api/waste.js', () => ({
   USING_MOCKS: true,
   fetchMapContainers: vi.fn(),
+  fetchMassEvents: vi.fn(() => Promise.resolve([])),
   fetchContainers: vi.fn(),
   fetchContainer: vi.fn(),
   fetchZones: vi.fn(),

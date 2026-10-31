@@ -1,16 +1,40 @@
 import { Fragment } from 'react';
-import { MapContainer, CircleMarker, Tooltip } from 'react-leaflet';
+import { MapContainer, Circle, CircleMarker, Tooltip } from 'react-leaflet';
 import BaseTiles from './map/BaseTiles.jsx';
 import 'leaflet/dist/leaflet.css';
 import { colorForState, STATE_LABEL, neverReported } from '../domain/states.js';
+import { MASS_EVENT_COLOR, endLabel } from '../domain/massEvents.js';
 
 /** Obelisco: el seed del simulador crea los contenedores alrededor de este punto. */
 const CABA_CENTER = [-34.6037, -58.3816];
 
-export default function ContainersMap({ containers, selectedId, onSelect }) {
+export default function ContainersMap({ containers, selectedId, onSelect, massEvents = [] }) {
   return (
     <MapContainer center={CABA_CENTER} zoom={15} className="map" scrollWheelZoom>
       <BaseTiles />
+
+      {/* Zonas de actividades masivas (squad 3). Van antes que los contenedores
+          para quedar debajo: el circulo no puede tapar el click en un marcador. */}
+      {massEvents.map((event) => (
+        <Circle
+          key={event.actividadId}
+          center={[event.lat, event.lng]}
+          radius={event.radioMetros}
+          pathOptions={{
+            color: MASS_EVENT_COLOR,
+            weight: 2,
+            dashArray: '6 6',
+            fillColor: MASS_EVENT_COLOR,
+            fillOpacity: 0.08,
+          }}
+        >
+          <Tooltip direction="top">
+            <strong>{event.titulo ?? 'Actividad masiva'}</strong>
+            <br />
+            {event.capacidad.toLocaleString('es-AR')} personas · {endLabel(event.fin)}
+          </Tooltip>
+        </Circle>
+      ))}
 
       {containers.map((container) => {
         // `incendioActivo` lo trae el propio payload del mapa: no depende del
