@@ -35,6 +35,8 @@ export const EventTypes = {
   RECLAMO_EVALUADO: 'residuos.reclamo.evaluado',
   INTERVENCION_PROGRAMADA: 'residuos.intervencion.programada',
   INTERVENCION_COMPLETADA: 'residuos.intervencion.completada',
+  /** CU-INT-01: una emergencia corto el camino y una parada de una ruta en marcha quedo afectada. */
+  INTERVENCION_ACTUALIZADA: 'residuos.intervencion.actualizada',
 } as const;
 
 export type EventType = (typeof EventTypes)[keyof typeof EventTypes];

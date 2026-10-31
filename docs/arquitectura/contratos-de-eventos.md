@@ -273,6 +273,46 @@ contenedores reforzados por actividad = contenedores de cada uno de esos refuerz
 
 ---
 
+### `residuos.intervencion.actualizada` — CU-INT-01
+
+Sale al bus como **`com.citypass.residuos.IntervencionActualizada`**. Se emite **una vez por parada**
+cuando llega una `EmergenciaCreada` con `afectaCirculacion: true` y un contenedor a menos de 300 m
+tiene una parada pendiente en una ruta `ASIGNADA` o `EN_CURSO`. Esa parada queda `OMITIDA` y la ruta
+se recalcula. En una ruta `PROPUESTA` la parada se borra sin publicar nada: el camión no salió.
+
+```json
+{
+  "intervencionId": "9c4e2a1b-6d8f-4b3a-a7e5-1f0d3c8b6e21",
+  "camionId": "AB123CD",
+  "estadoAnterior": "PROGRAMADA",
+  "estadoNuevo": "AFECTADA",
+  "causaId": "a3c9e5f1-7b2d-4d8e-b6a0-9f1c2e3d4b55",
+  "causaTipo": "INCIDENTE_VIAL",
+  "correlationId": "c-5521",
+  "updatedAt": "2026-11-16T02:40:00.000Z"
+}
+```
+
+#### Métrica para BI: cuadrillas afectadas por incidentes viales (caso 4)
+
+```text
+camionId distintos con estadoNuevo = AFECTADA y causaTipo = INCIDENTE_VIAL
+```
+
+- **`intervencionId` es el id de la parada:** para Analítica, cada parada es una intervención. Con
+  esa misma lectura, contar eventos da las paradas afectadas. No coincide con el `intervencionId` de
+  `IntervencionProgramada`, que es uno por emergencia: esta métrica no los cruza.
+- **`causaId` y `causaTipo` son los de `EmergenciaCreada`:** si no vienen los dos, salen en `null` y
+  el evento no suma a la métrica, aunque la parada se omita igual.
+- **`updatedAt` va en ISO-8601**, como pide el contrato de Analítica del 29/10, y no en milisegundos
+  como `ReclamoEvaluado`.
+
+> **Lo registra Residuos, no EDA:** desde la consola del gateway, en el catálogo de tipos, con el
+> esquema Avro de [`schemas/IntervencionActualizada.avsc`](schemas/IntervencionActualizada.avsc).
+> Mientras no esté registrado, el gateway responde 404 y el evento queda `FALLIDO` en el outbox.
+
+---
+
 ### `residuos.ruta.recalculada` — CU-INT-02 · solo interno
 
 No sale al bus: lo usa nuestro front, que lo ve por la API. Ver

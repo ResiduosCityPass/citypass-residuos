@@ -547,6 +547,47 @@ describe('ParadasService (CU-10)', () => {
       );
     });
 
+    describe('CU-INT-01 · una emergencia corta el camino', () => {
+      const MOTIVO_EMERGENCIA = 'Zona bloqueada por la emergencia em-1';
+      const INCIDENTE = {
+        causaId: 'in-1',
+        causaTipo: 'INCIDENTE_VIAL',
+        correlationId: 'c-5521',
+      };
+
+      it('la parada de una ruta en marcha publica que la cuadrilla quedo afectada', async () => {
+        await sistema.quitarContenedores(['c-tapada'], MOTIVO_EMERGENCIA, undefined, INCIDENTE);
+
+        const [evento, ...resto] = eventos.getPublished(EventTypes.INTERVENCION_ACTUALIZADA);
+        expect(resto).toHaveLength(0);
+        expect(evento.correlationId).toBe('c-5521');
+        expect(evento.payload).toEqual({
+          intervencionId: 'tapada',
+          camionId: ruta.camion?.patente ?? ruta.camionId,
+          estadoAnterior: 'PROGRAMADA',
+          estadoNuevo: 'AFECTADA',
+          causaId: 'in-1',
+          causaTipo: 'INCIDENTE_VIAL',
+          updatedAt: expect.any(String),
+        });
+      });
+
+      it('una ruta propuesta se recalcula sin afectar a nadie: el camion no salio', async () => {
+        ruta.estado = EstadoRuta.PROPUESTA;
+
+        await sistema.quitarContenedores(['c-tapada'], MOTIVO_EMERGENCIA, undefined, INCIDENTE);
+
+        expect(delaRuta.some((p) => p.id === 'tapada')).toBe(false);
+        expect(eventos.getPublished(EventTypes.INTERVENCION_ACTUALIZADA)).toHaveLength(0);
+      });
+
+      it('un auto que tapa un contenedor no cuenta como cuadrilla afectada', async () => {
+        await sistema.quitarContenedores(['c-tapada'], MOTIVO_RECLAMO, 'RC-123');
+
+        expect(eventos.getPublished(EventTypes.INTERVENCION_ACTUALIZADA)).toHaveLength(0);
+      });
+    });
+
     it('no toca el contenedor ni sus alertas: sigue lleno', async () => {
       await sistema.quitarContenedores(['c-tapada'], MOTIVO_RECLAMO);
 

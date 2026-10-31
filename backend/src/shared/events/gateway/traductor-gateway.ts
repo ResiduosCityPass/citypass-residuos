@@ -24,6 +24,7 @@ const ubicacion = (payload: Payload): { lat: number; lng: number } =>
  *   residuos.reclamo.evaluado     -> ReclamoEvaluado (CU-INT-02, la respuesta a Reclamos)
  *   residuos.intervencion.programada -> IntervencionProgramada
  *   residuos.intervencion.completada -> IntervencionCompletada
+ *   residuos.intervencion.actualizada -> IntervencionActualizada (cuadrillas afectadas)
  *
  * Los eventos sin consumidores fuera del modulo (ruta generada, asignada,
  * recalculada, parada omitida) devuelven null: no salen del modulo.
@@ -139,6 +140,22 @@ export function traducirAGateway(evento: DomainEvent): EventoGateway | null {
           // Milisegundos desde epoch, no ISO: es lo que lee Analitica, y EDA lo
           // recomendo para los eventos nuevos (26/10). Los anteriores siguen en ISO.
           occurredAt: Date.parse(String(p.evaluadoEn ?? evento.occurredAt)),
+        },
+      };
+
+    case EventTypes.INTERVENCION_ACTUALIZADA:
+      return {
+        tipo: 'IntervencionActualizada',
+        datos: {
+          intervencionId: p.intervencionId,
+          camionId: p.camionId,
+          estadoAnterior: p.estadoAnterior,
+          estadoNuevo: p.estadoNuevo,
+          causaId: p.causaId,
+          causaTipo: p.causaTipo,
+          correlationId,
+          // En ISO, como pide el contrato de Analitica del 29/10.
+          updatedAt: p.updatedAt,
         },
       };
 

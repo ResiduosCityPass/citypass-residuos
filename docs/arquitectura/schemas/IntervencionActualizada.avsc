@@ -1,0 +1,16 @@
+{
+  "type": "record",
+  "name": "IntervencionActualizada",
+  "namespace": "com.citypass.residuos",
+  "doc": "Una parada de una ruta en marcha quedo afectada porque una emergencia corto el camino (CU-INT-01). Se publica una vez por parada. Metrica para BI, caso 4: camionId distintos con estadoNuevo=AFECTADA y causaTipo=INCIDENTE_VIAL.",
+  "fields": [
+    { "name": "intervencionId", "type": "string", "doc": "Id de la parada: para Analitica, cada parada es una intervencion." },
+    { "name": "camionId", "type": "string", "doc": "Patente del camion. Identifica a la cuadrilla: es la clave para contar." },
+    { "name": "estadoAnterior", "type": "string", "doc": "PROGRAMADA." },
+    { "name": "estadoNuevo", "type": "string", "doc": "AFECTADA." },
+    { "name": "causaId", "type": ["null", "string"], "default": null, "doc": "El que manda EmergenciaCreada: con causaTipo INCIDENTE_VIAL, es el incidenteId de Movilidad. Null si la emergencia no trae causa." },
+    { "name": "causaTipo", "type": ["null", "string"], "default": null, "doc": "El que manda EmergenciaCreada, sin cambios. Null si y solo si causaId es null." },
+    { "name": "correlationId", "type": ["null", "string"], "default": null, "doc": "El que manda Emergencias; si no trae, el emergenciaId." },
+    { "name": "updatedAt", "type": "string", "doc": "Momento en que la parada quedo afectada, en ISO-8601 UTC." }
+  ]
+}

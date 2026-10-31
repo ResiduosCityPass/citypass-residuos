@@ -153,6 +153,36 @@ describe('traducirAGateway (CU-INT-01)', () => {
     });
   });
 
+  it('la parada afectada sale como IntervencionActualizada, con la fecha en ISO', () => {
+    const evento = buildEvent(
+      EventTypes.INTERVENCION_ACTUALIZADA,
+      {
+        intervencionId: 'pa-1',
+        camionId: 'AB123CD',
+        estadoAnterior: 'PROGRAMADA',
+        estadoNuevo: 'AFECTADA',
+        causaId: 'in-1',
+        causaTipo: 'INCIDENTE_VIAL',
+        updatedAt: '2026-11-16T02:40:00.000Z',
+      },
+      { correlationId: 'c-5521' },
+    );
+
+    expect(traducirAGateway(evento)).toEqual({
+      tipo: 'IntervencionActualizada',
+      datos: {
+        intervencionId: 'pa-1',
+        camionId: 'AB123CD',
+        estadoAnterior: 'PROGRAMADA',
+        estadoNuevo: 'AFECTADA',
+        causaId: 'in-1',
+        causaTipo: 'INCIDENTE_VIAL',
+        correlationId: 'c-5521',
+        updatedAt: '2026-11-16T02:40:00.000Z',
+      },
+    });
+  });
+
   it('los eventos sin consumidores fuera del modulo no salen', () => {
     expect(traducirAGateway(buildEvent(EventTypes.RUTA_GENERADA, { rutaId: 'rt-1' }))).toBeNull();
     expect(
