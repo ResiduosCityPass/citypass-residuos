@@ -449,3 +449,47 @@ Nico no puede sumar mis preguntas a su consulta con Valen, y me dijo que le preg
 - Abrí el #64 (`RefuerzoProgramado`) y el #65 (tachos ya vaciados y valores que no entran en la base). Fran aprobó los dos.
 - **El #64 entró a `develop`** (commit `dda1756`).
 - **El #65 perdió la aprobación:** GitHub la descartó cuando entró el #64, porque cambió la base del PR. Fran lo volvió a aprobar, pero siguió bloqueado hasta actualizar la rama con `develop`. Cuando se encadenan dos PRs hay que contar con una aprobación más para el segundo.
+
+## Sáb 31/10 · Todo mi código está en `develop`
+
+- **El #65 entró a `develop`** (commit `4b61dc6`), con el CI en verde.
+- **También entraron** el #60 de Adri, el #62 de Nico y el #66 de Fran. El CI de `develop` está en verde después de cada uno.
+- **El #63 de Nico** se había quedado sin mi aprobación al actualizarse. Lo aprobó Rami, así que ya no hace falta la mía.
+- **`main`:** el último release sigue siendo el #50, del 16/10. Render todavía no tiene el caso. Adri y Nico dijeron que de su lado no falta nada para el release.
+- **Tomás:** todavía no tiene rama ni PR.
+
+## Sáb 31/10 · Probé mi caso con el refactor de Fran (#66)
+
+**Qué cambió Fran en mi caso:** la búsqueda por radio y la lectura de coordenadas ahora están en `shared/domain/geo.ts`, compartidas con los otros casos. El corte de 300 m y las reglas no cambiaron. Como aprobó Rami, no lo revisé antes de que entrara, así que lo probé después.
+
+**Pruebas sobre `develop`:**
+- Pasan los 248 tests unitarios de `integracion`, `geo` y `rutas`.
+- En local, `npm run actividad -- --contenedor CT-0005 --termina-en 0` dejó la zona en `GET /actividades-masivas` con 1 contenedor.
+- La ruta del camión de reciclables salió con CT-0005 al 0 %. Después la descarté.
+- **Lo nuevo del refactor:** una actividad con las coordenadas en texto se guarda. Una con la latitud fuera de rango se ignora y responde 204.
+
+**Por pantalla, sin errores en la consola:**
+1. El mapa muestra el aviso y la zona de la actividad.
+2. El operador generó la propuesta para el camión de reciclables, con CT-0005 al 0 %.
+3. Se la asigné a la chofer y confirmé la parada desde `/chofer`, con el GPS simulado. La ruta quedó completa y el camión, disponible.
+
+**Lo que apareció en el ensayo:** en local, el token de chofer corresponde a Juana Perez, no a la chofer llamada `dev-chofer`. Se la asigné primero a `dev-chofer` y `/chofer` decía que no había ruta. La ruta ya asignada no se puede reasignar, así que la corregí en la base local. Lo sumé a la tabla de fallas del guion.
+
+**Lo que apareció:** faltaba correr en mi base local la migración de `intervencion` del #60. Es el mismo aviso de siempre: después de traer `develop`, `npm run migration:run`.
+
+## Sáb 31/10 · Consumir por Kafka (propuesta de Fran)
+
+- **Qué propone:** Exequiel recomienda Kafka en vez de webhook, porque el webhook reintenta 3 veces cada 2 segundos y con Render dormido se pierden eventos. Fran haría un consumidor que llama al mismo `IntegracionService.procesar`, y el webhook queda de respaldo.
+- **Qué me afecta:** el consumidor tiene que incluir `com.citypass.espacios.ActividadCreada`. Si un evento llega por los dos lados no se duplica, porque `procesar` descarta los repetidos por `eventId`.
+- **Mi paso 5 no cambia:** sigo con la suscripción por webhook.
+
+## Sáb 31/10 · Registrar `RefuerzoProgramado` en el catálogo
+
+Adri y Nico le pasaron a Rami sus eventos para registrarlos en la consola de EDA. Le pido que sume `RefuerzoProgramado`, con `docs/arquitectura/schemas/RefuerzoProgramado.avsc`. Sin eso, el gateway responde 404 y el evento queda `FALLIDO` en el outbox.
+
+Comparé el `.avsc` con lo que publica el traductor al gateway: tienen los mismos 6 campos. Falta comprobarlo contra el gateway real.
+
+## Sáb 31/10 · El secreto del webhook
+
+- Generé el valor de `GATEWAY_WEBHOOK_TOKEN` para Render. No está en el repo y se pasa solo por privado.
+- **Rami** lo carga en Render. **Fran** lo necesita para sus suscripciones. Tiene que ser el mismo valor para los dos.
