@@ -112,3 +112,4 @@ que nadie tuviera que avisarnos."
 | Fecha | Dónde | Resultado |
 |---|---|---|
 | 27/10 | Local, por API | Pasos 1 a 3: con la actividad ya terminada al lado de CT-0005, la ruta del camión de reciclables salió con CT-0005 al 0 %. Paso 4 sin repetir (probado el 22/10). Falta el ensayo con el bus real y la pantalla |
+| 30/10 | Local, por API y pantalla | Pasos 1 a 4 con `develop` adentro: zona en el mapa, CT-0005 en la ruta y ruta cerrada por el chofer, con GPS simulado. Falta el ensayo en Render con el bus real |

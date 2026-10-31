@@ -307,6 +307,30 @@ Mientras espero el cliente del Login, adelanté el paso 6: el guion de mi parte 
 
 - **Qué pasó:** la pila de Fran (#53, #54, #55 y #58) y el #61 ya están en `develop`, así que el siguiente es mi #57. Tenía conflictos.
 - **Conflictos:** 4 archivos, todos de sumar. Dejé las dos partes en `integracion.service.ts`, `integracion.module.ts`, `simulator/package.json` y `simulator/README.md`. Mi caso sigue con su `case` en el `switch` y el de Fran entra por el `default`, así que no se pisan.
-- **Pruebas:** tipos y lint en verde, pasan los 510 tests unitarios y los 103 e2e. En local, el backend arrancó sin errores con las migraciones de los dos y `npm run actividad` dejó la zona en `GET /actividades-masivas`.
+- **Pruebas:** tipos y lint en verde, pasan los 510 tests unitarios y los 103 e2e. En local, el backend arrancó sin errores y `npm run actividad` dejó la zona en `GET /actividades-masivas`.
 - **Orden que sigue (Rami):** #57 → #60 → release a `main`. Rami hace antes el backup de la base y necesita `GATEWAY_WEBHOOK_TOKEN`, que le paso por privado.
 - **Para tener en cuenta:** Nico abrió el #62, que toca archivos que también tocan otros PRs. El que entre después va a tener conflictos.
+
+## Vie 30/10 · Prueba completa en local después del merge
+
+Probé el caso entero con lo de Fran adentro, por API y por pantalla.
+
+**Por pantalla, sin errores en la consola:**
+1. El mapa muestra el aviso y el círculo azul de la actividad.
+2. El operador generó la ruta del camión de reciclables y CT-0005 entró aunque estaba al 0 %.
+3. Se la asignó a Juana Perez.
+4. Juana confirmó la parada desde `/chofer`, con el GPS simulado, y la ruta terminó.
+
+**Por API:**
+- Responden 204 y no guardan nada: actividad chica, cancelada y sin ubicación. Un tipo de evento desconocido también responde 204.
+- Un evento repetido guarda una sola actividad y un webhook sin token responde 401.
+- Confirmar lejos del contenedor responde 403 (`PARADA_FUERA_DE_RADIO`).
+- El plan B (`npm run actividad` con `--lat` y `--lng`) funciona sin token de administrador y avisa si el secreto está mal.
+
+**Convivencia con el caso de Fran:**
+- Un auto tapando un tacho de la escuadrilla lo saca del ruteo aunque esté reforzado. Cuando se retira el auto, vuelve a entrar.
+- Un reclamo sobre la parada de una ruta asignada la omite. Como era la única parada, la ruta quedó `COMPLETADA`.
+
+**Lo que apareció:** mi base local no tenía la migración de Fran y generar una ruta dio error 500. Se arregló con `npm run migration:run`. No es un error del código y no afecta a Render, donde las migraciones corren solas al desplegar. Cualquiera que traiga `develop` tiene que correrla en su base local.
+
+**Sin probar:** el bus real (falta el `client_id` y el secreto) y un reclamo sobre una ruta de varias paradas con la escuadrilla, porque en la prueba la ruta tenía una sola parada.
