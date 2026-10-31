@@ -1,11 +1,22 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { EventTypes, buildEvent } from '../../../shared/domain/domain-event';
 import { distanciaMetros } from '../../../shared/domain/geo';
+import { EVENT_PUBLISHER, EventPublisher } from '../../../shared/events/event-publisher';
 import {
   CONTENEDOR_REPOSITORY,
   ContenedorRepository,
 } from '../../contenedores/domain/contenedor.repository';
 import { INTEGRACION_REPOSITORY, IntegracionRepository } from '../domain/integracion.repository';
+
+/*
+ * Topes de las columnas: un valor que no entra hace fallar el insert, el webhook
+ * responde error y el bus lo reintenta para siempre.
+ */
+/** `act-` + id tiene que entrar en los 64 de `refuerzo_evento.eventoId`. */
+const LARGO_MAXIMO_ID = 60;
+const LARGO_MAXIMO_TITULO = 200;
+const CAPACIDAD_MAXIMA = 2_147_483_647;
 
 /** Lo que Residuos necesita de una ActividadCreada, ya validado. */
 interface ActividadLeida {
@@ -25,7 +36,8 @@ interface ActividadLeida {
  *   - la guarda con sus contenedores cercanos, para mostrar la zona en el mapa;
  *   - agenda la escuadrilla: desde la hora de fin y durante
  *     `INTEGRACION_HORAS_ZONA_EVENTO`, esos contenedores entran a la ruta que
- *     genera CU-08 aunque no esten criticos. Reusa el refuerzo de CU-INT-01.
+ *     genera CU-08 aunque no esten criticos. Reusa el refuerzo de CU-INT-01;
+ *   - publica `RefuerzoProgramado`, del que Analitica saca la metrica del caso.
  *
  * Lee los campos del contrato del squad (E1 en plan-squad-3.md), que es como
  * Espacios lo publica en el bus. Tiene su propio corte de capacidad, aparte del
@@ -47,6 +59,8 @@ export class ActividadesMasivasService {
     private readonly integracion: IntegracionRepository,
     @Inject(CONTENEDOR_REPOSITORY)
     private readonly contenedores: ContenedorRepository,
+    @Inject(EVENT_PUBLISHER)
+    private readonly eventos: EventPublisher,
     config: ConfigService,
   ) {
     this.radioMetros = Number(config.get('INTEGRACION_RADIO_METROS', 300));
@@ -82,15 +96,27 @@ export class ActividadesMasivasService {
     });
 
     if (contenedorIds.length > 0) {
+      // Prefijo propio: el id de Espacios podria coincidir con el de un
+      // EventoComunitarioPublicado y pisaria el refuerzo de CU-INT-01.
+      const eventoId = `act-${actividad.actividadId}`;
+
       await this.integracion.guardarRefuerzo({
-        // Prefijo propio: el id de Espacios podria coincidir con el de un
-        // EventoComunitarioPublicado y pisaria el refuerzo de CU-INT-01.
-        eventoId: `act-${actividad.actividadId}`,
+        eventoId,
         zona: null,
         contenedorIds,
         desde: actividad.fin,
         hasta: new Date(actividad.fin.getTime() + this.horasZonaEvento * 3_600_000),
       });
+
+      await this.eventos.publish(
+        buildEvent(EventTypes.REFUERZO_PROGRAMADO, {
+          refuerzoId: `refuerzo-${eventoId}`,
+          eventoId,
+          zona: '',
+          contenedores: contenedorIds.length,
+          programadoPara: actividad.fin.toISOString(),
+        }),
+      );
     }
   }
 
@@ -117,9 +143,10 @@ export class ActividadesMasivasService {
   }
 }
 
-/** null si falta el id, la ubicacion o una fecha valida. */
+/** null si falta el id, la ubicacion o una fecha valida, o si la capacidad no es un entero. */
 function leerActividad(data: Record<string, unknown>): ActividadLeida | null {
-  const { actividadId, titulo, capacidad, estado, ubicacion } = data;
+  const { actividadId, titulo, estado, ubicacion } = data;
+  const capacidad = Number(data.capacidad ?? 0);
   const { lat, lng } = (ubicacion ?? {}) as Record<string, unknown>;
   const inicio = leerFecha(data.fechaHoraInicio);
   const fin = leerFecha(data.fechaHoraFinalizacion);
@@ -127,6 +154,9 @@ function leerActividad(data: Record<string, unknown>): ActividadLeida | null {
   if (
     typeof actividadId !== 'string' ||
     actividadId.length === 0 ||
+    actividadId.length > LARGO_MAXIMO_ID ||
+    !Number.isInteger(capacidad) ||
+    capacidad > CAPACIDAD_MAXIMA ||
     typeof lat !== 'number' ||
     typeof lng !== 'number' ||
     !inicio ||
@@ -137,8 +167,8 @@ function leerActividad(data: Record<string, unknown>): ActividadLeida | null {
 
   return {
     actividadId,
-    titulo: typeof titulo === 'string' ? titulo : null,
-    capacidad: Number(capacidad ?? 0),
+    titulo: typeof titulo === 'string' ? titulo.slice(0, LARGO_MAXIMO_TITULO) : null,
+    capacidad,
     punto: { lat, lng },
     inicio,
     fin,
@@ -149,5 +179,10 @@ function leerActividad(data: Record<string, unknown>): ActividadLeida | null {
 
 /** Las fechas llegan en milisegundos (timestamp-millis de Avro). */
 function leerFecha(valor: unknown): Date | null {
-  return typeof valor === 'number' && Number.isFinite(valor) ? new Date(valor) : null;
+  if (typeof valor !== 'number') {
+    return null;
+  }
+
+  const fecha = new Date(valor);
+  return Number.isNaN(fecha.getTime()) ? null : fecha;
 }

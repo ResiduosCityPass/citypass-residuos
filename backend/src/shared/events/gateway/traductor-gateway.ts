@@ -22,6 +22,8 @@ const ubicacion = (payload: Payload): { lat: number; lng: number } =>
  *   residuos.contenedor.vaciado   -> RecoleccionCompletada
  *   residuos.refuerzo.programado  -> RefuerzoProgramado
  *   residuos.reclamo.evaluado     -> ReclamoEvaluado (CU-INT-02, la respuesta a Reclamos)
+ *   residuos.intervencion.programada -> IntervencionProgramada
+ *   residuos.intervencion.completada -> IntervencionCompletada
  *   residuos.intervencion.actualizada -> IntervencionActualizada (cuadrillas afectadas)
  *
  * Los eventos sin consumidores fuera del modulo (ruta generada, asignada,
@@ -95,6 +97,34 @@ export function traducirAGateway(evento: DomainEvent): EventoGateway | null {
           contenedores: p.contenedores,
           programadoPara: p.programadoPara,
           occurredAt: evento.occurredAt,
+        },
+      };
+
+    case EventTypes.INTERVENCION_PROGRAMADA:
+      return {
+        tipo: 'IntervencionProgramada',
+        datos: {
+          intervencionId: p.intervencionId,
+          emergenciaId: p.emergenciaId,
+          contenedorId: p.contenedorId ?? null,
+          latitud: ubicacion(p).lat,
+          longitud: ubicacion(p).lng,
+          // Epoch en milisegundos, que es lo que lee Analitica.
+          programadaEn: Date.parse(String(p.programadaEn)),
+          correlationId,
+          occurredAt: Date.parse(evento.occurredAt),
+        },
+      };
+
+    case EventTypes.INTERVENCION_COMPLETADA:
+      return {
+        tipo: 'IntervencionCompletada',
+        datos: {
+          intervencionId: p.intervencionId,
+          emergenciaId: p.emergenciaId,
+          completadaEn: Date.parse(String(p.completadaEn)),
+          correlationId,
+          occurredAt: Date.parse(evento.occurredAt),
         },
       };
 

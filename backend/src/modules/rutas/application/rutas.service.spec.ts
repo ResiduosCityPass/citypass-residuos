@@ -80,6 +80,7 @@ describe('RutasService (CU-08, CU-09)', () => {
       contenedoresEnRutasVivas: jest.fn().mockResolvedValue([]),
       avanceDeParadas: jest.fn().mockResolvedValue(new Map()),
       rutasVivasConPendientes: jest.fn().mockResolvedValue([]),
+      ultimosVaciados: jest.fn().mockResolvedValue(new Map()),
     };
     paradas = {
       crearVarias: jest.fn().mockResolvedValue([]),
@@ -403,6 +404,54 @@ describe('RutasService (CU-08, CU-09)', () => {
 
       const creadas = paradas.crearVarias.mock.calls[0][0];
       expect(creadas.map((p) => p.contenedorId).sort()).toEqual(['c-1', 'c-3']);
+    });
+
+    describe('un contenedor reforzado que ya se vacio', () => {
+      const DESDE = new Date('2026-11-01T20:00:00.000Z');
+      const generarConVaciado = async (vaciadoEn: Date, estado = EstadoContenedor.NORMAL) => {
+        const reforzado = { ...contenedor('c-3', 0.005), estado } as Contenedor;
+        contenedores.listar.mockImplementation(async (filtro) =>
+          filtro.estado === EstadoContenedor.CRITICO
+            ? [
+                contenedor('c-1', 0.005),
+                ...(estado === EstadoContenedor.CRITICO ? [reforzado] : []),
+              ]
+            : [contenedor('c-1', 0.005), reforzado],
+        );
+        rutas.ultimosVaciados.mockResolvedValue(new Map([['c-3', vaciadoEn]]));
+
+        await new RutasService(
+          rutas,
+          paradas,
+          contenedores,
+          eventos,
+          flota as unknown as FlotaService,
+          choferes as unknown as ChoferesService,
+          zonas as unknown as ZonasService,
+          { ejecutar: <T>(b: () => Promise<T>) => b() } as unknown as ContextoTransaccional,
+          new ConfigService({}),
+          { vigentes: jest.fn().mockResolvedValue([{ contenedorIds: ['c-3'], desde: DESDE }]) },
+        ).generar({ camionId: 'cm-1' });
+
+        return paradas.crearVarias.mock.calls[0][0].map((p) => p.contenedorId).sort();
+      };
+
+      it('no vuelve a entrar si se vacio despues de que arranco el refuerzo', async () => {
+        expect(await generarConVaciado(new Date('2026-11-01T21:00:00.000Z'))).toEqual(['c-1']);
+      });
+
+      it('entra si el vaciado fue antes de que arrancara el refuerzo', async () => {
+        expect(await generarConVaciado(new Date('2026-11-01T19:00:00.000Z'))).toEqual([
+          'c-1',
+          'c-3',
+        ]);
+      });
+
+      it('entra si se lleno de nuevo y esta critico', async () => {
+        expect(
+          await generarConVaciado(new Date('2026-11-01T21:00:00.000Z'), EstadoContenedor.CRITICO),
+        ).toEqual(['c-1', 'c-3']);
+      });
     });
   });
 

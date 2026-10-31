@@ -4,6 +4,53 @@ import { traducirAGateway } from './traductor-gateway';
 describe('traducirAGateway (CU-INT-01)', () => {
   const ubicacion = { lat: -34.6118, lng: -58.396 };
 
+  it('la intervencion sale como IntervencionProgramada con el correlationId de la emergencia', () => {
+    const evento = buildEvent(
+      EventTypes.INTERVENCION_PROGRAMADA,
+      {
+        intervencionId: 'in-1',
+        emergenciaId: 'EMG-1',
+        contenedorId: 'ct-1',
+        ubicacion,
+        programadaEn: '2026-11-01T15:00:00.000Z',
+      },
+      { correlationId: 'EMG-1' },
+    );
+
+    expect(traducirAGateway(evento)).toEqual({
+      tipo: 'IntervencionProgramada',
+      datos: {
+        intervencionId: 'in-1',
+        emergenciaId: 'EMG-1',
+        contenedorId: 'ct-1',
+        latitud: ubicacion.lat,
+        longitud: ubicacion.lng,
+        programadaEn: Date.parse('2026-11-01T15:00:00.000Z'),
+        correlationId: 'EMG-1',
+        occurredAt: Date.parse(evento.occurredAt),
+      },
+    });
+  });
+
+  it('la intervencion completada sale como IntervencionCompletada con fechas en ms', () => {
+    const evento = buildEvent(
+      EventTypes.INTERVENCION_COMPLETADA,
+      { intervencionId: 'in-1', emergenciaId: 'EMG-1', completadaEn: '2026-11-01T17:00:00.000Z' },
+      { correlationId: 'EMG-1' },
+    );
+
+    expect(traducirAGateway(evento)).toEqual({
+      tipo: 'IntervencionCompletada',
+      datos: {
+        intervencionId: 'in-1',
+        emergenciaId: 'EMG-1',
+        completadaEn: Date.parse('2026-11-01T17:00:00.000Z'),
+        correlationId: 'EMG-1',
+        occurredAt: Date.parse(evento.occurredAt),
+      },
+    });
+  });
+
   it('la saturacion sale como AlertaGenerada con su alertaId', () => {
     const evento = buildEvent(
       EventTypes.CONTENEDOR_CRITICO,

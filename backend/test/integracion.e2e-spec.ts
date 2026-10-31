@@ -115,6 +115,77 @@ describe('Integracion CityPass+ (e2e)', () => {
     expect(await bloqueada(zonaId)).toBe(true);
   });
 
+  describe('intervencion por emergencia con causa RESIDUOS (CU-01, A7)', () => {
+    const resuelta = (eventId: string, causasRelacionadas: string[], tipo = 'EmergenciaResuelta') =>
+      http
+        .post(webhook)
+        .send({
+          metadata: { eventId, eventType: `com.citypass.emergencias.${tipo}` },
+          data: {
+            emergenciaId: 'EMG-1',
+            causasRelacionadas,
+            ubicacion: PLAZA_ITALIA,
+          },
+        })
+        .expect(204);
+
+    const intervenciones = async () =>
+      (await http.get('/api/v1/intervenciones').set(auth(admin)).expect(200)).body;
+
+    it('con RESIDUOS programa la intervencion en el contenedor cercano', async () => {
+      await zonaConContenedor();
+
+      await resuelta('ev-1', ['RESIDUOS']);
+
+      const lista = await intervenciones();
+      expect(lista).toHaveLength(1);
+      expect(lista[0]).toMatchObject({ emergenciaId: 'EMG-1', estado: 'PROGRAMADA' });
+      expect(lista[0].contenedorId).not.toBeNull();
+    });
+
+    it('con VIA no hace nada', async () => {
+      await zonaConContenedor();
+
+      await resuelta('ev-1', ['VIA']);
+
+      expect(await intervenciones()).toHaveLength(0);
+    });
+
+    it('la misma emergencia por dos eventos distintos programa una sola intervencion', async () => {
+      await zonaConContenedor();
+
+      await resuelta('ev-1', ['RESIDUOS'], 'EmergenciaResuelta');
+      await resuelta('ev-2', ['RESIDUOS'], 'EmergenciaActualizada');
+
+      expect(await intervenciones()).toHaveLength(1);
+    });
+
+    it('completar la intervencion la cierra, y una segunda vez da 409', async () => {
+      await resuelta('ev-1', ['RESIDUOS']);
+      const [creada] = await intervenciones();
+
+      const cerrada = await http
+        .patch(`/api/v1/intervenciones/${creada.id}/completar`)
+        .set(auth(admin))
+        .expect(200);
+      expect(cerrada.body).toMatchObject({ estado: 'COMPLETADA' });
+      expect(cerrada.body.completadaEn).not.toBeNull();
+
+      await http
+        .patch(`/api/v1/intervenciones/${creada.id}/completar`)
+        .set(auth(admin))
+        .expect(409);
+    });
+
+    it('sin contenedores cerca la intervencion se programa igual', async () => {
+      await resuelta('ev-1', ['RESIDUOS']);
+
+      const lista = await intervenciones();
+      expect(lista).toHaveLength(1);
+      expect(lista[0].contenedorId).toBeNull();
+    });
+  });
+
   it('una reentrega de un evento ya procesado no vuelve a bloquear la zona', async () => {
     const zonaId = await zonaConContenedor();
 

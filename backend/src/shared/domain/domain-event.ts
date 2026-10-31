@@ -33,6 +33,8 @@ export const EventTypes = {
   RUTA_RECALCULADA: 'residuos.ruta.recalculada',
   /** CU-INT-02: la respuesta a Reclamos, si el auto denunciado tapa algun contenedor. */
   RECLAMO_EVALUADO: 'residuos.reclamo.evaluado',
+  INTERVENCION_PROGRAMADA: 'residuos.intervencion.programada',
+  INTERVENCION_COMPLETADA: 'residuos.intervencion.completada',
   /** CU-INT-01: una emergencia corto el camino y una parada de una ruta en marcha quedo afectada. */
   INTERVENCION_ACTUALIZADA: 'residuos.intervencion.actualizada',
 } as const;
