@@ -64,6 +64,13 @@ export interface ResultadoOmision {
   rutaEstado: EstadoRuta;
 }
 
+/** Por que el camino quedo cortado: es lo que Analitica lee en IntervencionActualizada. */
+export interface CausaAfectacion {
+  causaId: string | null;
+  causaTipo: string | null;
+  correlationId: string;
+}
+
 /**
  * CU-10 · Confirmar vaciado.
  *
@@ -252,18 +259,23 @@ export class ParadasService {
    *
    * El contenedor no se toca: sigue lleno y con su alerta abierta. Devuelve las
    * rutas que cambiaron.
+   *
+   * Con `afectacion` (una emergencia corto el camino, CU-INT-01), cada parada
+   * omitida ademas publica que la cuadrilla quedo afectada. Las de una PROPUESTA
+   * no: el camion todavia no salio, asi que no se afecto a nadie.
    */
   async quitarContenedores(
     contenedorIds: string[],
     motivo: string,
     reclamoId?: string,
+    afectacion?: CausaAfectacion,
   ): Promise<string[]> {
     const quitar = async () => {
       const rutaIds = await this.rutas.rutasVivasConPendientes(contenedorIds);
       const tapados = new Set(contenedorIds);
 
       for (const rutaId of rutaIds) {
-        await this.recalcular(rutaId, tapados, motivo, reclamoId ?? null);
+        await this.recalcular(rutaId, tapados, motivo, reclamoId ?? null, afectacion);
       }
 
       return rutaIds;
@@ -277,6 +289,7 @@ export class ParadasService {
     tapados: Set<string>,
     motivo: string,
     reclamoId: string | null,
+    afectacion?: CausaAfectacion,
   ): Promise<void> {
     const antes = await this.rutas.buscarPorId(rutaId);
     const quitadas = (antes?.paradas ?? []).filter(
@@ -288,6 +301,25 @@ export class ParadasService {
     } else {
       for (const parada of quitadas) {
         await this.omitirPorSistema(parada.id, motivo);
+
+        if (afectacion) {
+          await this.eventos.publish(
+            buildEvent(
+              EventTypes.INTERVENCION_ACTUALIZADA,
+              {
+                // Para Analitica, cada parada es una intervencion (Valen, 30/10).
+                intervencionId: parada.id,
+                camionId: antes?.camion?.patente ?? antes?.camionId,
+                estadoAnterior: 'PROGRAMADA',
+                estadoNuevo: 'AFECTADA',
+                causaId: afectacion.causaId,
+                causaTipo: afectacion.causaTipo,
+                updatedAt: new Date().toISOString(),
+              },
+              { correlationId: afectacion.correlationId },
+            ),
+          );
+        }
       }
     }
 

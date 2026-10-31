@@ -179,6 +179,62 @@ describe('IntegracionService (CU-INT-01)', () => {
       expect(bloqueada('z-caballito')).toBe(false);
     });
 
+    describe('rutas en marcha', () => {
+      const paradas = { quitarContenedores: jest.fn() };
+      const conRutas = () =>
+        new IntegracionService(
+          integracion,
+          contenedores as unknown as ContenedorRepository,
+          eventos,
+          zonas,
+          { ejecutar: <T>(b: () => Promise<T>) => b() } as unknown as ContextoTransaccional,
+          new ConfigService({}),
+          actividades as unknown as ActividadesMasivasService,
+          undefined,
+          paradas,
+        );
+      const incidente = (cambios: Record<string, unknown>) =>
+        sobre('com.citypass.emergencias.EmergenciaCreada', {
+          ...incendio.data,
+          ...cambios,
+        });
+
+      beforeEach(() => paradas.quitarContenedores.mockReset());
+
+      it('saca los contenedores cercanos con la causa que manda Emergencias', async () => {
+        await conRutas().procesar(
+          incidente({
+            causaId: 'in-1',
+            causaTipo: 'INCIDENTE_VIAL',
+            correlationId: 'c-5521',
+          }),
+        );
+
+        expect(paradas.quitarContenedores).toHaveBeenCalledWith(
+          ['c-cerca'],
+          'Zona bloqueada por la emergencia em-1',
+          undefined,
+          { causaId: 'in-1', causaTipo: 'INCIDENTE_VIAL', correlationId: 'c-5521' },
+        );
+      });
+
+      it('sin causa completa la manda en null: el contrato pide los dos campos juntos', async () => {
+        await conRutas().procesar(incidente({ causaTipo: 'INCIDENTE_VIAL' }));
+
+        expect(paradas.quitarContenedores.mock.calls[0][3]).toEqual({
+          causaId: null,
+          causaTipo: null,
+          correlationId: 'em-1',
+        });
+      });
+
+      it('una emergencia que no corta la circulacion no toca las rutas', async () => {
+        await conRutas().procesar(incidente({ afectaCirculacion: false }));
+
+        expect(paradas.quitarContenedores).not.toHaveBeenCalled();
+      });
+    });
+
     it('una emergencia que no corta la circulacion no bloquea nada', async () => {
       await service.procesar(
         sobre('com.citypass.emergencias.EmergenciaCreada', {
