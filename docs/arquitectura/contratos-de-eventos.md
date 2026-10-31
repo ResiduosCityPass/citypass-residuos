@@ -446,5 +446,10 @@ siempre.
   revierte por una falla de publicación —el contenedor se marca crítico aunque el bus esté caído—
   y el evento no se pierde: queda pendiente hasta que salga. Tras agotar los reintentos pasa a
   `FALLIDO` y queda en la tabla para inspección.
-- **Consumo:** procesamiento idempotente por `eventId`. Tras 3 intentos fallidos el mensaje va a una
-  *dead letter queue* para inspección manual.
+- **Consumo:** por Kafka (`CitypassKafkaConsumer`, la vía que recomienda EDA) y por el webhook,
+  que queda porque en Render free es lo que despierta la API. Los dos llaman al mismo
+  `IntegracionService.procesar`, así que un evento que llega por los dos lados se procesa una
+  vez. Kafka arranca desde lo último, no desde el historial, y un evento mal formado se loguea y
+  se saltea para no trabar la partición. Procesamiento idempotente por `eventId`. Por el
+  webhook, tras 3 intentos fallidos el mensaje va a una *dead letter queue* para inspección
+  manual.

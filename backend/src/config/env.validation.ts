@@ -122,6 +122,16 @@ class VariablesEntorno {
   @IsOptional()
   GATEWAY_CLIENT_SECRET?: string;
 
+  /** Brokers de Kafka separados por coma. Vacio: no se consume por Kafka, solo por webhook. */
+  @IsString()
+  @IsOptional()
+  KAFKA_BROKERS?: string;
+
+  /** `false` solo para el bus local (SASL_PLAINTEXT). En produccion es SASL_SSL. */
+  @IsString()
+  @IsOptional()
+  KAFKA_SSL?: string;
+
   /** Secreto de la URL del webhook (?token=...). Vacio: el webhook rechaza todo. */
   @IsString()
   @IsOptional()

@@ -8,6 +8,7 @@ import { ActividadesMasivasService } from './application/actividades-masivas.ser
 import { IntegracionService } from './application/integracion.service';
 import { IntervencionesService } from './application/intervenciones.service';
 import { ReclamosService } from './application/reclamos.service';
+import { CitypassKafkaConsumer } from './citypass-kafka.consumer';
 import { CitypassWebhookController } from './citypass-webhook.controller';
 import { ActividadMasiva } from './domain/actividad-masiva.entity';
 import { Intervencion } from './domain/intervencion.entity';
@@ -45,6 +46,7 @@ import { IntegracionTypeormRepository } from './infrastructure/integracion.typeo
   controllers: [CitypassWebhookController, ActividadesMasivasController, IntervencionesController],
   providers: [
     IntegracionService,
+    CitypassKafkaConsumer,
     ActividadesMasivasService,
     IntervencionesService,
     ReclamosService,

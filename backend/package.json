@@ -25,6 +25,7 @@
     "migration:run:prod": "typeorm -d dist/config/data-source.js migration:run"
   },
   "dependencies": {
+    "@kafkajs/confluent-schema-registry": "^4.1.0",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.0",
     "@nestjs/core": "^11.0.1",
@@ -36,6 +37,7 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "dotenv": "^17.4.2",
+    "kafkajs": "^2.2.4",
     "pg": "^8.13.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
