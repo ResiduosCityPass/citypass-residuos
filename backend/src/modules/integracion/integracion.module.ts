@@ -3,9 +3,17 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ContenedoresModule } from '../contenedores/contenedores.module';
 import { RutasModule } from '../rutas/rutas.module';
 import { ZonasModule } from '../zonas/zonas.module';
+import { ActividadesMasivasController } from './actividades-masivas.controller';
+import { ActividadesMasivasService } from './application/actividades-masivas.service';
 import { IntegracionService } from './application/integracion.service';
+import { IntervencionesService } from './application/intervenciones.service';
 import { ReclamosService } from './application/reclamos.service';
 import { CitypassWebhookController } from './citypass-webhook.controller';
+import { ActividadMasiva } from './domain/actividad-masiva.entity';
+import { Intervencion } from './domain/intervencion.entity';
+import { INTERVENCION_REPOSITORY } from './domain/intervencion.repository';
+import { IntervencionTypeormRepository } from './infrastructure/intervencion.typeorm.repository';
+import { IntervencionesController } from './intervenciones.controller';
 import { BloqueoPorIncidente } from './domain/bloqueo-por-incidente.entity';
 import { EventoRecibido } from './domain/evento-recibido.entity';
 import {
@@ -24,7 +32,9 @@ import { IntegracionTypeormRepository } from './infrastructure/integracion.typeo
       EventoRecibido,
       RefuerzoEvento,
       BloqueoPorIncidente,
+      ActividadMasiva,
       ObstruccionPorReclamo,
+      Intervencion,
     ]),
     ContenedoresModule,
     ZonasModule,
@@ -32,11 +42,14 @@ import { IntegracionTypeormRepository } from './infrastructure/integracion.typeo
     // recalculan rutas (CU-INT-02).
     forwardRef(() => RutasModule),
   ],
-  controllers: [CitypassWebhookController],
+  controllers: [CitypassWebhookController, ActividadesMasivasController, IntervencionesController],
   providers: [
     IntegracionService,
+    ActividadesMasivasService,
+    IntervencionesService,
     ReclamosService,
     IntegracionTypeormRepository,
+    { provide: INTERVENCION_REPOSITORY, useClass: IntervencionTypeormRepository },
     { provide: INTEGRACION_REPOSITORY, useExisting: IntegracionTypeormRepository },
     { provide: REFUERZOS_VIGENTES, useExisting: IntegracionTypeormRepository },
     { provide: OBSTRUCCION_REPOSITORY, useExisting: IntegracionTypeormRepository },

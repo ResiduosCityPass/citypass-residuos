@@ -10,6 +10,8 @@ import {
 } from '../../contenedores/domain/contenedor.repository';
 import { ZonasService } from '../../zonas/application/zonas.service';
 import { INTEGRACION_REPOSITORY, IntegracionRepository } from '../domain/integracion.repository';
+import { IntervencionesService } from './intervenciones.service';
+import { ActividadesMasivasService } from './actividades-masivas.service';
 import { ReclamosService } from './reclamos.service';
 
 /** Sobre con el que el gateway del Squad 1 entrega cada evento por webhook. */
@@ -23,8 +25,34 @@ export type ResultadoProcesamiento = 'procesado' | 'duplicado' | 'ignorado';
 const ESPACIOS = 'com.citypass.espacios.';
 const EMERGENCIAS = 'com.citypass.emergencias.';
 
+/**
+ * Como figuran en el CU-01 (version del 29/10): sin prefijo y en minusculas con
+ * puntos. Emergencias todavia publica los de arriba; se aceptan los dos.
+ */
+const RESUELTA_SEGUN_CU01 = 'emergencia.resuelta';
+const ESTADO_ACTUALIZADO_SEGUN_CU01 = 'emergencia.estado.actualizado';
+
 /** Estados en los que una emergencia deja de cortar la circulacion. */
 const EMERGENCIA_TERMINADA = new Set(['RESUELTA', 'CERRADA', 'DESCARTADA', 'CANCELADA']);
+
+/**
+ * Estados en los que la emergencia ya se atendio y puede haber algo por
+ * intervenir. Cancelada o descartada no dejan nada.
+ */
+const EMERGENCIA_ATENDIDA = new Set(['RESUELTA', 'CERRADA']);
+
+/**
+ * Como se llama, segun Emergencias, el campo con el estado nuevo. El backend de
+ * Emergencias publica `EmergenciaEstadoActualizado` y el contrato nunca se cerro
+ * por escrito: se aceptan las variantes razonables, en un solo lugar, para
+ * recortarlas cuando se confirme.
+ */
+const CAMPOS_ESTADO = ['estadoNuevo', 'estado', 'nuevoEstado'] as const;
+
+function estadoDe(data: Record<string, unknown>): string {
+  const campo = CAMPOS_ESTADO.find((c) => typeof data[c] === 'string');
+  return campo ? String(data[campo]).toUpperCase() : '';
+}
 
 /**
  * Reacciones a eventos de otros modulos de CityPass+ (CU-INT-01).
@@ -33,6 +61,9 @@ const EMERGENCIA_TERMINADA = new Set(['RESUELTA', 'CERRADA', 'DESCARTADA', 'CANC
  *   EventoCancelado            -> se cancela el refuerzo
  *   EmergenciaCreada           -> se bloquean para el ruteo las zonas afectadas
  *   EmergenciaActualizada      -> al terminar la emergencia se desbloquean
+ *   EmergenciaEstadoActualizado-> igual: es como la publica Emergencias de verdad
+ *   EmergenciaCerrada          -> igual, y si trae causa RESIDUOS, intervencion
+ *   ActividadCreada            -> zona del evento y escuadrilla (squad 3, ActividadesMasivasService)
  *   Reclamos (CU-INT-02)       -> ver ReclamosService
  *
  * Todo corre en una transaccion: si algo falla tampoco queda registrado el
@@ -56,9 +87,11 @@ export class IntegracionService {
     private readonly zonas: ZonasService,
     private readonly transaccion: ContextoTransaccional,
     config: ConfigService,
-    // Opcional para que los tests de CU-INT-01 no tengan que armarlo.
+    private readonly actividades: ActividadesMasivasService,
+    // Opcionales y al final, para no romper los specs que arman este servicio a mano.
     @Optional()
     private readonly reclamos?: ReclamosService,
+    @Optional() private readonly intervenciones?: IntervencionesService,
   ) {
     this.radioMetros = Number(config.get('INTEGRACION_RADIO_METROS', 300));
     this.cupoMinimoRefuerzo = Number(config.get('INTEGRACION_CUPO_MINIMO_REFUERZO', 100));
@@ -93,7 +126,31 @@ export class IntegracionService {
           await this.bloquearZonas(data);
           return 'procesado';
         case `${EMERGENCIAS}EmergenciaActualizada`:
-          await this.desbloquearSiTermino(data);
+        case `${EMERGENCIAS}EmergenciaEstadoActualizado`:
+        case ESTADO_ACTUALIZADO_SEGUN_CU01: {
+          const estado = estadoDe(data);
+          await this.desbloquearSiTermino({ ...data, estadoNuevo: estado });
+          // Cancelada o descartada no deja nada por intervenir.
+          if (EMERGENCIA_ATENDIDA.has(estado)) {
+            await this.intervenciones?.programarSiCorresponde(data);
+          }
+          return 'procesado';
+        }
+        // Nombres de cierre sin confirmar: CU-01 documenta emergencia.resuelta y el
+        // backend de Emergencias publica EmergenciaCerrada.
+        case `${EMERGENCIAS}EmergenciaResuelta`:
+        case `${EMERGENCIAS}EmergenciaCerrada`:
+        case RESUELTA_SEGUN_CU01: {
+          const cerrada = eventType.endsWith('EmergenciaCerrada');
+          await this.desbloquearSiTermino({
+            ...data,
+            estadoNuevo: cerrada ? 'CERRADA' : 'RESUELTA',
+          });
+          await this.intervenciones?.programarSiCorresponde(data);
+          return 'procesado';
+        }
+        case `${ESPACIOS}ActividadCreada`:
+          await this.actividades.registrar(data);
           return 'procesado';
         default:
           if (await this.reclamos?.procesar(eventType, data)) {

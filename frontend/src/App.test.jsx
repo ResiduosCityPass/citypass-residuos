@@ -13,6 +13,7 @@ import {
 vi.mock('./api/waste.js', () => ({
   USING_MOCKS: true,
   fetchMapContainers: vi.fn(),
+  fetchMassEvents: vi.fn(() => Promise.resolve([])),
   fetchContainers: vi.fn(),
   fetchContainer: vi.fn(),
   fetchZones: vi.fn(),
@@ -32,6 +33,8 @@ vi.mock('./api/waste.js', () => ({
   fetchNearbyContainers: vi.fn(),
   fetchTrucks: vi.fn(() => Promise.resolve([])),
   fetchDrivers: vi.fn(() => Promise.resolve([])),
+  fetchInterventions: vi.fn(() => Promise.resolve([])),
+  completeIntervention: vi.fn(),
   fetchRoutes: vi.fn(() => Promise.resolve([])),
 }));
 
@@ -126,7 +129,7 @@ describe('shell de la aplicacion', () => {
    * sabe que es un "CU-07" y en la demo no tienen que aparecer en ningun lado:
    * ni en el menu, ni en el subtitulo de ninguna pantalla.
    */
-  it.each(['/mapa', '/contenedores', '/zonas', '/alertas', '/flota', '/choferes', '/rutas'])(
+  it.each(['/mapa', '/contenedores', '/zonas', '/alertas', '/flota', '/choferes', '/rutas', '/intervenciones'])(
     '%s no muestra codigos de caso de uso',
     async (path) => {
       window.history.pushState({}, '', path);

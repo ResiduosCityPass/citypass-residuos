@@ -33,6 +33,8 @@ export const EventTypes = {
   RUTA_RECALCULADA: 'residuos.ruta.recalculada',
   /** CU-INT-02: la respuesta a Reclamos, si el auto denunciado tapa algun contenedor. */
   RECLAMO_EVALUADO: 'residuos.reclamo.evaluado',
+  INTERVENCION_PROGRAMADA: 'residuos.intervencion.programada',
+  INTERVENCION_COMPLETADA: 'residuos.intervencion.completada',
 } as const;
 
 export type EventType = (typeof EventTypes)[keyof typeof EventTypes];

@@ -105,6 +105,7 @@ Dura 8 horas: el día de la demo hay que generarlo esa misma mañana.
 | `/rutas` | Rutas | CU-08 |
 | `/rutas/:id` | Detalle de la ruta | CU-08 + CU-09 |
 | `/choferes` | Choferes | CU-09 |
+| `/intervenciones` | Intervenciones por emergencia | CU-01 de Emergencias (A7) |
 
 Y dos que corren **fuera del Shell**, porque no son del operador:
 
@@ -511,6 +512,51 @@ defecto. Es un bypass del único control del caso de uso, así que no existe en 
 sea una demo. Hace falta porque los contenedores del seed están en el Obelisco y cualquiera que
 pruebe está a kilómetros: sin él, el camino feliz no se puede mostrar nunca. Con el toggle apagado
 se sigue demostrando el `403`.
+
+---
+
+## Intervención por emergencia (CU-01 de Emergencias, A7)
+
+**Actor:** el sistema la programa, el Operador la ve · **Pantalla:** `/intervenciones`
+
+Emergencias (Squad 6) es el dueño del caso: un ciudadano accidentado en bici aprieta el botón de
+pánico y ellos gestionan el incidente. Residuos solo interviene en la alternativa A7: cuando
+resuelven y marcan `RESIDUOS` entre las `causasRelacionadas` (un contenedor en la ciclovía, basura
+en la calzada).
+
+**Dónde vive:** [`intervenciones.service.ts`](backend/src/modules/integracion/application/intervenciones.service.ts) ·
+[`InterventionsPage.jsx`](frontend/src/pages/InterventionsPage.jsx) ·
+[`simulator/emergencia.js`](simulator/emergencia.js)
+
+**Entra por:** el webhook de siempre, `POST /webhooks/citypass`, en el mismo `case` que el fin de
+una emergencia (`EmergenciaActualizada`/`EmergenciaResuelta`). **Consume:** `GET /intervenciones`.
+
+**Reglas:**
+
+- **Solo actúa si `causasRelacionadas` incluye `RESIDUOS`.** Con `VIA` o `ESPACIO_PUBLICO` no hace
+  nada, y esa ausencia es parte del caso.
+- **Una intervención por emergencia**, garantizado por un índice único en `emergenciaId`. Alcanza
+  para el caso en que el aviso llegue por dos eventos distintos: la deduplicación por `eventId`
+  solo frena el mismo evento reenviado.
+- **Radio de 50 m**, no los 300 de las zonas: si la causa es un contenedor en la ciclovía está a
+  pocos metros, y a 300 m agarraría uno que no tiene nada que ver. No se filtran los
+  `FUERA_DE_SERVICIO`: uno roto en la ciclovía puede ser justamente la causa.
+- **Sin contenedor cerca la intervención se programa igual**, con `contenedorId: null`.
+- **Con contenedor cerca se crea un refuerzo**, para que la próxima ruta pase por ahí aunque no
+  esté crítico. Como siempre, la ruta la sigue generando el operador. **El refuerzo no se publica**
+  como `RefuerzoProgramado`: ese evento es del dashboard de eventos de Analítica.
+- **El operador la cierra con `PATCH /intervenciones/:id/completar`** (botón "Marcar completada"), y se publica `residuos.intervencion.completada`, que el CU-01 lista como evento de Residuos. No se reabre (`409 INTERVENCION_YA_COMPLETADA`).
+- **Las tarjetas de la pantalla** son el dashboard del módulo que pide el caso (intervenciones, con refuerzo, sin contenedor cerca, completadas). Salen de la misma lista, sin un segundo endpoint. Los "motivos" que muestra el prototipo no existen: ningún evento los trae.
+- **Un evento sin ubicación o mal formado se ignora y se loguea**, no se responde 400.
+- **Pendiente de confirmar con Emergencias.** Su backend publica `EmergenciaEstadoActualizado` y
+  `EmergenciaCerrada`, y **ninguno trae `causasRelacionadas` ni `ubicacion`**: hasta que lo agreguen,
+  la intervención no se puede disparar con sus eventos reales (sí con el simulador). Se aceptan
+  todas las variantes de nombre, del campo del estado y de las coordenadas. El prototipo del caso
+  mostraba otro evento, `emergencia.solicitud.residuos`; la versión del 29/10 del CU-01 lo descartó y define `emergencia.resuelta`, que también se acepta.
+- **Para que el evento saliente llegue a EDA**, Residuos tiene que registrar `IntervencionProgramada`
+  en la consola de EDA, con su esquema Avro (`docs/arquitectura/schemas/`); si no, el gateway
+  responde 404 y queda `FALLIDO` en el outbox. La suscripción al evento de resolución de Emergencias
+  también se crea desde esa consola, con la URL del webhook.
 
 ---
 

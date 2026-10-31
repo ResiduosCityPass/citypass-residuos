@@ -320,14 +320,28 @@ export class RutasService {
       }));
   }
 
-  /** Contenedores de los refuerzos por evento vigentes ahora, del tipo pedido. */
+  /**
+   * Contenedores de los refuerzos por evento vigentes ahora, del tipo pedido.
+   * El que ya se vacio desde que arranco el refuerzo no vuelve a entrar: el
+   * refuerzo pide una pasada, no una por cada ruta que se genere en la ventana.
+   * Si se llena de nuevo, entra como critico.
+   */
   private async contenedoresReforzados(tipoResiduo: TipoResiduo, zonaId?: string) {
     if (!this.refuerzos) {
       return [];
     }
 
+    const vigentes = await this.refuerzos.vigentes(new Date());
+    const vaciados = await this.rutas.ultimosVaciados([
+      ...new Set(vigentes.flatMap((r) => r.contenedorIds)),
+    ]);
     const ids = new Set(
-      (await this.refuerzos.vigentes(new Date())).flatMap((r) => r.contenedorIds),
+      vigentes.flatMap((r) =>
+        r.contenedorIds.filter((id) => {
+          const vaciado = vaciados.get(id);
+          return !vaciado || vaciado < r.desde;
+        }),
+      ),
     );
     if (ids.size === 0) {
       return [];
