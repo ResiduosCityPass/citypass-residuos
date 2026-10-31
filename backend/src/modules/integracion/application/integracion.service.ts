@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventTypes, buildEvent } from '../../../shared/domain/domain-event';
-import { distanciaMetros } from '../../../shared/domain/geo';
+import { Punto, dentroDelRadio, ubicacionDe } from '../../../shared/domain/geo';
 import { EVENT_PUBLISHER, EventPublisher } from '../../../shared/events/event-publisher';
 import { ContextoTransaccional } from '../../../shared/persistence/contexto-transaccional';
 import {
@@ -177,7 +177,7 @@ export class IntegracionService {
 
   /** Refuerzo de recoleccion para despues de un evento masivo. */
   private async programarRefuerzo(data: Record<string, unknown>): Promise<void> {
-    const punto = coordenadas(data);
+    const punto = ubicacionDe(data);
     const cupo = Number(data.cupoMaximo ?? 0);
 
     if (!punto || cupo < this.cupoMinimoRefuerzo) {
@@ -221,7 +221,7 @@ export class IntegracionService {
    * cuadras del corte se puede seguir haciendo.
    */
   private async bloquearZonas(data: Record<string, unknown>): Promise<void> {
-    const punto = coordenadas(data);
+    const punto = ubicacionDe(data);
 
     // Las emergencias que no cortan la circulacion (medica, panico) llegan sin coordenadas.
     if (data.afectaCirculacion !== true || !punto) {
@@ -283,9 +283,9 @@ export class IntegracionService {
     }
   }
 
-  private async contenedoresCerca(punto: { lat: number; lng: number }) {
+  private async contenedoresCerca(punto: Punto) {
     const activos = await this.contenedores.listar({ soloActivos: true });
-    return activos.filter((c) => distanciaMetros(punto, c) <= this.radioMetros);
+    return dentroDelRadio(punto, activos, this.radioMetros).map(({ item }) => item);
   }
 }
 
@@ -314,10 +314,4 @@ function causaDeLaEmergencia(data: Record<string, unknown>, emergenciaId: string
     causaTipo: completa ? causaTipo : null,
     correlationId: typeof correlationId === 'string' ? correlationId : emergenciaId,
   };
-}
-
-function coordenadas(data: Record<string, unknown>): { lat: number; lng: number } | null {
-  return typeof data.latitud === 'number' && typeof data.longitud === 'number'
-    ? { lat: data.latitud, lng: data.longitud }
-    : null;
 }

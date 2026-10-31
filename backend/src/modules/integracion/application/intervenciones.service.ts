@@ -1,7 +1,7 @@
 import { ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventTypes, buildEvent } from '../../../shared/domain/domain-event';
-import { distanciaMetros } from '../../../shared/domain/geo';
+import { Punto, dentroDelRadio, ubicacionDe } from '../../../shared/domain/geo';
 import { EVENT_PUBLISHER, EventPublisher } from '../../../shared/events/event-publisher';
 import { ContextoTransaccional } from '../../../shared/persistence/contexto-transaccional';
 import {
@@ -60,7 +60,7 @@ export class IntervencionesService {
     }
 
     const emergenciaId = leerEmergenciaId(data);
-    const punto = leerUbicacion(data);
+    const punto = ubicacionDe(data);
 
     if (!emergenciaId || !punto) {
       this.logger.warn(
@@ -182,12 +182,11 @@ export class IntervencionesService {
     });
   }
 
-  private async contenedorMasCercano(punto: { lat: number; lng: number }) {
+  private async contenedorMasCercano(punto: Punto) {
     const activos = await this.contenedores.listar({ soloActivos: true });
 
-    return activos
-      .map((c) => ({ id: c.id, distancia: distanciaMetros(punto, c) }))
-      .filter((c) => c.distancia <= this.radioMetros)
+    return dentroDelRadio(punto, activos, this.radioMetros)
+      .map(({ item, distancia }) => ({ id: item.id, distancia }))
       .sort((a, b) => a.distancia - b.distancia)[0];
   }
 }
@@ -203,18 +202,4 @@ function tieneCausaResiduos(data: Record<string, unknown>): boolean {
 function leerEmergenciaId(data: Record<string, unknown>): string | null {
   const id = data.emergenciaId ?? data.correlationId;
   return typeof id === 'string' && id.length > 0 && id.length <= 64 ? id : null;
-}
-
-/** Acepta `ubicacion: {lat, lng}` (CU-01) y `latitud`/`longitud` (resto de los eventos). */
-function leerUbicacion(data: Record<string, unknown>): { lat: number; lng: number } | null {
-  const u = data.ubicacion as Record<string, unknown> | undefined;
-  const lat = u?.lat ?? data.latitud;
-  const lng = u?.lng ?? data.longitud;
-
-  return typeof lat === 'number' &&
-    typeof lng === 'number' &&
-    Math.abs(lat) <= 90 &&
-    Math.abs(lng) <= 180
-    ? { lat, lng }
-    : null;
 }

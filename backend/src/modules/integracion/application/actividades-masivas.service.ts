@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventTypes, buildEvent } from '../../../shared/domain/domain-event';
-import { distanciaMetros } from '../../../shared/domain/geo';
+import { dentroDelRadio, ubicacionDe } from '../../../shared/domain/geo';
 import { EVENT_PUBLISHER, EventPublisher } from '../../../shared/events/event-publisher';
 import {
   CONTENEDOR_REPOSITORY,
@@ -80,9 +80,9 @@ export class ActividadesMasivasService {
     }
 
     const activos = await this.contenedores.listar({ soloActivos: true });
-    const contenedorIds = activos
-      .filter((c) => distanciaMetros(actividad.punto, c) <= this.radioMetros)
-      .map((c) => c.id);
+    const contenedorIds = dentroDelRadio(actividad.punto, activos, this.radioMetros).map(
+      ({ item }) => item.id,
+    );
 
     await this.integracion.guardarActividad({
       actividadId: actividad.actividadId,
@@ -145,9 +145,9 @@ export class ActividadesMasivasService {
 
 /** null si falta el id, la ubicacion o una fecha valida, o si la capacidad no es un entero. */
 function leerActividad(data: Record<string, unknown>): ActividadLeida | null {
-  const { actividadId, titulo, estado, ubicacion } = data;
+  const { actividadId, titulo, estado } = data;
   const capacidad = Number(data.capacidad ?? 0);
-  const { lat, lng } = (ubicacion ?? {}) as Record<string, unknown>;
+  const punto = ubicacionDe(data);
   const inicio = leerFecha(data.fechaHoraInicio);
   const fin = leerFecha(data.fechaHoraFinalizacion);
 
@@ -157,8 +157,7 @@ function leerActividad(data: Record<string, unknown>): ActividadLeida | null {
     actividadId.length > LARGO_MAXIMO_ID ||
     !Number.isInteger(capacidad) ||
     capacidad > CAPACIDAD_MAXIMA ||
-    typeof lat !== 'number' ||
-    typeof lng !== 'number' ||
+    !punto ||
     !inicio ||
     !fin
   ) {
@@ -169,7 +168,7 @@ function leerActividad(data: Record<string, unknown>): ActividadLeida | null {
     actividadId,
     titulo: typeof titulo === 'string' ? titulo.slice(0, LARGO_MAXIMO_TITULO) : null,
     capacidad,
-    punto: { lat, lng },
+    punto,
     inicio,
     fin,
     // En el nucleo siempre llega PROGRAMADA; el contrato deja lugar a CANCELADA.
