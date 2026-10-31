@@ -1,0 +1,41 @@
+{
+  "type": "record",
+  "name": "IntervencionCompletada",
+  "namespace": "com.citypass.residuos",
+  "doc": "La cuadrilla de Residuos ya intervino en el lugar de la emergencia (CU-01 de Emergencias, A7).",
+  "fields": [
+    {
+      "name": "intervencionId",
+      "type": "string"
+    },
+    {
+      "name": "emergenciaId",
+      "type": "string"
+    },
+    {
+      "name": "completadaEn",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      },
+      "doc": "Epoch en milisegundos."
+    },
+    {
+      "name": "correlationId",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "Igual al emergenciaId."
+    },
+    {
+      "name": "occurredAt",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      },
+      "doc": "Epoch en milisegundos."
+    }
+  ]
+}

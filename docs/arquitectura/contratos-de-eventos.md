@@ -125,6 +125,53 @@ pierden y por qué. Es el dato que justifica cambiar un horario o una frecuencia
 
 ---
 
+### `residuos.intervencion.programada` — CU-01 de Emergencias (alternativa A7)
+
+Se emite cuando Emergencias resuelve un incidente y **`causasRelacionadas` incluye `RESIDUOS`**
+(un contenedor en la ciclovía, residuos en la calzada). Con cualquier otra causa (`VIA`,
+`ESPACIO_PUBLICO`) no se emite nada. Sale al bus como `IntervencionProgramada`.
+
+```json
+{
+  "intervencionId": "a3f1c2d4-7b5e-4a90-8c11-2e6d9f0b7a15",
+  "emergenciaId": "EMG-20261008-0091",
+  "contenedorId": "ct-01",
+  "latitud": -34.6037,
+  "longitud": -58.3816,
+  "programadaEn": 1791486321000,
+  "correlationId": "EMG-20261008-0091",
+  "occurredAt": 1791486321000
+}
+```
+
+`programadaEn` y `occurredAt` van en **epoch milisegundos** (lo que lee Analítica). `contenedorId` es `null` si no había ningún contenedor a menos de 50 m (radio configurable con
+`INTEGRACION_RADIO_INTERVENCION_METROS`): la intervención se programa igual. Si había uno, además
+se crea un refuerzo interno para que entre en la próxima ruta. **No se publica `RefuerzoProgramado`**: ese evento alimenta el dashboard de eventos de Analítica y un refuerzo por emergencia no es de ningún evento comunitario.
+
+`correlationId` es el `emergenciaId`, para que EDA pueda seguir la cadena completa.
+
+**Consumidores esperados:** EDA (Squad 1) para verificar el flujo; Analítica Urbana (Squad 8), que solo lee eventos y arma gráficos, no publica nada.
+
+### `residuos.intervencion.completada` — CU-01 de Emergencias (A7)
+
+Se emite cuando el operador marca la intervención como completada (`PATCH /intervenciones/:id/completar`). Está en el catálogo del CU-01 (versión del 29/10). Sale al bus como `IntervencionCompletada`; esquema en [`schemas/IntervencionCompletada.avsc`](schemas/IntervencionCompletada.avsc).
+
+```json
+{
+  "intervencionId": "a3f1c2d4-7b5e-4a90-8c11-2e6d9f0b7a15",
+  "emergenciaId": "EMG-20261008-0091",
+  "completadaEn": 1791489600000,
+  "correlationId": "EMG-20261008-0091",
+  "occurredAt": 1791489600000
+}
+```
+
+Una intervención completada no se reabre (`409 INTERVENCION_YA_COMPLETADA`).
+
+El esquema Avro para registrarlo en la consola de EDA está en [`schemas/IntervencionProgramada.avsc`](schemas/IntervencionProgramada.avsc). **Lo registra Residuos, no EDA**; sin eso el gateway devuelve 404.
+
+---
+
 ### `residuos.reclamo.evaluado` — CU-INT-02
 
 Sale al bus como **`com.citypass.residuos.ReclamoEvaluado`**. Se emite **cada vez que Residuos
@@ -253,11 +300,28 @@ No sale al bus: lo usa nuestro front, que lo ve por la API. Ver
 | Evento | Squad origen | Qué hacemos al recibirlo |
 |---|---|---|
 | `emergencias.incidente.creado` | 6 — Emergencias | Si el incidente ocurre dentro de una zona, marcamos la zona como bloqueada y sus contenedores quedan excluidos del ruteo de CU-08. |
+| `emergencia.resuelta` (el del CU-01), `EmergenciaCerrada`, `EmergenciaResuelta`, y `EmergenciaEstadoActualizado` / `EmergenciaActualizada` con estado `RESUELTA` o `CERRADA` | 6 — Emergencias | Además de desbloquear las zonas, si `causasRelacionadas` incluye `RESIDUOS` programamos una intervención en `ubicacion` y publicamos `residuos.intervencion.programada`. El backend de Emergencias publica hoy `EmergenciaEstadoActualizado` y `EmergenciaCerrada`; su CU-01 documenta `emergencia.resuelta`. Se aceptan todas las variantes (el campo del estado puede llamarse `estadoNuevo`, `estado` o `nuevoEstado`). |
 | `movilidad.calle.cortada` | 3 — Movilidad Urbana | Se excluye el tramo del cálculo de ruta. Si la ruta ya estaba asignada, se marca para recálculo. |
 | `reclamos.creado` | 5 — Reclamos Ciudadanos | Si la categoría es residuos y referencia un contenedor nuestro, se le adjunta el reclamo y se eleva su prioridad en el ruteo. |
 | `com.citypass.reclamos.ReclamoCreado` (o variantes) | 5 — Reclamos Ciudadanos | **CU-INT-02, implementado.** Si es de estacionamiento indebido y el auto tapa un contenedor, lo sacamos del ruteo, recalculamos las rutas vivas y publicamos `ReclamoEvaluado`. Las variantes aceptadas están en `contrato-reclamos.ts` |
 | `com.citypass.reclamos.ReclamoActualizado` con `estadoNuevo: RESUELTO` (o variantes) | 5 — Reclamos Ciudadanos | **CU-INT-02, implementado.** Destapamos los contenedores del reclamo. También si queda rechazado o cancelado. Si nadie avisa, el bloqueo vence solo |
 | `com.citypass.reclamos.ReclamoReclasificado` (implementado por Reclamos, falta registrarlo en el catálogo) | 5 — Reclamos Ciudadanos | **CU-INT-02, implementado.** Si con la categoría nueva es un auto mal estacionado, se evalúa como un reclamo nuevo; si deja de serlo, se liberan sus contenedores. Para decidir si es un vehículo usamos el título y la descripción; `objetoAfectadoNuevo` solo suma (`CICLOVIA` alcanza) y nunca descarta, porque nombra lo afectado y lo elige el vecino |
+
+### Lo que necesitamos de Emergencias para el CU-01 (A7)
+
+El CU-01 (versión del 29/10) define **`emergencia.resuelta`** con `causasRelacionadas` y `ubicacion`, y quitó las solicitudes con confirmación. Pero al 29/10 el backend de Emergencias publica `EmergenciaEstadoActualizado` y `EmergenciaCerrada`, y **ninguno trae `causasRelacionadas` ni `ubicacion`**: sin eso Residuos no puede saber si actuar ni dónde. Mínimo que pedimos, sin inventar un evento nuevo, en `EmergenciaCerrada` (o en `emergencia.resuelta`, como dice su CU-01):
+
+```json
+{
+  "emergenciaId": "EMG-20261008-0091",
+  "causasRelacionadas": ["RESIDUOS"],
+  "ubicacion": { "lat": -34.6037, "lng": -58.3816 }
+}
+```
+
+El prototipo del caso mostraba un evento `emergencia.solicitud.residuos` con un `solicitudId`; la versión del 29/10 del CU-01 ya no lo menciona y se descartó.
+
+**Decidido el 30/10 con Analítica:** `RefuerzoProgramado` **no se publica** desde la intervención. El CU-01 lo listaba para A7, pero Analítica (G8) no lo necesita —sale del mismo `contenedorId` de la intervención— y ese evento alimenta su dashboard de eventos de Espacios. Se saca del doc del caso. El refuerzo sigue existiendo como mecanismo interno de ruteo.
 
 > Estos tres nombres son **supuestos**, derivados de la descripción de cada módulo en el enunciado.
 > Hay que confirmarlos con cada squad durante el Sprint 3, que es la instancia donde la cátedra

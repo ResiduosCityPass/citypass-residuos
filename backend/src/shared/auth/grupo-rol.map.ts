@@ -11,6 +11,13 @@ import { Rol } from '../domain/enums';
  * dados de alta. Si difieren, se corrige aca, no en los guards.
  */
 const GRUPO_A_ROL: Record<string, Rol> = {
+  // Nombres que se crean en el panel del Login, con el formato de Reclamos
+  // (reclamos-administradores, reclamos-operadores). El chofer no tiene grupo
+  // aca: entra con la credencial interna de ADR-009.
+  'residuos-administradores': Rol.ADMINISTRADOR,
+  'residuos-operadores': Rol.OPERADOR,
+  // Nombres de los sprints 1 y 2, que usan los tokens de desarrollo
+  // (`npm run token:dev`). Se sacan cuando el Login real este en uso.
   administrador: Rol.ADMINISTRADOR,
   operador: Rol.OPERADOR,
   chofer: Rol.CHOFER,
