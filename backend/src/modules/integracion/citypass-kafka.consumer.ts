@@ -35,13 +35,18 @@ const TOPICOS = /^com\.citypass\.(reclamos|emergencias|espacios)\./;
 @Injectable()
 export class CitypassKafkaConsumer implements OnApplicationBootstrap, OnApplicationShutdown {
   private readonly logger = new Logger(CitypassKafkaConsumer.name);
+  private readonly registry: SchemaRegistry;
   private consumer: Consumer | null = null;
 
   constructor(
     private readonly integracion: IntegracionService,
     private readonly gateway: GatewayTransporte,
     private readonly config: ConfigService,
-  ) {}
+  ) {
+    const urlGateway = config.get<string>('GATEWAY_URL', 'http://localhost:8080');
+    // El gateway responde /schemas/ids/{id} igual que un Schema Registry.
+    this.registry = new SchemaRegistry({ host: `${urlGateway}/api/v1` });
+  }
 
   async onApplicationBootstrap(): Promise<void> {
     const brokers = this.config.get<string>('KAFKA_BROKERS', '');
@@ -51,9 +56,6 @@ export class CitypassKafkaConsumer implements OnApplicationBootstrap, OnApplicat
     }
 
     const namespace = this.config.get<string>('GATEWAY_NAMESPACE', 'com.citypass.residuos');
-    const urlGateway = this.config.get<string>('GATEWAY_URL', 'http://localhost:8080');
-    // El gateway responde /schemas/ids/{id} igual que un Schema Registry.
-    const registry = new SchemaRegistry({ host: `${urlGateway}/api/v1` });
 
     const kafka = new Kafka({
       clientId: this.config.get<string>('GATEWAY_CLIENT_ID', 'svc-residuos'),
@@ -71,18 +73,17 @@ export class CitypassKafkaConsumer implements OnApplicationBootstrap, OnApplicat
 
     // Sin await: conectarse reintenta varios segundos y frenaria el arranque. Si
     // el bus no responde, la API arranca igual y el webhook sigue andando.
-    this.conectar(this.consumer, registry).catch((error: Error) =>
+    this.conectar(this.consumer).catch((error: Error) =>
       this.logger.error(`No se pudo conectar a Kafka: ${error.message}`),
     );
   }
 
-  private async conectar(consumer: Consumer, registry: SchemaRegistry): Promise<void> {
+  private async conectar(consumer: Consumer): Promise<void> {
     await consumer.connect();
     // Desde lo ultimo: el historial traeria emergencias viejas que bloquearian zonas.
     await consumer.subscribe({ topics: [TOPICOS], fromBeginning: false });
     await consumer.run({
-      eachMessage: async ({ message }) =>
-        message.value ? this.alRecibir(await registry.decode(message.value)) : undefined,
+      eachMessage: ({ message }) => this.alRecibir(message.value),
     });
     this.logger.log('Consumiendo del bus por Kafka');
   }
@@ -92,18 +93,54 @@ export class CitypassKafkaConsumer implements OnApplicationBootstrap, OnApplicat
   }
 
   /**
-   * kafkajs commitea el offset solo si esto termina bien. Un evento mal formado
-   * no se arregla reintentando y trabaria la particion, asi que se loguea y se
-   * sigue. Cualquier otro error (la base caida) se relanza para que se reintente.
+   * kafkajs commitea el offset solo si esto termina bien. Un mensaje o un evento
+   * mal formado no se arregla reintentando y trabaria la particion, asi que se
+   * loguea y se sigue. Cualquier otro error (el registry o la base caidos) se
+   * relanza para que se reintente.
    */
-  async alRecibir(sobre: unknown): Promise<void> {
+  async alRecibir(valor: Buffer | null): Promise<void> {
+    const sobre = await this.decodificar(valor);
+
+    if (sobre === null) {
+      return;
+    }
+
     try {
       await this.integracion.procesar(sobre as SobreGateway);
     } catch (error) {
       if (!(error instanceof BadRequestException)) {
         throw error;
       }
-      this.logger.warn(`Evento de Kafka descartado: ${JSON.stringify(error.getResponse())}`);
+      // Error y no warning: si todos caen aca, el sobre de Kafka no es el esperado.
+      this.logger.error(`Evento de Kafka descartado: ${JSON.stringify(error.getResponse())}`);
+    }
+  }
+
+  /** null si el mensaje no se puede leer. Tira si el registry no responde. */
+  private async decodificar(valor: Buffer | null): Promise<unknown> {
+    // Formato Confluent: [0x00][id del esquema, 4 bytes][Avro].
+    if (!valor || valor.length < 5 || valor[0] !== 0) {
+      this.logger.error('Mensaje de Kafka descartado: no tiene el formato de Confluent');
+      return null;
+    }
+
+    // Lo que falle aca es la conexion y se reintenta, salvo un esquema que el
+    // gateway no conoce: ese no va a aparecer. Despues queda en cache.
+    try {
+      await this.registry.getSchema(valor.readInt32BE(1));
+    } catch (error) {
+      if ((error as { status?: number }).status !== 404) {
+        throw error;
+      }
+      this.logger.error(`Mensaje de Kafka descartado: esquema ${valor.readInt32BE(1)} desconocido`);
+      return null;
+    }
+
+    try {
+      return await this.registry.decode(valor);
+    } catch (error) {
+      this.logger.error(`Mensaje de Kafka descartado: ${(error as Error).message}`);
+      return null;
     }
   }
 }
