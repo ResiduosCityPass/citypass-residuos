@@ -129,31 +129,33 @@ export class IntervencionesService {
   async completar(id: string): Promise<Intervencion> {
     return this.transaccion.ejecutar(async () => {
       const intervencion = await this.obtener(id);
+      const completadaEn = new Date();
 
-      if (intervencion.estado === EstadoIntervencion.COMPLETADA) {
+      // El UPDATE condicional es lo que decide, no la lectura de arriba: con dos
+      // operadores a la vez los dos leen PROGRAMADA, pero solo uno cambia la fila.
+      if (
+        intervencion.estado === EstadoIntervencion.COMPLETADA ||
+        !(await this.intervenciones.completarSiProgramada(id, completadaEn))
+      ) {
         throw new ConflictException({
           message: 'La intervencion ya esta completada',
           code: 'INTERVENCION_YA_COMPLETADA',
         });
       }
 
-      intervencion.estado = EstadoIntervencion.COMPLETADA;
-      intervencion.completadaEn = new Date();
-      const guardada = await this.intervenciones.guardar(intervencion);
-
       await this.eventos.publish(
         buildEvent(
           EventTypes.INTERVENCION_COMPLETADA,
           {
-            intervencionId: guardada.id,
-            emergenciaId: guardada.emergenciaId,
-            completadaEn: intervencion.completadaEn.toISOString(),
+            intervencionId: intervencion.id,
+            emergenciaId: intervencion.emergenciaId,
+            completadaEn: completadaEn.toISOString(),
           },
-          { correlationId: guardada.emergenciaId },
+          { correlationId: intervencion.emergenciaId },
         ),
       );
 
-      return guardada;
+      return { ...intervencion, estado: EstadoIntervencion.COMPLETADA, completadaEn };
     });
   }
 

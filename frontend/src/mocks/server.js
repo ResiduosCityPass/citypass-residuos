@@ -104,6 +104,33 @@ export const fetchMapContainers = (filters = {}) =>
       })),
   );
 
+/* --- Squad 3 · Actividades masivas -------------------------------------- */
+
+/** Mismo radio que usa el backend (INTEGRACION_RADIO_METROS). */
+const MASS_EVENT_RADIUS_M = 300;
+
+/** Un festival en el Obelisco que termina en dos horas, como para la demo. */
+const MASS_EVENTS = [
+  {
+    actividadId: '3f1c2a9e-0000-4000-8000-000000000001',
+    titulo: 'Festival de Primavera',
+    capacidad: 5000,
+    lat: -34.6037,
+    lng: -58.3816,
+    inicio: new Date(Date.now() - 3 * 3_600_000).toISOString(),
+    fin: new Date(Date.now() + 2 * 3_600_000).toISOString(),
+  },
+];
+
+export const fetchMassEvents = () =>
+  respond(
+    MASS_EVENTS.map((event) => ({
+      ...event,
+      radioMetros: MASS_EVENT_RADIUS_M,
+      contenedores: active().filter((c) => distanceMeters(event, c) <= MASS_EVENT_RADIUS_M).length,
+    })),
+  );
+
 /* --- CU-01 · Contenedores ----------------------------------------------- */
 
 export const fetchContainers = (filters = {}) =>

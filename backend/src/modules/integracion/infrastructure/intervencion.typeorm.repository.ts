@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { ContextoTransaccional } from '../../../shared/persistence/contexto-transaccional';
-import { Intervencion } from '../domain/intervencion.entity';
+import { EstadoIntervencion, Intervencion } from '../domain/intervencion.entity';
 import { IntervencionRepository } from '../domain/intervencion.repository';
 
 @Injectable()
@@ -45,7 +45,14 @@ export class IntervencionTypeormRepository implements IntervencionRepository {
     return this.manager().getRepository(Intervencion).findOneBy({ id });
   }
 
-  guardar(intervencion: Intervencion): Promise<Intervencion> {
-    return this.manager().getRepository(Intervencion).save(intervencion);
+  async completarSiProgramada(id: string, completadaEn: Date): Promise<boolean> {
+    const resultado = await this.manager()
+      .getRepository(Intervencion)
+      .update(
+        { id, estado: EstadoIntervencion.PROGRAMADA },
+        { estado: EstadoIntervencion.COMPLETADA, completadaEn },
+      );
+
+    return (resultado.affected ?? 0) > 0;
   }
 }

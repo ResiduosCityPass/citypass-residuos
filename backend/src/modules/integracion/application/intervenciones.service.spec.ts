@@ -39,7 +39,7 @@ describe('IntervencionesService (CU-01, A7)', () => {
         .mockImplementation(async (i: Partial<Intervencion>) => ({ id: 'in-1', ...i })),
       listar: jest.fn(),
       buscar: jest.fn(),
-      guardar: jest.fn().mockImplementation(async (i: Intervencion) => i),
+      completarSiProgramada: jest.fn().mockResolvedValue(true),
     };
     integracion = { guardarRefuerzo: jest.fn().mockImplementation(async (r) => r) };
     contenedores = { listar: jest.fn().mockResolvedValue([LEJOS, A_80M, MUY_CERCA]) };
@@ -184,6 +184,14 @@ describe('IntervencionesService (CU-01, A7)', () => {
       const [evento] = eventos.getPublished(EventTypes.INTERVENCION_COMPLETADA);
       expect(evento.correlationId).toBe('EMG-1');
       expect(evento.payload).toMatchObject({ intervencionId: 'in-1', emergenciaId: 'EMG-1' });
+    });
+
+    it('si otro operador la completo entre la lectura y el cierre, da 409 y no publica', async () => {
+      repo.buscar.mockResolvedValue(programada());
+      repo.completarSiProgramada.mockResolvedValue(false);
+
+      await expect(service.completar('in-1')).rejects.toBeInstanceOf(ConflictException);
+      expect(eventos.getPublished()).toHaveLength(0);
     });
 
     it('una intervencion ya completada da 409 y no vuelve a publicar', async () => {

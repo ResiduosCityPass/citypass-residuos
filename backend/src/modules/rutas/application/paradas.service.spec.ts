@@ -87,6 +87,7 @@ describe('ParadasService (CU-10)', () => {
       listar: jest.fn(),
       buscarActivaDeChofer: jest.fn(),
       contenedoresEnRutasVivas: jest.fn(),
+      ultimosVaciados: jest.fn(),
       avanceDeParadas: jest.fn(),
       rutasVivasConPendientes: jest.fn().mockResolvedValue([]),
     };

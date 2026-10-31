@@ -3,10 +3,13 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ContenedoresModule } from '../contenedores/contenedores.module';
 import { RutasModule } from '../rutas/rutas.module';
 import { ZonasModule } from '../zonas/zonas.module';
+import { ActividadesMasivasController } from './actividades-masivas.controller';
+import { ActividadesMasivasService } from './application/actividades-masivas.service';
 import { IntegracionService } from './application/integracion.service';
 import { IntervencionesService } from './application/intervenciones.service';
 import { ReclamosService } from './application/reclamos.service';
 import { CitypassWebhookController } from './citypass-webhook.controller';
+import { ActividadMasiva } from './domain/actividad-masiva.entity';
 import { Intervencion } from './domain/intervencion.entity';
 import { INTERVENCION_REPOSITORY } from './domain/intervencion.repository';
 import { IntervencionTypeormRepository } from './infrastructure/intervencion.typeorm.repository';
@@ -29,6 +32,7 @@ import { IntegracionTypeormRepository } from './infrastructure/integracion.typeo
       EventoRecibido,
       RefuerzoEvento,
       BloqueoPorIncidente,
+      ActividadMasiva,
       ObstruccionPorReclamo,
       Intervencion,
     ]),
@@ -38,9 +42,10 @@ import { IntegracionTypeormRepository } from './infrastructure/integracion.typeo
     // recalculan rutas (CU-INT-02).
     forwardRef(() => RutasModule),
   ],
-  controllers: [CitypassWebhookController, IntervencionesController],
+  controllers: [CitypassWebhookController, ActividadesMasivasController, IntervencionesController],
   providers: [
     IntegracionService,
+    ActividadesMasivasService,
     IntervencionesService,
     ReclamosService,
     IntegracionTypeormRepository,
