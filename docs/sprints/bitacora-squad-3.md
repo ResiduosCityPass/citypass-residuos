@@ -370,3 +370,34 @@ Rama `feat/squad3-refuerzo-programado`, creada desde la del #57.
 - En local, `npm run actividad -- --contenedor CT-0005 --termina-en 0` dejó el evento en el outbox, con `eventoId` `act-...` y 1 contenedor.
 
 **Sin probar:** el gateway real. En local el driver es `inmemory`. Tampoco está confirmada la métrica con Valen.
+
+## Sáb 31/10 · Reclamos sobre una ruta de escuadrilla con varias paradas
+
+Era lo que había quedado sin probar el 30/10. Ruta del camión de reciclables con 4 tachos de escuadrilla: CT-0010, CT-0016, CT-0005 y CT-0008.
+
+**Lo que pasó:**
+1. Un auto tapó CT-0010 con la ruta `ASIGNADA`: la parada quedó `OMITIDA` con el motivo y el resto se reordenó. La distancia bajó de 5,6 a 5,4 km.
+2. Otro auto tapó CT-0008: pasó lo mismo y la ruta siguió `ASIGNADA`, sin arrancar sola.
+3. Juana confirmó CT-0005 y la ruta pasó a `EN_CURSO`.
+4. Un auto tapó CT-0016, la última pendiente: la ruta pasó a `COMPLETADA` y el camión quedó `DISPONIBLE`.
+5. Una ruta nueva no incluyó los tachos tapados. Avisar que el reclamo se resolvió liberó las obstrucciones.
+
+**Lo que apareció:** esa ruta nueva sí incluyó CT-0005, recién vaciado y al 0 %. El refuerzo dura 6 h y no mira si el tacho ya se vació, así que cada ruta nueva de esa ventana lo vuelve a sumar. No es de esta prueba: pasa con cualquier ruta de escuadrilla ya cerrada.
+
+## Sáb 31/10 · Un tacho ya vaciado no vuelve a entrar por el refuerzo
+
+Rama `fix/squad3-refuerzo-tacho-vaciado`, creada desde `feat/squad3-refuerzo-programado`.
+
+**Qué cambió:** al armar la ruta, un tacho reforzado queda afuera si el chofer lo vació después de que arrancó el refuerzo. El refuerzo pide una pasada, no una por cada ruta que se genere en la ventana. También aplica al refuerzo de Nico, porque es el mismo mecanismo.
+
+**Lo que sigue igual:**
+- Si el tacho se llena de nuevo y queda crítico, entra como cualquier crítico.
+- Un vaciado anterior al inicio del refuerzo no cuenta: el tacho entra.
+- Una parada omitida no cuenta como vaciado: el tacho vuelve a entrar.
+
+**Pruebas:**
+- 3 tests nuevos. Pasan los 514 tests unitarios, los 103 e2e, tipos y lint.
+- En local, con el camión de reciclables:
+  1. La ruta nueva salió con CT-0010, CT-0016 y CT-0008, sin CT-0005, que ya estaba vaciado.
+  2. Con los cuatro vaciados, generar otra ruta respondió 409 (`RUTA_SIN_CONTENEDORES`).
+  3. Una actividad nueva al lado de CT-0005 lo hizo entrar otra vez.
