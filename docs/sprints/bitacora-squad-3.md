@@ -334,3 +334,39 @@ Probé el caso entero con lo de Fran adentro, por API y por pantalla.
 **Lo que apareció:** mi base local no tenía la migración de Fran y generar una ruta dio error 500. Se arregló con `npm run migration:run`. No es un error del código y no afecta a Render, donde las migraciones corren solas al desplegar. Cualquiera que traiga `develop` tiene que correrla en su base local.
 
 **Sin probar:** el bus real (falta el `client_id` y el secreto) y un reclamo sobre una ruta de varias paradas con la escuadrilla, porque en la prueba la ruta tenía una sola parada.
+
+## Sáb 31/10 · Falta la métrica de BI de mi caso
+
+**Qué pidió Fran:** cada caso necesita una métrica para Analítica y el #57 no publica nada al bus. Propone publicar `RefuerzoProgramado` cuando se agenda la escuadrilla. Esto cambia lo que decidimos el 22/10, que Residuos solo recibe. Falta confirmarlo con Valen (Analítica).
+
+**Lo que revisé:**
+- **El traductor y el código:** `RefuerzoProgramado` ya se traduce para el bus y lo publica el caso de Nico. Agregarlo a `ActividadesMasivasService` es un cambio chico.
+- **Sin confirmar:** si está registrado en el catálogo, porque consultarlo pide token (responde 401). En el repo no está su esquema `.avsc`.
+- **Sin confirmar:** si Analítica lo lee. En `main` de su repo público, la capa de Residuos solo lee `AlertaGenerada` y `RecoleccionCompletada`, pero el último cambio es de septiembre y puede estar desactualizado.
+- **Para la métrica:** el evento también sale por los refuerzos de Nico. Los de mi caso se distinguen porque su `eventoId` empieza con `act-`.
+- **Superposición:** el documento de Fran le asignaba a Tomás publicar este evento. Hay que avisarle para no duplicarlo.
+
+**Estado de los PRs:**
+- #57: CI y Sonar en verde, sin conflictos, todavía sin revisión.
+- #60 y #62: aprobados y sin mergear. Si entran antes, el #57 puede volver a tener conflictos.
+- #63: sin revisión.
+- `main`: el último release sigue siendo el #50, del 16/10.
+- Tomás: todavía no tiene rama ni PR.
+
+**Decisión:** la publicación va en una rama y un PR aparte, para no cambiarle el #57 a Nico mientras lo revisa.
+
+## Sáb 31/10 · Residuos publica `RefuerzoProgramado` en mi caso
+
+Rama `feat/squad3-refuerzo-programado`, creada desde la del #57.
+
+**Qué hace:** cuando se agenda la escuadrilla, `ActividadesMasivasService` publica `RefuerzoProgramado` en la misma transacción. No lo publica si la actividad es chica, está cancelada, llega mal formada o no tiene contenedores cerca.
+
+**Documentación:**
+- Sumé el evento y la métrica propuesta a `docs/arquitectura/contratos-de-eventos.md`.
+- Sumé el esquema `docs/arquitectura/schemas/RefuerzoProgramado.avsc`, para registrarlo en el catálogo si hace falta.
+
+**Pruebas:**
+- Pasan los 511 tests unitarios, los 103 e2e, tipos y lint.
+- En local, `npm run actividad -- --contenedor CT-0005 --termina-en 0` dejó el evento en el outbox, con `eventoId` `act-...` y 1 contenedor.
+
+**Sin probar:** el gateway real. En local el driver es `inmemory`. Tampoco está confirmada la métrica con Valen.
