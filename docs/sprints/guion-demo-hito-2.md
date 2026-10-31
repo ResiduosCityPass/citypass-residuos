@@ -102,7 +102,7 @@ que nadie tuviera que avisarnos."
 | El evento no aparece en el mapa | Refrescar. Si sigue sin aparecer, `npm run bus -- fallidos`; si tarda, pasar al plan B |
 | El bus o Espacios no responden | Plan B: el script, mismo evento, misma historia |
 | La ruta sale sin el tacho de la plaza | El evento no terminó todavía (la escuadrilla arranca a la hora de fin) o el tacho está en otra ruta viva |
-| "No hay contenedores para la ruta" | Hay una ruta en `PROPUESTA` colgada: descartarla y generar de nuevo |
+| "No hay contenedores para la ruta" | Hay una ruta en `PROPUESTA` colgada: descartarla y generar de nuevo. Si los tachos ya se vaciaron, no vuelven a entrar: mandar otra actividad para repetir |
 | El chofer no puede confirmar | La ubicación de DevTools no es la del contenedor |
 
 ---

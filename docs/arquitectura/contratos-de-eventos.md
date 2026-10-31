@@ -324,8 +324,8 @@ el log.
    como un círculo, con un aviso con la hora de fin.
 4. **Escuadrilla:** si hay contenedores cerca, crea un refuerzo `act-<actividadId>` que va
    desde `fechaHoraFinalizacion` hasta 6 h después. En esa ventana, esos contenedores entran a la ruta que
-   genera CU-08 aunque no estén críticos. El operador genera y asigna la ruta, y el chofer la
-   cierra con CU-10.
+   genera CU-08 aunque no estén críticos, salvo que ya se hayan vaciado desde que arrancó el
+   refuerzo. El operador genera y asigna la ruta, y el chofer la cierra con CU-10.
 
 **Errores:** si falta el id, las coordenadas o una fecha válida, el evento se ignora, se deja un
 aviso en el log y se responde `204`. No se responde `400`, porque el bus lo reintentaría para

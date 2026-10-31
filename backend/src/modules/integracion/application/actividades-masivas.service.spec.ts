@@ -138,6 +138,11 @@ describe('ActividadesMasivasService (squad 3)', () => {
         { fechaHoraFinalizacion: '2026-11-01T20:00:00Z' },
       ],
       ['sin fecha de inicio', { fechaHoraInicio: undefined }],
+      ['con una fecha fuera de rango', { fechaHoraFinalizacion: 1e20 }],
+      ['con un id que no entra en el refuerzo', { actividadId: 'x'.repeat(61) }],
+      ['con una capacidad que no es un numero', { capacidad: 'muchos' }],
+      ['con una capacidad con decimales', { capacidad: 1000.5 }],
+      ['con una capacidad que no entra en la columna', { capacidad: 3_000_000_000 }],
     ])('%s', async (_caso, cambios) => {
       await expect(service.registrar(actividad(cambios))).resolves.toBeUndefined();
 
@@ -145,6 +150,24 @@ describe('ActividadesMasivasService (squad 3)', () => {
       expect(integracion.guardarRefuerzo).not.toHaveBeenCalled();
       expect(eventos.publish).not.toHaveBeenCalled();
     });
+  });
+
+  it('acepta el id mas largo que entra en el refuerzo', async () => {
+    const actividadId = 'x'.repeat(60);
+
+    await service.registrar(actividad({ actividadId }));
+
+    expect(integracion.guardarRefuerzo).toHaveBeenCalledWith(
+      expect.objectContaining({ eventoId: `act-${actividadId}` }),
+    );
+  });
+
+  it('recorta un titulo que no entra en la columna, sin perder la actividad', async () => {
+    await service.registrar(actividad({ titulo: 'x'.repeat(250) }));
+
+    expect(integracion.guardarActividad).toHaveBeenCalledWith(
+      expect.objectContaining({ titulo: 'x'.repeat(200) }),
+    );
   });
 
   it('para el mapa trae las que terminaron hace menos de 6 h, con su radio', async () => {

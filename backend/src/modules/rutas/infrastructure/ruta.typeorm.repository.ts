@@ -109,6 +109,23 @@ export class RutaTypeormRepository extends RepositorioTypeorm<Ruta> implements R
     return filas.map((f) => f.rutaId);
   }
 
+  async ultimosVaciados(contenedorIds: string[]): Promise<Map<string, Date>> {
+    if (contenedorIds.length === 0) {
+      return new Map();
+    }
+
+    const filas = await this.paradas
+      .createQueryBuilder('parada')
+      .select('parada.contenedorId', 'contenedorId')
+      .addSelect('MAX(parada.confirmadaEn)', 'ultimoVaciado')
+      .where('parada.contenedorId IN (:...contenedorIds)', { contenedorIds })
+      .andWhere('parada.estado = :confirmada', { confirmada: EstadoParada.CONFIRMADA })
+      .groupBy('parada.contenedorId')
+      .getRawMany<{ contenedorId: string; ultimoVaciado: Date }>();
+
+    return new Map(filas.map((f) => [f.contenedorId, new Date(f.ultimoVaciado)]));
+  }
+
   /**
    * Una sola consulta agrupada para todas las rutas del listado. Traer las
    * paradas enteras por ruta seria mover cientos de filas para mostrar un
