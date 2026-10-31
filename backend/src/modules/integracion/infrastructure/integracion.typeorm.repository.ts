@@ -1,13 +1,20 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, EntityManager, LessThanOrEqual, MoreThan } from 'typeorm';
+import { DataSource, EntityManager, IsNull, LessThanOrEqual, MoreThan } from 'typeorm';
 import { ContextoTransaccional } from '../../../shared/persistence/contexto-transaccional';
 import { ActividadMasiva } from '../domain/actividad-masiva.entity';
 import { BloqueoPorIncidente } from '../domain/bloqueo-por-incidente.entity';
-import { IntegracionRepository, RefuerzosVigentes } from '../domain/integracion.repository';
+import {
+  IntegracionRepository,
+  ObstruccionRepository,
+  RefuerzosVigentes,
+} from '../domain/integracion.repository';
+import { ObstruccionPorReclamo } from '../domain/obstruccion-por-reclamo.entity';
 import { RefuerzoEvento } from '../domain/refuerzo-evento.entity';
 
 @Injectable()
-export class IntegracionTypeormRepository implements IntegracionRepository, RefuerzosVigentes {
+export class IntegracionTypeormRepository
+  implements IntegracionRepository, RefuerzosVigentes, ObstruccionRepository
+{
   constructor(
     private readonly dataSource: DataSource,
     private readonly contexto: ContextoTransaccional,
@@ -67,5 +74,41 @@ export class IntegracionTypeormRepository implements IntegracionRepository, Refu
     return this.manager()
       .getRepository(RefuerzoEvento)
       .findBy({ desde: LessThanOrEqual(momento), hasta: MoreThan(momento) });
+  }
+
+  async guardarObstrucciones(filas: Partial<ObstruccionPorReclamo>[]): Promise<void> {
+    if (filas.length === 0) {
+      return;
+    }
+
+    // ON CONFLICT DO NOTHING sobre (reclamoId, contenedorId): un reclamo que
+    // llega de nuevo con otro eventId no rompe la transaccion ni extiende el
+    // vencimiento de lo que ya estaba tapado.
+    await this.manager()
+      .getRepository(ObstruccionPorReclamo)
+      .createQueryBuilder()
+      .insert()
+      .values(filas)
+      .orIgnore()
+      .execute();
+  }
+
+  async resolverReclamo(reclamoId: string, momento: Date): Promise<number> {
+    const resultado = await this.manager()
+      .getRepository(ObstruccionPorReclamo)
+      .update({ reclamoId, resueltaEn: IsNull() }, { resueltaEn: momento });
+
+    return resultado.affected ?? 0;
+  }
+
+  async contenedoresObstruidos(momento: Date): Promise<string[]> {
+    const filas = await this.manager()
+      .getRepository(ObstruccionPorReclamo)
+      .find({
+        select: { contenedorId: true },
+        where: { resueltaEn: IsNull(), venceEn: MoreThan(momento) },
+      });
+
+    return [...new Set(filas.map((f) => f.contenedorId))];
   }
 }

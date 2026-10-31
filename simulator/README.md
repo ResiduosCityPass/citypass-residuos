@@ -93,6 +93,27 @@ BUS_URL=<url-del-bus> CLIENT_ID=<id> CLIENT_SECRET=<secreto> WEBHOOK_TOKEN=<el-d
 `--topico` cambia el tipo de evento (default `com.citypass.espacios.ActividadCreada`). En vez de
 `CLIENT_ID` y `CLIENT_SECRET` se puede pasar un token ya emitido en `BUS_TOKEN`. Los pasos completos
 para Render están en `docs/sprints/plan-maximo-residuos.md`.
+## Reclamo por un auto que bloquea la bicisenda (CU-INT-02)
+
+`reclamo.js` hace de módulo de Reclamos: le manda al webhook de Residuos los mismos eventos que
+mandaría el gateway, con el formato del contrato de Reclamos del 22/10. Sirve para la demo sin
+depender de que ellos estén publicando. Guion completo en `docs/sprints/guion-demo-reclamos.md`.
+
+Necesita una ruta `EN_CURSO` o `ASIGNADA`, el token de administrador y el
+`GATEWAY_WEBHOOK_TOKEN` del backend:
+
+```bash
+TOKEN=<jwt> WEBHOOK_TOKEN=webhook-local npm run reclamo
+```
+
+| Comando | Qué provoca |
+|---|---|
+| `npm run reclamo` | Un auto a ~5 m de la próxima parada pendiente: la parada se omite y la ruta se reordena |
+| `npm run reclamo -- --lejos` | El auto a ~100 m: no tapa nada, `afectaRecoleccion: false` |
+| `npm run reclamo -- --ruta <id>` | Elige la ruta en vez de tomar la primera activa |
+| `npm run reclamo:resuelto` | Reclamos avisa que se retiró el auto (usa el último reclamo enviado) |
+
+El id del último reclamo queda en `ultimo-reclamo.txt`, que no se versiona.
 
 ## El nivel sobrevive entre corridas
 

@@ -79,12 +79,14 @@ describe('RutasService (CU-08, CU-09)', () => {
       buscarActivaDeChofer: jest.fn().mockResolvedValue(null),
       contenedoresEnRutasVivas: jest.fn().mockResolvedValue([]),
       avanceDeParadas: jest.fn().mockResolvedValue(new Map()),
+      rutasVivasConPendientes: jest.fn().mockResolvedValue([]),
     };
     paradas = {
       crearVarias: jest.fn().mockResolvedValue([]),
       guardar: jest.fn(),
       buscarPorId: jest.fn(),
       listarDeRuta: jest.fn().mockResolvedValue([]),
+      borrar: jest.fn(),
     };
     contenedores = {
       crear: jest.fn(),
@@ -401,6 +403,49 @@ describe('RutasService (CU-08, CU-09)', () => {
 
       const creadas = paradas.crearVarias.mock.calls[0][0];
       expect(creadas.map((p) => p.contenedorId).sort()).toEqual(['c-1', 'c-3']);
+    });
+  });
+
+  describe('CU-INT-02 · contenedor tapado por un auto', () => {
+    const conObstrucciones = (obstruidos: string[]) =>
+      new RutasService(
+        rutas,
+        paradas,
+        contenedores,
+        eventos,
+        flota as unknown as FlotaService,
+        choferes as unknown as ChoferesService,
+        zonas as unknown as ZonasService,
+        { ejecutar: <T>(b: () => Promise<T>) => b() } as unknown as ContextoTransaccional,
+        new ConfigService({}),
+        { vigentes: jest.fn().mockResolvedValue([{ contenedorIds: ['c-2'] }]) },
+        { contenedoresObstruidos: jest.fn().mockResolvedValue(obstruidos) },
+      );
+
+    beforeEach(() => {
+      contenedores.listar.mockResolvedValue([contenedor('c-1', 0.005), contenedor('c-2', 0.01)]);
+    });
+
+    it('deja afuera del ruteo al contenedor obstruido', async () => {
+      await conObstrucciones(['c-1']).generar({ camionId: 'cm-1' });
+
+      const creadas = paradas.crearVarias.mock.calls[0][0];
+      expect(creadas.map((p) => p.contenedorId)).toEqual(['c-2']);
+    });
+
+    it('lo deja afuera aunque este reforzado por un evento', async () => {
+      await conObstrucciones(['c-2']).generar({ camionId: 'cm-1' });
+
+      const creadas = paradas.crearVarias.mock.calls[0][0];
+      expect(creadas.map((p) => p.contenedorId)).toEqual(['c-1']);
+    });
+
+    it('si todos estan tapados, no hay ruta que generar', async () => {
+      await expect(conObstrucciones(['c-1', 'c-2']).generar({ camionId: 'cm-1' })).rejects.toThrow(
+        expect.objectContaining({
+          response: expect.objectContaining({ code: 'RUTA_SIN_CONTENEDORES' }),
+        }),
+      );
     });
   });
 });

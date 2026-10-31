@@ -302,3 +302,11 @@ Mientras espero el cliente del Login, adelanté el paso 6: el guion de mi parte 
 - **Qué hace el #54:** el ruteo saltea los contenedores tapados por un auto, aunque estén reforzados. Además, el sistema puede omitir una parada sin sesión de chofer. El endpoint del chofer queda igual.
 - **Lo revisé y lo aprobé.** CI y Sonar en verde. No choca con mi #57 en `rutas`: el único conflicto sigue siendo `integracion.module.ts`.
 - **Le dejé una observación que no bloquea:** si el sistema omite una parada de una ruta `ASIGNADA` y quedan otras pendientes, la ruta pasa a `EN_CURSO` aunque el chofer no haya arrancado. Hoy solo cambia lo que se ve en pantalla.
+
+## Vie 30/10 · Actualicé el #57 con `develop`
+
+- **Qué pasó:** la pila de Fran (#53, #54, #55 y #58) y el #61 ya están en `develop`, así que el siguiente es mi #57. Tenía conflictos.
+- **Conflictos:** 4 archivos, todos de sumar. Dejé las dos partes en `integracion.service.ts`, `integracion.module.ts`, `simulator/package.json` y `simulator/README.md`. Mi caso sigue con su `case` en el `switch` y el de Fran entra por el `default`, así que no se pisan.
+- **Pruebas:** tipos y lint en verde, pasan los 510 tests unitarios y los 103 e2e. En local, el backend arrancó sin errores con las migraciones de los dos y `npm run actividad` dejó la zona en `GET /actividades-masivas`.
+- **Orden que sigue (Rami):** #57 → #60 → release a `main`. Rami hace antes el backup de la base y necesita `GATEWAY_WEBHOOK_TOKEN`, que le paso por privado.
+- **Para tener en cuenta:** Nico abrió el #62, que toca archivos que también tocan otros PRs. El que entre después va a tener conflictos.

@@ -78,6 +78,7 @@ describe('ParadasService (CU-10)', () => {
       guardar: jest.fn().mockImplementation(async (p) => p),
       buscarPorId: jest.fn().mockResolvedValue(parada),
       listarDeRuta: jest.fn().mockResolvedValue([parada]),
+      borrar: jest.fn(),
     };
     rutas = {
       crear: jest.fn(),
@@ -87,6 +88,7 @@ describe('ParadasService (CU-10)', () => {
       buscarActivaDeChofer: jest.fn(),
       contenedoresEnRutasVivas: jest.fn(),
       avanceDeParadas: jest.fn(),
+      rutasVivasConPendientes: jest.fn().mockResolvedValue([]),
     };
     contenedores = {
       crear: jest.fn(),
@@ -363,6 +365,238 @@ describe('ParadasService (CU-10)', () => {
       await expect(service.confirmar('pd-1', SESION, EN_EL_CONTENEDOR)).rejects.toThrow(
         ConflictException,
       );
+    });
+  });
+
+  describe('omitirPorSistema · CU-INT-02, un reclamo avisa que un auto tapa el contenedor', () => {
+    const MOTIVO_RECLAMO = 'Acceso bloqueado por vehiculo (reclamo RC-123)';
+    let transaccion: { ejecutar: jest.Mock; managerActual: jest.Mock };
+    let sistema: ParadasService;
+
+    beforeEach(() => {
+      transaccion = {
+        ejecutar: jest.fn().mockImplementation(<T>(b: () => Promise<T>) => b()),
+        managerActual: jest.fn().mockReturnValue(null),
+      };
+      sistema = new ParadasService(
+        paradas,
+        rutas,
+        contenedores,
+        eventos,
+        alertas as unknown as AlertasService,
+        choferes as unknown as ChoferesService,
+        flota as unknown as FlotaService,
+        transaccion as unknown as ContextoTransaccional,
+        new ConfigService({}),
+      );
+    });
+
+    it('omite sin sesion de chofer, con los mismos efectos que la omision del chofer', async () => {
+      const resultado = await sistema.omitirPorSistema('pd-1', MOTIVO_RECLAMO);
+
+      expect(parada.estado).toBe(EstadoParada.OMITIDA);
+      expect(resultado.motivo).toBe(MOTIVO_RECLAMO);
+      expect(contenedores.guardar).not.toHaveBeenCalled();
+      expect(alertas.resolverAbiertasPorTipoConIds).not.toHaveBeenCalled();
+      expect(choferes.buscarActivoPorUsuarioSub).not.toHaveBeenCalled();
+
+      const [evento] = eventos.getPublished(EventTypes.PARADA_OMITIDA);
+      expect(evento.payload).toEqual(
+        expect.objectContaining({ motivo: MOTIVO_RECLAMO, choferId: CHOFER.legajo }),
+      );
+    });
+
+    it('no arranca la ruta: si el chofer no salio, sigue ASIGNADA', async () => {
+      const otra = { ...parada, id: 'pd-2', estado: EstadoParada.PENDIENTE } as Parada;
+      paradas.listarDeRuta.mockResolvedValue([parada, otra]);
+
+      const resultado = await sistema.omitirPorSistema('pd-1', MOTIVO_RECLAMO);
+
+      expect(resultado.rutaEstado).toBe(EstadoRuta.ASIGNADA);
+      expect(rutas.guardar).not.toHaveBeenCalled();
+    });
+
+    it('se suma a la transaccion en curso en vez de abrir otra', async () => {
+      transaccion.managerActual.mockReturnValue({});
+
+      await sistema.omitirPorSistema('pd-1', MOTIVO_RECLAMO);
+
+      expect(transaccion.ejecutar).not.toHaveBeenCalled();
+    });
+
+    it('sin transaccion en curso, abre una propia', async () => {
+      await sistema.omitirPorSistema('pd-1', MOTIVO_RECLAMO);
+
+      expect(transaccion.ejecutar).toHaveBeenCalledTimes(1);
+    });
+
+    it('una parada ya cerrada no se vuelve a cerrar', async () => {
+      parada.estado = EstadoParada.CONFIRMADA;
+
+      await expect(sistema.omitirPorSistema('pd-1', MOTIVO_RECLAMO)).rejects.toThrow(
+        ConflictException,
+      );
+    });
+
+    it('falla con 404 si la parada no existe', async () => {
+      paradas.buscarPorId.mockResolvedValue(null);
+
+      await expect(sistema.omitirPorSistema('pd-1', MOTIVO_RECLAMO)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
+  describe('quitarContenedores · CU-INT-02, recalcular rutas por un auto que tapa', () => {
+    const MOTIVO_RECLAMO = 'Acceso bloqueado por vehiculo (reclamo RC-123)';
+    const DEPOSITO = { lat: -34.6037, lng: -58.3816 };
+    const alSur = (grados: number) => ({ lat: DEPOSITO.lat - grados, lng: DEPOSITO.lng });
+
+    let transaccion: { ejecutar: jest.Mock; managerActual: jest.Mock };
+    let sistema: ParadasService;
+    let delaRuta: Parada[];
+
+    const paradaEn = (id: string, orden: number, estado: EstadoParada, grados: number): Parada =>
+      ({
+        id,
+        rutaId: 'rt-1',
+        contenedorId: `c-${id}`,
+        contenedor: { id: `c-${id}`, codigo: `CT-${id}`, ...alSur(grados) } as Contenedor,
+        orden,
+        estado,
+      }) as Parada;
+
+    beforeEach(() => {
+      ruta.estado = EstadoRuta.EN_CURSO;
+      delaRuta = [
+        paradaEn('vaciada', 1, EstadoParada.CONFIRMADA, 0.01),
+        paradaEn('tapada', 2, EstadoParada.PENDIENTE, 0.03),
+        paradaEn('lejos', 3, EstadoParada.PENDIENTE, 0.05),
+        paradaEn('cerca', 4, EstadoParada.PENDIENTE, 0.015),
+      ];
+
+      rutas.rutasVivasConPendientes.mockResolvedValue(['rt-1']);
+      rutas.buscarPorId.mockImplementation(
+        async () => ({ ...ruta, paradas: [...delaRuta] }) as Ruta,
+      );
+      paradas.buscarPorId.mockImplementation(
+        async (id) => delaRuta.find((p) => p.id === id) ?? null,
+      );
+      paradas.listarDeRuta.mockImplementation(async () => delaRuta);
+      paradas.borrar.mockImplementation(async (ids) => {
+        delaRuta = delaRuta.filter((p) => !ids.includes(p.id));
+      });
+
+      transaccion = {
+        ejecutar: jest.fn().mockImplementation(<T>(b: () => Promise<T>) => b()),
+        managerActual: jest.fn().mockReturnValue(null),
+      };
+      sistema = new ParadasService(
+        paradas,
+        rutas,
+        contenedores,
+        eventos,
+        alertas as unknown as AlertasService,
+        choferes as unknown as ChoferesService,
+        flota as unknown as FlotaService,
+        transaccion as unknown as ContextoTransaccional,
+        new ConfigService({ DEPOSITO_LAT: DEPOSITO.lat, DEPOSITO_LNG: DEPOSITO.lng }),
+      );
+    });
+
+    const orden = (id: string) => delaRuta.find((p) => p.id === id)?.orden;
+
+    it('en una ruta en curso, la parada tapada queda OMITIDA con el motivo del reclamo', async () => {
+      await sistema.quitarContenedores(['c-tapada'], MOTIVO_RECLAMO, 'RC-123');
+
+      const tapada = delaRuta.find((p) => p.id === 'tapada');
+      expect(tapada?.estado).toBe(EstadoParada.OMITIDA);
+      expect(tapada?.motivo).toBe(MOTIVO_RECLAMO);
+      expect(eventos.getPublished(EventTypes.PARADA_OMITIDA)).toHaveLength(1);
+    });
+
+    it('reordena las pendientes desde la ultima vaciada, que es donde esta el camion', async () => {
+      await sistema.quitarContenedores(['c-tapada'], MOTIVO_RECLAMO);
+
+      // El camion quedo en "vaciada" (0,01): "cerca" (0,015) va antes que "lejos" (0,05).
+      // Las dos siguen despues de la omitida, que conserva su numero.
+      expect(orden('vaciada')).toBe(1);
+      expect(orden('tapada')).toBe(2);
+      expect(orden('cerca')).toBe(3);
+      expect(orden('lejos')).toBe(4);
+    });
+
+    it('actualiza la distancia y publica residuos.ruta.recalculada', async () => {
+      const rutaIds = await sistema.quitarContenedores(['c-tapada'], MOTIVO_RECLAMO, 'RC-123');
+
+      expect(rutaIds).toEqual(['rt-1']);
+      expect(rutas.guardar).toHaveBeenCalledWith(
+        expect.objectContaining({ distanciaEstimadaKm: expect.any(Number) }),
+      );
+
+      const [evento] = eventos.getPublished(EventTypes.RUTA_RECALCULADA);
+      expect(evento.payload).toEqual(
+        expect.objectContaining({
+          rutaId: 'rt-1',
+          reclamoId: 'RC-123',
+          paradasQuitadas: ['CT-tapada'],
+          paradasPendientes: 2,
+          estado: EstadoRuta.EN_CURSO,
+        }),
+      );
+    });
+
+    it('no toca el contenedor ni sus alertas: sigue lleno', async () => {
+      await sistema.quitarContenedores(['c-tapada'], MOTIVO_RECLAMO);
+
+      expect(contenedores.guardar).not.toHaveBeenCalled();
+      expect(alertas.resolverAbiertasPorTipoConIds).not.toHaveBeenCalled();
+    });
+
+    it('si era la ultima pendiente, la ruta se cierra y libera el camion', async () => {
+      delaRuta = delaRuta.filter((p) => p.id === 'vaciada' || p.id === 'tapada');
+
+      await sistema.quitarContenedores(['c-tapada'], MOTIVO_RECLAMO);
+
+      expect(flota.guardarEstado).toHaveBeenCalledWith(
+        expect.objectContaining({ estado: EstadoCamion.DISPONIBLE }),
+      );
+    });
+
+    it('en una propuesta, la parada se borra en vez de omitirse', async () => {
+      ruta.estado = EstadoRuta.PROPUESTA;
+
+      await sistema.quitarContenedores(['c-tapada'], MOTIVO_RECLAMO);
+
+      expect(paradas.borrar).toHaveBeenCalledWith(['tapada']);
+      expect(eventos.getPublished(EventTypes.PARADA_OMITIDA)).toHaveLength(0);
+      expect(delaRuta.map((p) => p.id)).not.toContain('tapada');
+    });
+
+    it('una propuesta que se queda sin paradas se cancela', async () => {
+      ruta.estado = EstadoRuta.PROPUESTA;
+      delaRuta = delaRuta.filter((p) => p.id === 'tapada');
+
+      await sistema.quitarContenedores(['c-tapada'], MOTIVO_RECLAMO);
+
+      expect(rutas.guardar).toHaveBeenCalledWith(
+        expect.objectContaining({ estado: EstadoRuta.CANCELADA }),
+      );
+    });
+
+    it('si ninguna ruta viva tiene el contenedor pendiente, no hace nada', async () => {
+      rutas.rutasVivasConPendientes.mockResolvedValue([]);
+
+      expect(await sistema.quitarContenedores(['c-tapada'], MOTIVO_RECLAMO)).toEqual([]);
+      expect(eventos.getPublished(EventTypes.RUTA_RECALCULADA)).toHaveLength(0);
+    });
+
+    it('se suma a la transaccion en curso en vez de abrir otra', async () => {
+      transaccion.managerActual.mockReturnValue({});
+
+      await sistema.quitarContenedores(['c-tapada'], MOTIVO_RECLAMO);
+
+      expect(transaccion.ejecutar).not.toHaveBeenCalled();
     });
   });
 });

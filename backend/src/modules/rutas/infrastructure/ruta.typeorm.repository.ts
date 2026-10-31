@@ -79,9 +79,34 @@ export class RutaTypeormRepository extends RepositorioTypeorm<Ruta> implements R
       .select('parada.contenedorId', 'contenedorId')
       .innerJoin('parada.ruta', 'ruta')
       .where('ruta.estado IN (:...estados)', { estados: ESTADOS_VIVOS })
+      // Solo lo que falta visitar: una parada omitida (por el chofer o por un
+      // reclamo) ya no la va a hacer nadie, y sin este filtro su contenedor
+      // quedaba afuera de toda otra ruta hasta que terminara esta.
+      .andWhere('parada.estado = :pendiente', { pendiente: EstadoParada.PENDIENTE })
       .getRawMany<{ contenedorId: string }>();
 
     return filas.map((f) => f.contenedorId);
+  }
+
+  async rutasVivasConPendientes(contenedorIds: string[]): Promise<string[]> {
+    if (contenedorIds.length === 0) {
+      return [];
+    }
+
+    // Por el manager de la transaccion en curso: corre dentro de la del webhook
+    // de integracion, junto con la obstruccion que la dispara.
+    const filas = await this.repo()
+      .manager.getRepository(Parada)
+      .createQueryBuilder('parada')
+      .select('parada.rutaId', 'rutaId')
+      .distinct(true)
+      .innerJoin('parada.ruta', 'ruta')
+      .where('ruta.estado IN (:...estados)', { estados: ESTADOS_VIVOS })
+      .andWhere('parada.estado = :pendiente', { pendiente: EstadoParada.PENDIENTE })
+      .andWhere('parada.contenedorId IN (:...contenedorIds)', { contenedorIds })
+      .getRawMany<{ rutaId: string }>();
+
+    return filas.map((f) => f.rutaId);
   }
 
   /**
