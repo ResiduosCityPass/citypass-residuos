@@ -1,4 +1,4 @@
-import { Punto } from '../../../../shared/domain/geo';
+import { Punto, ubicacionDe } from '../../../../shared/domain/geo';
 
 /**
  * CU-INT-02 · Como se lee un evento de reclamos que llega por el bus.
@@ -216,31 +216,4 @@ function normalizar(texto: string): string {
 
 function textoDe(valor: unknown): string {
   return typeof valor === 'string' ? valor : '';
-}
-
-function ubicacionDe(data: Record<string, unknown>): Punto | null {
-  const anidada =
-    typeof data.ubicacion === 'object' && data.ubicacion !== null
-      ? (data.ubicacion as Record<string, unknown>)
-      : null;
-
-  return parDeCoordenadas(data) ?? (anidada ? parDeCoordenadas(anidada) : null);
-}
-
-function parDeCoordenadas(origen: Record<string, unknown>): Punto | null {
-  const lat = numero(origen.latitud ?? origen.lat);
-  const lng = numero(origen.longitud ?? origen.lng);
-
-  if (lat === null || lng === null || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
-    return null;
-  }
-
-  return { lat, lng };
-}
-
-/** Acepta numeros y numeros en texto: "-34.6037" es una coordenada valida. */
-function numero(valor: unknown): number | null {
-  const n = typeof valor === 'string' && valor.trim() !== '' ? Number(valor) : valor;
-
-  return typeof n === 'number' && Number.isFinite(n) ? n : null;
 }

@@ -1,4 +1,4 @@
-import { distanciaKm, distanciaMetros } from './geo';
+import { dentroDelRadio, distanciaKm, distanciaMetros, ubicacionDe } from './geo';
 
 const OBELISCO = { lat: -34.6037, lng: -58.3816 };
 
@@ -31,5 +31,40 @@ describe('distanciaMetros', () => {
     const casiIgual = { lat: OBELISCO.lat + 1e-12, lng: OBELISCO.lng };
 
     expect(Number.isNaN(distanciaMetros(OBELISCO, casiIgual))).toBe(false);
+  });
+});
+
+describe('dentroDelRadio', () => {
+  it('deja los que estan en el radio, con su distancia y en el orden en que vinieron', () => {
+    const lejos = { id: 'lejos', lat: OBELISCO.lat + 0.01, lng: OBELISCO.lng };
+    const a50m = { id: 'a50m', lat: OBELISCO.lat + 0.00045, lng: OBELISCO.lng };
+    const encima = { id: 'encima', ...OBELISCO };
+
+    const cercanos = dentroDelRadio(OBELISCO, [a50m, lejos, encima], 100);
+
+    expect(cercanos.map(({ item }) => item.id)).toEqual(['a50m', 'encima']);
+    expect(cercanos[0].distancia).toBeCloseTo(50, 0);
+    expect(cercanos[1].distancia).toBe(0);
+  });
+});
+
+describe('ubicacionDe', () => {
+  it.each([
+    [{ latitud: -34.6, longitud: -58.4 }],
+    [{ lat: -34.6, lng: -58.4 }],
+    [{ ubicacion: { lat: -34.6, lng: -58.4 } }],
+    [{ ubicacion: { latitud: '-34.6', longitud: '-58.4' } }],
+  ])('lee %j', (data) => {
+    expect(ubicacionDe(data)).toEqual({ lat: -34.6, lng: -58.4 });
+  });
+
+  it.each([
+    [{}],
+    [{ latitud: -34.6 }],
+    [{ latitud: 'abc', longitud: -58.4 }],
+    [{ latitud: 91, longitud: -58.4 }],
+    [{ ubicacion: null }],
+  ])('devuelve null con %j', (data) => {
+    expect(ubicacionDe(data)).toBeNull();
   });
 });

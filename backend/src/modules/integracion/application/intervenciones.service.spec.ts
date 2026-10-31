@@ -144,7 +144,7 @@ describe('IntervencionesService (CU-01, A7)', () => {
   it.each([
     ['sin ubicacion', { ubicacion: undefined }],
     ['con coordenadas fuera de rango', { ubicacion: { lat: 200, lng: 0 } }],
-    ['con coordenadas como texto', { ubicacion: { lat: '1', lng: '2' } }],
+    ['con coordenadas que no son numeros', { ubicacion: { lat: 'abc', lng: '2' } }],
     ['sin emergenciaId', { emergenciaId: undefined }],
     ['con emergenciaId demasiado largo', { emergenciaId: 'x'.repeat(65) }],
   ])('un evento %s se ignora sin romper', async (_caso, cambios) => {

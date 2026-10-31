@@ -1,7 +1,7 @@
 import { Inject, Injectable, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventTypes, buildEvent } from '../../../shared/domain/domain-event';
-import { Punto, distanciaMetros } from '../../../shared/domain/geo';
+import { Punto, dentroDelRadio } from '../../../shared/domain/geo';
 import { EVENT_PUBLISHER, EventPublisher } from '../../../shared/events/event-publisher';
 import {
   CONTENEDOR_REPOSITORY,
@@ -75,12 +75,11 @@ export class ReclamosService {
     const ahora = new Date();
     const venceEn = new Date(ahora.getTime() + this.vigenciaMs);
 
-    // ponytail: recorre todos los contenedores activos en memoria, igual que los
-    // refuerzos y bloqueos de CU-INT-01. Alcanza para cientos; con miles, pasar a
-    // la consulta por radio de `ContenedorCercanoRepository`.
-    const tapados = (await this.contenedores.listar({ soloActivos: true }))
-      .map((contenedor) => ({ contenedor, distancia: distanciaMetros(auto, contenedor) }))
-      .filter(({ distancia }) => distancia <= this.radioMetros);
+    const tapados = dentroDelRadio(
+      auto,
+      await this.contenedores.listar({ soloActivos: true }),
+      this.radioMetros,
+    ).map(({ item, distancia }) => ({ contenedor: item, distancia }));
 
     await this.obstrucciones.guardarObstrucciones(
       tapados.map(({ contenedor, distancia }) => ({
