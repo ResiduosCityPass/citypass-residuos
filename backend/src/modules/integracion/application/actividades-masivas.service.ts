@@ -9,6 +9,15 @@ import {
 } from '../../contenedores/domain/contenedor.repository';
 import { INTEGRACION_REPOSITORY, IntegracionRepository } from '../domain/integracion.repository';
 
+/*
+ * Topes de las columnas: un valor que no entra hace fallar el insert, el webhook
+ * responde error y el bus lo reintenta para siempre.
+ */
+/** `act-` + id tiene que entrar en los 64 de `refuerzo_evento.eventoId`. */
+const LARGO_MAXIMO_ID = 60;
+const LARGO_MAXIMO_TITULO = 200;
+const CAPACIDAD_MAXIMA = 2_147_483_647;
+
 /** Lo que Residuos necesita de una ActividadCreada, ya validado. */
 interface ActividadLeida {
   actividadId: string;
@@ -134,9 +143,10 @@ export class ActividadesMasivasService {
   }
 }
 
-/** null si falta el id, la ubicacion o una fecha valida. */
+/** null si falta el id, la ubicacion o una fecha valida, o si la capacidad no es un entero. */
 function leerActividad(data: Record<string, unknown>): ActividadLeida | null {
-  const { actividadId, titulo, capacidad, estado, ubicacion } = data;
+  const { actividadId, titulo, estado, ubicacion } = data;
+  const capacidad = Number(data.capacidad ?? 0);
   const { lat, lng } = (ubicacion ?? {}) as Record<string, unknown>;
   const inicio = leerFecha(data.fechaHoraInicio);
   const fin = leerFecha(data.fechaHoraFinalizacion);
@@ -144,6 +154,9 @@ function leerActividad(data: Record<string, unknown>): ActividadLeida | null {
   if (
     typeof actividadId !== 'string' ||
     actividadId.length === 0 ||
+    actividadId.length > LARGO_MAXIMO_ID ||
+    !Number.isInteger(capacidad) ||
+    capacidad > CAPACIDAD_MAXIMA ||
     typeof lat !== 'number' ||
     typeof lng !== 'number' ||
     !inicio ||
@@ -154,8 +167,8 @@ function leerActividad(data: Record<string, unknown>): ActividadLeida | null {
 
   return {
     actividadId,
-    titulo: typeof titulo === 'string' ? titulo : null,
-    capacidad: Number(capacidad ?? 0),
+    titulo: typeof titulo === 'string' ? titulo.slice(0, LARGO_MAXIMO_TITULO) : null,
+    capacidad,
     punto: { lat, lng },
     inicio,
     fin,
@@ -166,5 +179,10 @@ function leerActividad(data: Record<string, unknown>): ActividadLeida | null {
 
 /** Las fechas llegan en milisegundos (timestamp-millis de Avro). */
 function leerFecha(valor: unknown): Date | null {
-  return typeof valor === 'number' && Number.isFinite(valor) ? new Date(valor) : null;
+  if (typeof valor !== 'number') {
+    return null;
+  }
+
+  const fecha = new Date(valor);
+  return Number.isNaN(fecha.getTime()) ? null : fecha;
 }

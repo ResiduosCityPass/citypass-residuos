@@ -401,3 +401,45 @@ Rama `fix/squad3-refuerzo-tacho-vaciado`, creada desde `feat/squad3-refuerzo-pro
   1. La ruta nueva salió con CT-0010, CT-0016 y CT-0008, sin CT-0005, que ya estaba vaciado.
   2. Con los cuatro vaciados, generar otra ruta respondió 409 (`RUTA_SIN_CONTENEDORES`).
   3. Una actividad nueva al lado de CT-0005 lo hizo entrar otra vez.
+
+## Sáb 31/10 · Respuesta de Fran sobre las dos ramas
+
+- **Fran** revisó `feat/squad3-refuerzo-programado` y `fix/squad3-refuerzo-tacho-vaciado` y dijo que están bien. Cuando entre el #57, abro los PRs y él los aprueba.
+- **Métrica:** Fran tampoco tiene contacto con Valen. Las preguntas van por Nico, que ya está consultando lo de su métrica. Fran sumó una: si Analítica necesita un porcentaje, hay que publicar también las actividades sin refuerzo.
+
+## Sáb 31/10 · Qué traba el #57
+
+- **Lo único que falta es una aprobación.** CI y Sonar están en verde y no hay conflictos. `develop` pide una aprobación de cualquier integrante, no necesariamente la de Nico.
+- **Para tener en cuenta:** un push nuevo a la rama descarta las aprobaciones, así que no hay que pushear al #57 mientras lo revisan.
+
+## Sáb 31/10 · Revisé el #63 de Nico
+
+Fran pidió un revisor. Es la pantalla de Métricas, que muestra en un iframe el dashboard de Analítica.
+
+- **Pruebas:** pasan los 329 tests, lint y build. En el navegador, con una página de prueba en lugar del dashboard, se ve bien en escritorio y en celular, sin scroll horizontal ni errores en la consola.
+- **Observación que no bloquea:** el `frontend/Dockerfile` no recibe `VITE_BI_DASHBOARD_URL`, así que una imagen de Docker muestra "todavía no está conectado". Render no se ve afectado.
+- **Sin probar:** un dashboard real de Analítica.
+- **Resultado:** lo aprobé en GitHub con la observación del Dockerfile.
+
+## Sáb 31/10 · La métrica se consulta en el squad
+
+Nico no puede sumar mis preguntas a su consulta con Valen, y me dijo que le pregunte a quien está de Analítica en mi squad: Francisco Csik, según `plan-squad-3.md`. Al final le preguntó otra persona del squad.
+
+## Sáb 31/10 · Fran aprobó el #57
+
+**Fran lo aprobó** y dejó tres comentarios que no bloquean:
+1. `actividades` es un parámetro obligatorio en el medio del constructor de `IntegracionService`. Los specs del #60 y el #62 van a fallar al actualizarse. Fran ya les avisó a Adri y a Nico.
+2. Una `capacidad` que no es número da `NaN` y pasa el corte de 1.000. El insert falla y el bus reintenta para siempre.
+3. Un `actividadId` de más de 60 caracteres no entra en `refuerzo_evento.eventoId`, y pasa lo mismo.
+
+**Lo que corregí de los puntos 2 y 3:** va en la rama `fix/squad3-refuerzo-tacho-vaciado`, no en el #57, porque un push nuevo descartaría la aprobación.
+- Se ignoran como mal formados: un id de más de 60 caracteres, una capacidad que no es un entero o no entra en la columna, y una fecha fuera de rango.
+- Un título de más de 200 caracteres se recorta, para no perder la actividad.
+
+**Pruebas:** 7 tests nuevos. Pasan los 521 tests unitarios, los 103 e2e, tipos y lint.
+
+## Sáb 31/10 · El #57 entró a `develop`
+
+- Mergeé el #57 (commit `8a09c6e`). Mis dos ramas siguientes no tienen conflictos con `develop`.
+- **Lo que sigue:** abrir sus PRs. Después, Adri y Nico actualizan el #60 y el #62, y Rami hace el backup y el release a `main`. Render recién tiene el caso cuando salga ese release.
+- **Tomás:** ahora tiene que arrancar desde `develop`, no desde mi rama.
