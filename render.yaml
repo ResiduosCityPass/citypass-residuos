@@ -76,6 +76,8 @@ services:
         value: "false"
       - key: VITE_SIMULAR_GPS
         value: "false"
+      - key: VITE_BI_DASHBOARD_URL
+        sync: false
     routes:
       - type: rewrite
         source: /*

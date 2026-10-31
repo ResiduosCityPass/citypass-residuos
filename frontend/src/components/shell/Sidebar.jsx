@@ -32,6 +32,7 @@ const WASTE_SECTIONS = [
   { to: '/choferes', icon: 'profile', label: 'Choferes' },
   { to: '/rutas', icon: 'routes', label: 'Rutas' },
   { to: '/intervenciones', icon: 'alerts', label: 'Intervenciones' },
+  { to: '/metricas', icon: 'analytics', label: 'Métricas' },
 ];
 
 /**

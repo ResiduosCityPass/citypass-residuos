@@ -11,6 +11,7 @@ import FleetPage from './pages/FleetPage.jsx';
 import DriversPage from './pages/DriversPage.jsx';
 import RoutesPage from './pages/RoutesPage.jsx';
 import RouteDetailPage from './pages/RouteDetailPage.jsx';
+import MetricsPage from './pages/MetricsPage.jsx';
 import NearbyContainersPage from './pages/NearbyContainersPage.jsx';
 import DriverStopsPage from './pages/DriverStopsPage.jsx';
 import { fetchAlerts } from './api/waste.js';
@@ -34,6 +35,7 @@ const TITLES = {
   '/choferes': ['Choferes', 'A quién se le asigna una ruta y cómo entra a verla'],
   '/rutas': ['Rutas', 'Generación y asignación'],
   '/intervenciones': ['Intervenciones', 'Emergencias cuya causa fue residuos'],
+  '/metricas': ['Métricas', 'El dashboard de Residuos que arma Analítica'],
 };
 
 function titleFor(pathname) {
@@ -122,6 +124,7 @@ function Application() {
         <Route path="/rutas" element={<RoutesPage />} />
         <Route path="/intervenciones" element={<InterventionsPage />} />
         <Route path="/rutas/:id" element={<RouteDetailPage />} />
+        <Route path="/metricas" element={<MetricsPage />} />
         <Route path="*" element={<Navigate to="/mapa" replace />} />
       </Route>
 
