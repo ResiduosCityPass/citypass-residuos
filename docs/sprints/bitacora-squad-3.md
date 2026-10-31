@@ -443,3 +443,9 @@ Nico no puede sumar mis preguntas a su consulta con Valen, y me dijo que le preg
 - Mergeé el #57 (commit `8a09c6e`). Mis dos ramas siguientes no tienen conflictos con `develop`.
 - **Lo que sigue:** abrir sus PRs. Después, Adri y Nico actualizan el #60 y el #62, y Rami hace el backup y el release a `main`. Render recién tiene el caso cuando salga ese release.
 - **Tomás:** ahora tiene que arrancar desde `develop`, no desde mi rama.
+
+## Sáb 31/10 · #64 y #65
+
+- Abrí el #64 (`RefuerzoProgramado`) y el #65 (tachos ya vaciados y valores que no entran en la base). Fran aprobó los dos.
+- **El #64 entró a `develop`** (commit `dda1756`).
+- **El #65 perdió la aprobación:** GitHub la descartó cuando entró el #64, porque cambió la base del PR. Fran lo volvió a aprobar, pero siguió bloqueado hasta actualizar la rama con `develop`. Cuando se encadenan dos PRs hay que contar con una aprobación más para el segundo.
