@@ -77,7 +77,8 @@ export class GatewayTransporte implements EventPublisher {
     });
   }
 
-  private async obtenerToken(): Promise<string> {
+  /** Token de servicio del Login. Lo reusa el consumidor de Kafka para su SASL. */
+  async obtenerToken(): Promise<string> {
     if (this.token && Date.now() < this.tokenVenceEn - MARGEN_RENOVACION_MS) {
       return this.token;
     }

@@ -69,6 +69,7 @@ import { OutboxTypeormRepository } from './outbox/outbox.typeorm.repository';
     DespachadorOutbox,
     ContextoTransaccional,
     OUTBOX_REPOSITORY,
+    GatewayTransporte,
   ],
 })
 export class EventsModule {}
