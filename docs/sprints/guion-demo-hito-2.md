@@ -104,7 +104,7 @@ que nadie tuviera que avisarnos."
 | El evento no aparece en el mapa | Refrescar. Si sigue sin aparecer, `npm run bus -- fallidos`; si tarda, pasar al plan B |
 | El bus o Espacios no responden | Plan B: el script, mismo evento, misma historia |
 | La ruta sale sin el tacho de la plaza | El evento no terminó todavía (la escuadrilla arranca a la hora de fin) o el tacho está en otra ruta viva |
-| "No hay contenedores para la ruta" | Hay una ruta en `PROPUESTA` colgada: descartarla y generar de nuevo. Si los tachos ya se vaciaron, no vuelven a entrar: mandar otra actividad para repetir |
+| "No hay contenedores para la ruta" | El evento todavía no terminó: esperar a que el aviso diga "Terminó" y generar de nuevo. Si no, hay una ruta en `PROPUESTA` colgada: descartarla y generar de nuevo. Si los tachos ya se vaciaron, no vuelven a entrar: mandar otra actividad para repetir |
 | El chofer no puede confirmar | La ubicación de DevTools no es la del contenedor |
 | `/chofer` dice que no hay ruta | La ruta está asignada a otro chofer. En local, el token de chofer es el de Juana Perez, no el de `dev-chofer`. Una ruta asignada no se puede reasignar: hay que generar otra |
 
@@ -117,3 +117,4 @@ que nadie tuviera que avisarnos."
 | 27/10 | Local, por API | Pasos 1 a 3: con la actividad ya terminada al lado de CT-0005, la ruta del camión de reciclables salió con CT-0005 al 0 %. Paso 4 sin repetir (probado el 22/10). Falta el ensayo con el bus real y la pantalla |
 | 30/10 | Local, por API y pantalla | Pasos 1 a 4 con `develop` adentro: zona en el mapa, CT-0005 en la ruta y ruta cerrada por el chofer, con GPS simulado. Falta el ensayo en Render con el bus real |
 | 31/10 | Local, por API y pantalla | Pasos 1 a 4 con el #66 adentro: zona en el mapa, CT-0005 al 0 % en la ruta y ruta cerrada por el chofer, con GPS simulado. Falta el ensayo en Render con el bus real |
+| 02/11 | Local, por webhook y pantalla | Pasos 1 a 4 en Plaza Houssay, con el #68 adentro y el plan B: zona con 3 contenedores, CT-0018 al 0 % en la ruta del camión de reciclables y ruta cerrada por el chofer, con GPS simulado. Falta el ensayo en Render con el bus real |

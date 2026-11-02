@@ -6,7 +6,8 @@
  * Crea uno de cada tipo, asi la escuadrilla tiene algo que levantar con cualquier camion.
  * No les da sensor: quedan en 0 %, y la demo muestra que entran a la ruta igual.
  *
- * Se corre una sola vez por base. Requiere un token de administrador:
+ * Se corre una sola vez por base: la segunda vez la zona ya existe y falla sin
+ * crear nada. Requiere un token de administrador:
  *   cd ../backend && npm run token:dev -- ADMINISTRADOR
  *
  * Uso:
@@ -50,7 +51,7 @@ async function pedir(ruta, cuerpo) {
 
 async function main() {
   const zona = await pedir('/zonas', {
-    nombre: `Plaza Houssay ${Date.now()}`,
+    nombre: 'Plaza Houssay',
     umbralCriticoPct: 70,
     umbralTemperaturaC: 60,
   });

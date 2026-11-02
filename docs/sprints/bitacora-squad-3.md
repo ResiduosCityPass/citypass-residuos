@@ -522,6 +522,8 @@ Comparé el `.avsc` con lo que publica el traductor al gateway: tienen los mismo
 - **Solución:** `npm run plaza` en `simulator/` crea 3 contenedores en la plaza, uno de cada tipo. Con ellos sale el refuerzo.
 - Mandé los dos eventos de la misma actividad. Quedan 2 refuerzos, pero el contenedor entra una sola vez a la ruta: la ruta del camión de reciclables salió con CT-0018 al 0 %.
 
+**Ensayo en pantalla, en local y con el plan B:** salió entero en Plaza Houssay. Se vio la zona con 3 contenedores, CT-0018 entró a la ruta al 0 % y Juana Perez cerró la ruta, con GPS simulado. Si se genera la ruta antes de la hora de fin, da "no hay contenedores": lo sumé al guion.
+
 **Falta:**
 - Correr `npm run plaza` en Render, con un token de administrador.
 - La prueba con el bus real: el evento de Rodrigo, las credenciales y el release a `main`.
