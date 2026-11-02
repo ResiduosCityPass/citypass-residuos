@@ -29,8 +29,10 @@ no sabe que existimos; solo publica que se creó una actividad.
 - [ ] Hay un camión y un chofer de prueba con ruta vacía.
 - [ ] No quedan rutas en `PROPUESTA` ni actividades de ensayos que tapen el mapa: los contenedores
       de una ruta viva quedan fuera del ruteo nuevo.
-- [ ] Elegir **el contenedor de la plaza** (que no esté crítico) y anotar su código y sus
-      coordenadas. Es el que entra a la ruta gracias a la escuadrilla.
+- [ ] Crear los contenedores de **Plaza Houssay**, una sola vez por base:
+      `API_URL=<api-de-render>/api/v1 TOKEN=<token-de-administrador> npm run plaza`. Sin ellos no
+      hay ninguno a menos de 300 m y la escuadrilla no sale. Anotar sus códigos: son los que entran
+      a la ruta gracias a la escuadrilla.
 
 ### Diez minutos antes
 
@@ -45,15 +47,15 @@ no sabe que existimos; solo publica que se creó una actividad.
 
 ### 1. Llega el evento (30 s)
 
-**Con el bus real:** Rodrigo crea la actividad en Espacios, con la ubicación de la plaza y la
-hora de fin en 2 minutos.
+**Con el bus real:** Rodrigo crea la actividad en Espacios, en Plaza Houssay (-34.5994, -58.3988)
+y con la hora de fin en 2 minutos.
 
 **Plan B (si el bus o Espacios fallan):** el script hace de Espacios y manda el mismo evento al
 webhook:
 
 ```bash
 cd simulator
-API_URL=<api-de-render>/api/v1 WEBHOOK_TOKEN=<el-de-render> npm run actividad -- --lat <lat> --lng <lng> --termina-en 2
+API_URL=<api-de-render>/api/v1 WEBHOOK_TOKEN=<el-de-render> npm run actividad -- --lat -34.5994 --lng -58.3988 --termina-en 2
 ```
 
 En Render se usa `--lat` y `--lng` porque `--contenedor` necesita un token de administrador. En
