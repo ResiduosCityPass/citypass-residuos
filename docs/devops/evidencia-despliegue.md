@@ -10,8 +10,8 @@ Evidencia del despliegue del modulo de Residuos en Render, usando la infraestruc
 | Proveedor cloud | Render |
 | Blueprint | `citypass-residuos` |
 | Branch desplegada | `main` |
-| Commit verificado | `680312b` - `Merge pull request #29 from ResiduosCityPass/develop` |
-| Fecha de verificacion | 2026-09-19 ART |
+| Commit verificado | `807bc6b` - `Merge pull request #38 from ResiduosCityPass/develop` |
+| Fecha de verificacion | 2026-09-22 ART |
 | Responsable | Ramiro Souto |
 
 El `JWT_SECRET` esta configurado como secreto en Render y no se documenta en el repositorio.
@@ -38,7 +38,7 @@ Usar esta seccion como checklist de la parte DevOps de la demo.
 | Swagger | <https://citypass-residuos-api.onrender.com/docs> | La API expone documentacion navegable |
 | Endpoint publico | `curl -i "https://citypass-residuos-api.onrender.com/api/v1/publico/contenedores/cercanos?lat=-34.6037&lng=-58.3816&radioMetros=1500"` | API + PostgreSQL + esquema |
 | Endpoint privado | `curl -i https://citypass-residuos-api.onrender.com/api/v1/contenedores` | Los guards rechazan requests sin token |
-| CI/CD | <https://github.com/ResiduosCityPass/citypass-residuos/actions/runs/34300063105> | Backend, frontend, Docker, SonarQube y deploy-info en verde |
+| CI/CD | <https://github.com/ResiduosCityPass/citypass-residuos/actions/runs/35761946589> | Backend, frontend, Docker, SonarQube y deploy a Render en verde |
 | Calidad de codigo | <https://sonarcloud.io/summary/overall?id=ResiduosCityPass_citypass-residuos2&branch=main> | Analisis de calidad, seguridad, fiabilidad y cobertura de SonarQube Cloud |
 | IaC | [`render.yaml`](../../render.yaml) | La infraestructura esta declarada como codigo |
 
@@ -63,18 +63,18 @@ Usar esta seccion como checklist de la parte DevOps de la demo.
 
 ## CI en `main`
 
-La rama `main` quedo sincronizada desde `develop` y se verifico el despliegue del commit
-`680312b`.
+La rama `main` quedo sincronizada desde `develop` mediante el PR #38 y se verifico el despliegue
+del commit `807bc6b`.
 
 Workflow verificado:
 
-- CI: revisar la ultima corrida verde de `main` en <https://github.com/ResiduosCityPass/citypass-residuos/actions>.
+- CI #124: <https://github.com/ResiduosCityPass/citypass-residuos/actions/runs/35761946589>.
 - Backend: lint, build, migraciones, cobertura y tests de integracion en verde.
 - Frontend: lint, build y tests con cobertura en verde.
 - Docker: build de imagen backend y frontend en verde.
 - SonarQube Cloud: analisis de calidad y cobertura en verde. Dashboard: <https://sonarcloud.io/summary/overall?id=ResiduosCityPass_citypass-residuos2&branch=main>.
-- El 2026-09-19 Render no reacciono al push aunque los checks pasaron; API y frontend se
-  desplegaron manualmente y quedaron en `680312b`.
+- Deploy: el job final acepto los hooks de API y frontend. El dashboard de Render mostro ambos
+  servicios en estado `Deployed` para `807bc6b`.
 
 ## CD hacia Render
 
@@ -85,9 +85,11 @@ de que backend, frontend, Docker y SonarQube terminan correctamente. El job hace
 deploy hooks guardados como secretos de GitHub para API y frontend. Los servicios usan
 `autoDeployTrigger: off`: asi hay un solo disparador, visible y auditable desde CI.
 
-El cambio reemplaza el mecanismo anterior `checksPass`, que estaba configurado correctamente pero
-no proceso el push de `680312b`. El primer merge posterior a esta correccion debe confirmar ambos
-deploys en Render y registrar la corrida de CI correspondiente.
+El mecanismo anterior `checksPass` no proceso el push de `680312b`, por lo que fue reemplazado por
+hooks explicitos. El primer deploy por hooks se verifico con el commit `3f58b48` el 2026-09-21: API
+y frontend terminaron en Render desde `Deploy — Render`. La promocion #38 repitio la verificacion
+con el commit `807bc6b`: los dos hooks fueron aceptados en CI #124 y ambos servicios quedaron en
+estado `Deployed` en Render.
 
 ## Chequeos del despliegue
 
