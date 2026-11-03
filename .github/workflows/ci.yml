@@ -61,6 +61,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Verificar configuracion de Login y EDA del despliegue
+        run: npm run deploy:verificar
+
       # Que las migraciones corran es parte de lo que se verifica: el esquema de
       # produccion sale de aca, no de synchronize.
       - name: Migraciones
@@ -135,7 +138,12 @@ jobs:
         run: docker build -t citypass-residuos-api:ci ./backend
 
       - name: Build imagen frontend
-        run: docker build -t citypass-residuos-frontend:ci ./frontend
+        run: >-
+          docker build -t citypass-residuos-frontend:ci
+          --build-arg VITE_AUTH_MODE=federated
+          --build-arg VITE_IDP_URL=https://api.citypass-login.pp.ua
+          --build-arg VITE_IDP_CLIENT_ID=citypass-residuos-web
+          ./frontend
 
   sonarqube:
     name: SonarQube Cloud — calidad y cobertura

@@ -27,6 +27,10 @@ export const EventTypes = {
   RUTA_GENERADA: 'residuos.ruta.generada',
   RUTA_ASIGNADA: 'residuos.ruta.asignada',
   PARADA_OMITIDA: 'residuos.parada.omitida',
+  SERVICIO_AFECTADO: 'residuos.servicio.afectado',
+  RECUPERACION_PENDIENTE: 'residuos.recuperacion.pendiente',
+  RECUPERACION_HABILITADA: 'residuos.recuperacion.habilitada',
+  SERVICIO_RESTABLECIDO: 'residuos.servicio.restablecido',
   /** CU-INT-01: refuerzo de recoleccion cerca de un evento cultural. */
   REFUERZO_PROGRAMADO: 'residuos.refuerzo.programado',
   /** CU-INT-02: una ruta viva perdio paradas porque un auto tapa sus contenedores. */

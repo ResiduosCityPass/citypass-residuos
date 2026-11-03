@@ -1,3 +1,4 @@
+import { ContingenciasModule } from '../contingencias/contingencias.module';
 import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ContenedoresModule } from '../contenedores/contenedores.module';
@@ -38,6 +39,7 @@ import { IntegracionTypeormRepository } from './infrastructure/integracion.typeo
       Intervencion,
     ]),
     ContenedoresModule,
+    ContingenciasModule,
     ZonasModule,
     // Circular: rutas lee refuerzos y obstrucciones de aca, y los reclamos
     // recalculan rutas (CU-INT-02).

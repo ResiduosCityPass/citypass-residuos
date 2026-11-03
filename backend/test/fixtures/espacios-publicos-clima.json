@@ -1,0 +1,156 @@
+{
+  "source": {
+    "repository": "https://github.com/DappianoLuciano/DESAPPS2EspaciosPublicos",
+    "branch": "featuresDidi",
+    "commit": "6d2234b5f6d3bd21939352b9e4108fddf0ad200c",
+    "schemaFile": "espacios-publicos-backend/scripts/register-weather-event-types.ts"
+  },
+  "contracts": [
+    {
+      "name": "CriticidadClimaticaConfirmada",
+      "fields": [
+        {
+          "name": "alertaId",
+          "type": "string"
+        },
+        {
+          "name": "nivelCriticidad",
+          "type": {
+            "type": "enum",
+            "name": "NivelCriticidad",
+            "symbols": [
+              "BAJA",
+              "MEDIA",
+              "ALTA",
+              "CRITICA"
+            ]
+          }
+        },
+        {
+          "name": "fenomeno",
+          "type": {
+            "type": "enum",
+            "name": "FenomenoClimatico",
+            "symbols": [
+              "TORMENTA_FUERTE",
+              "LLUVIA_INTENSA",
+              "VIENTO_FUERTE",
+              "OLA_DE_CALOR",
+              "OLA_DE_FRIO",
+              "GRANIZO",
+              "TORMENTA_ELECTRICA",
+              "HURACAN",
+              "NIEVE"
+            ]
+          }
+        },
+        {
+          "name": "ubicaciones",
+          "type": {
+            "type": "array",
+            "items": {
+              "type": "record",
+              "name": "UbicacionClimatica",
+              "fields": [
+                {
+                  "name": "latitud",
+                  "type": "double"
+                },
+                {
+                  "name": "longitud",
+                  "type": "double"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "barrios",
+          "type": {
+            "type": "array",
+            "items": "string"
+          },
+          "default": []
+        },
+        {
+          "name": "vigenciaDesde",
+          "type": {
+            "type": "long",
+            "logicalType": "timestamp-millis"
+          }
+        },
+        {
+          "name": "vigenciaHasta",
+          "type": {
+            "type": "long",
+            "logicalType": "timestamp-millis"
+          }
+        },
+        {
+          "name": "temperaturaMinC",
+          "type": [
+            "null",
+            "double"
+          ],
+          "default": null
+        },
+        {
+          "name": "temperaturaMaxC",
+          "type": [
+            "null",
+            "double"
+          ],
+          "default": null
+        },
+        {
+          "name": "actorSub",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "CriticidadClimaticaFinalizada",
+      "fields": [
+        {
+          "name": "alertaId",
+          "type": "string"
+        },
+        {
+          "name": "finalizadaEn",
+          "type": {
+            "type": "long",
+            "logicalType": "timestamp-millis"
+          }
+        },
+        {
+          "name": "actorSub",
+          "type": "string"
+        }
+      ]
+    }
+  ],
+  "publishedStart": {
+    "alertaId": "f6029e4f-e0ef-46b8-9f1a-66e814f1c90e",
+    "nivelCriticidad": "ALTA",
+    "fenomeno": "OLA_DE_CALOR",
+    "ubicaciones": [
+      {
+        "latitud": -34.646403,
+        "longitud": -58.384272
+      },
+      {
+        "latitud": -34.609227,
+        "longitud": -58.421745
+      },
+      {
+        "latitud": -34.609099,
+        "longitud": -58.403062
+      }
+    ],
+    "vigenciaDesde": 1793399460000,
+    "vigenciaHasta": 1793406600000,
+    "temperaturaMinC": null,
+    "temperaturaMaxC": null,
+    "actorSub": "U000009"
+  }
+}

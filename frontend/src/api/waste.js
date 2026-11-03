@@ -80,3 +80,11 @@ export const skipStop = (...args) => source.skipStop(...args);
 
 /* CU-11 · Consulta ciudadana */
 export const fetchNearbyContainers = (...args) => source.fetchNearbyContainers(...args);
+
+export const fetchFloods = (...args) => source.fetchFloods(...args);
+export const simulateFloodStart = (...args) => source.simulateFloodStart(...args);
+export const simulateFloodEnd = (...args) => source.simulateFloodEnd(...args);
+export const enableFloodRecovery = (...args) => source.enableFloodRecovery(...args);
+export const fetchClimateAlerts = (...args) => source.fetchClimateAlerts(...args);
+export const simulateClimateEvent = (...args) => source.simulateClimateEvent(...args);
+export const resolveClimateAlert = (...args) => source.resolveClimateAlert(...args);

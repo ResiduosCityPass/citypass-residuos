@@ -7,6 +7,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Contenedor } from '../../contenedores/domain/contenedor.entity';
+import type { RestriccionInundacion } from '../../contingencias/domain/contingencia.repository';
 
 /**
  * Zona de la ciudad (CU-02).
@@ -17,6 +18,8 @@ import { Contenedor } from '../../contenedores/domain/contenedor.entity';
  */
 @Entity('zona')
 export class Zona {
+  /** Independientes del bloqueo manual persistido en `bloqueada`. */
+  restriccionesInundacion?: RestriccionInundacion[];
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 

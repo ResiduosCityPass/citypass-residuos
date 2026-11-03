@@ -8,6 +8,7 @@ import FillBar from '../components/ui/FillBar.jsx';
 import RouteMap from '../components/routes/RouteMap.jsx';
 import { fetchRoute, fetchDrivers, assignRoute, discardRoute } from '../api/waste.js';
 import { fieldErrors, generalMessage } from '../domain/errors.js';
+import { isStopSuspended } from '../domain/contingencies.js';
 import {
   ROUTE_STATE_LABEL,
   ROUTE_STATE_CHIP,
@@ -62,7 +63,11 @@ export default function RouteDetailPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    const timer = setInterval(load, 15000);
+    return () => clearInterval(timer);
+  }, [load]);
 
   // Solo si esta ruta se puede asignar: en una ruta ya asignada el listado no
   // llena nada y seria una llamada por pantalla sin nadie que la lea.
@@ -134,6 +139,10 @@ export default function RouteDetailPage() {
   return (
     <div className="screen">
       <Link to="/rutas" className="back-link">← Rutas</Link>
+      {route.paradasSuspendidas > 0 && <Notice type="warning" title="Recolección suspendida por inundación">
+        {route.paradasSuspendidas} parada(s) siguen pendientes. Revisá la contingencia en <Link to="/contingencias">Inundaciones</Link>.
+        Las propuestas afectadas deben esperar la habilitación o descartarse para generar otra.
+      </Notice>}
 
       {canAssign(route) && (
         <Notice type="warning" title="Esta ruta es una propuesta">
@@ -200,6 +209,8 @@ export default function RouteDetailPage() {
                       pedirlo no sirve para nada: la decision de si vuelve a
                       rutear este contenedor hoy o si el problema es de la
                       calle sale de aca. */}
+                  {stop.bloqueoManual && <p className="text-warning">Parada pendiente: zona bloqueada.</p>}
+                  {isStopSuspended(stop) && <p className="text-warning">Suspendida por inundación: {stop.restriccionesInundacion.map((r) => r.descripcion).join(', ')}</p>}
                   {stop.estado === 'OMITIDA' && stop.motivo && (
                     <p className="stop-motivo">No se pudo vaciar: {stop.motivo}</p>
                   )}
@@ -329,7 +340,7 @@ export default function RouteDetailPage() {
                 </Notice>
               )}
 
-              <Button variant="success" onClick={confirm} disabled={assigning || !driverId}>
+              <Button variant="success" onClick={confirm} disabled={assigning || !driverId || (route.paradasSuspendidas > 0 || route.paradasBloqueadasManualmente > 0)} disabledReason={route.paradasSuspendidas > 0 || route.paradasBloqueadasManualmente > 0 ? 'La propuesta tiene paradas suspendidas o zonas bloqueadas' : 'Elegí un chofer activo'}>
                 {assigning ? 'Asignando…' : 'Confirmar y asignar'}
               </Button>
             </>

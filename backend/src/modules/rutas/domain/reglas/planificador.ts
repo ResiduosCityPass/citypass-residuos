@@ -4,6 +4,7 @@ export interface CandidatoRuteo extends Punto {
   contenedorId: string;
   /** Litros que ocupa hoy este contenedor, segun su nivel de llenado. */
   litrosOcupados: number;
+  prioridadRecuperacion?: boolean;
 }
 
 export interface PlanDeRuta {
@@ -16,8 +17,8 @@ export interface PlanDeRuta {
 /**
  * CU-08 · Heuristica de ruteo.
  *
- * Sale del deposito y en cada paso toma el contenedor mas cercano que todavia
- * entre en el camion. Cuando ninguno entra, vuelve al deposito.
+ * Prioriza pendientes de recuperacion que entren en el camion; dentro de cada
+ * grupo elige por cercania. Cuando ninguno entra, vuelve al deposito.
  *
  * **Es vecino mas cercano, no optimizacion exacta.** El problema completo es un
  * Vehicle Routing Problem con capacidad, que es NP-hard. El recorte esta
@@ -46,8 +47,11 @@ export function planificarRuta(
       break;
     }
 
-    const masCercano = alcanzables.reduce((mejor, c) =>
-      distanciaKm(posicion, c) < distanciaKm(posicion, mejor) ? c : mejor,
+    const recuperacion = alcanzables.filter((c) => c.prioridadRecuperacion);
+    const prioritarios = recuperacion.length ? recuperacion : alcanzables;
+    const masCercano = prioritarios.reduce(
+      (mejor, c) => (distanciaKm(posicion, c) < distanciaKm(posicion, mejor) ? c : mejor),
+      prioritarios[0],
     );
 
     distancia += distanciaKm(posicion, masCercano);

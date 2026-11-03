@@ -1,3 +1,10 @@
+import { ContingenciasService } from '../../contingencias/application/contingencias.service';
+import { RecepcionEdaService } from '../../contingencias/application/recepcion-eda.service';
+import {
+  CRITICIDAD_CONFIRMADA,
+  CRITICIDAD_FINALIZADA,
+} from '../../contingencias/application/dto/criticidad-climatica.dto';
+import { SIMULACROS_EDA, esTopicDe } from '../../contingencias/application/simulacro-eda';
 import {
   BadRequestException,
   Inject,
@@ -24,7 +31,7 @@ import { ReclamosService } from './reclamos.service';
 
 /** Sobre con el que el gateway del Squad 1 entrega cada evento por webhook. */
 export interface SobreGateway {
-  metadata?: { eventId?: string; eventType?: string };
+  metadata?: { eventId?: string; eventType?: string; [key: string]: unknown };
   data?: Record<string, unknown>;
 }
 
@@ -105,13 +112,18 @@ export class IntegracionService {
     @Optional()
     @Inject(forwardRef(() => ParadasService))
     private readonly paradas?: Pick<ParadasService, 'quitarContenedores'>,
+    @Optional() private readonly clima?: RecepcionEdaService,
+    @Optional() private readonly contingencias?: ContingenciasService,
   ) {
     this.radioMetros = Number(config.get('INTEGRACION_RADIO_METROS', 300));
     this.cupoMinimoRefuerzo = Number(config.get('INTEGRACION_CUPO_MINIMO_REFUERZO', 100));
     this.ventanaRefuerzoHoras = Number(config.get('INTEGRACION_VENTANA_REFUERZO_HORAS', 12));
   }
 
-  async procesar(sobre: SobreGateway): Promise<ResultadoProcesamiento> {
+  async procesar(
+    sobre: SobreGateway,
+    entrega?: { topic: string; schemaId: number },
+  ): Promise<ResultadoProcesamiento> {
     const eventId = sobre?.metadata?.eventId;
     const eventType = sobre?.metadata?.eventType;
     const data = sobre?.data;
@@ -123,7 +135,28 @@ export class IntegracionService {
       });
     }
 
+    const simulacro = SIMULACROS_EDA.find((s) => esTopicDe(eventType, s.fqn));
+    const tipoClima =
+      [CRITICIDAD_CONFIRMADA, CRITICIDAD_FINALIZADA].find((t) => esTopicDe(eventType, t)) ??
+      simulacro?.tipo;
+    if (tipoClima) {
+      if (!this.clima) throw new Error('Recepcion climatica no configurada');
+      const resultado = await this.clima.procesar(
+        tipoClima,
+        entrega?.topic ?? eventType,
+        entrega?.schemaId ?? Number(sobre.metadata?.schemaId),
+        sobre,
+      );
+      return resultado.duplicado ? 'duplicado' : 'procesado';
+    }
+
     return this.transaccion.ejecutar(async () => {
+      // ponytail: lock global compartido con clima y ruteo. Pone en fila las
+      // transacciones de eventos (reclamos, emergencias, actividades y clima)
+      // para evitar carreras entre suspensiones, bloqueos y cambios de rutas.
+      // Para la escala del TPO es suficiente, aunque limita el paralelismo.
+      // Si crece el volumen, revisar locks por zona y su orden de adquisicion.
+      await this.contingencias?.bloquearOperacion();
       if (!(await this.integracion.registrarEvento(eventId, eventType))) {
         return 'duplicado';
       }

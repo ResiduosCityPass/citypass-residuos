@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import Shell from './components/shell/Shell.jsx';
 import MapPage from './pages/MapPage.jsx';
@@ -13,11 +13,17 @@ import RoutesPage from './pages/RoutesPage.jsx';
 import RouteDetailPage from './pages/RouteDetailPage.jsx';
 import MetricsPage from './pages/MetricsPage.jsx';
 import NearbyContainersPage from './pages/NearbyContainersPage.jsx';
-import DriverStopsPage from './pages/DriverStopsPage.jsx';
 import { fetchAlerts } from './api/waste.js';
 import { seedDevToken } from './api/client.js';
 import { matchesAnyPath } from './domain/paths.js';
 import './App.css';
+import OperatorSession from './auth/OperatorSession.jsx';
+import { federatedEnabled, accessToken, startSessionRefresh } from './auth/session.js';
+import LoginPage from './pages/LoginPage.jsx';
+
+const ContingenciesPage = lazy(() => import('./pages/ContingenciesPage.jsx'));
+const ClimateEventsPage = lazy(() => import('./pages/ClimateEventsPage.jsx'));
+const DriverStopsPage = lazy(() => import('./pages/DriverStopsPage.jsx'));
 
 /**
  * Titulo de la barra superior segun la ruta. Vive en un solo lugar para que la
@@ -34,6 +40,8 @@ const TITLES = {
   '/flota': ['Flota', 'Camiones, capacidad y disponibilidad'],
   '/choferes': ['Choferes', 'A quién se le asigna una ruta y cómo entra a verla'],
   '/rutas': ['Rutas', 'Generación y asignación'],
+  '/contingencias': ['Inundaciones', 'Suspensión del servicio y recuperación de la recolección'],
+  '/contingencias/clima': ['Eventos climáticos', 'Recepción y revisión de alertas de Espacios Públicos'],
   '/intervenciones': ['Intervenciones', 'Emergencias cuya causa fue residuos'],
   '/metricas': ['Métricas', 'El dashboard de Residuos que arma Analítica'],
 };
@@ -56,7 +64,7 @@ function titleFor(pathname) {
  * La comparacion va por segmento (`matchesPath`) y no con `startsWith` a secas:
  * `/choferes` es del operador, vive adentro del Shell y empieza con `/chofer`.
  */
-const PUBLIC_PATHS = ['/cerca', '/chofer'];
+const PUBLIC_PATHS = ['/cerca', '/chofer', '/login'];
 const isPublicPath = (pathname) => matchesAnyPath(pathname, PUBLIC_PATHS);
 
 /** Layout de las pantallas del operador. Solo monta en las rutas del Shell. */
@@ -72,6 +80,7 @@ function ShellLayout({ openAlerts, onTokenChange }) {
 }
 
 function Application() {
+  useEffect(() => startSessionRefresh(), []);
   const { pathname } = useLocation();
   const [tokenVersion, setTokenVersion] = useState(0);
   const [openAlerts, setOpenAlerts] = useState(0);
@@ -101,7 +110,7 @@ function Application() {
     // La vista ciudadana no tiene token y la del chofer no tiene sidebar:
     // pedir /alertas ahi es un 401 garantizado para alimentar un globo que no
     // se ve.
-    if (isPublicPath(pathname)) return;
+    if (isPublicPath(pathname) || (federatedEnabled() && !accessToken())) return;
     countAlerts();
   }, [countAlerts, tokenVersion, pathname]);
 
@@ -112,7 +121,7 @@ function Application() {
   // sueltas en sus tests, sin un Outlet alrededor.
   return (
     <Routes>
-      <Route element={<ShellLayout openAlerts={openAlerts} onTokenChange={onTokenChange} />}>
+      <Route element={<OperatorSession><ShellLayout openAlerts={openAlerts} onTokenChange={onTokenChange} /></OperatorSession>}>
         <Route path="/" element={<Navigate to="/mapa" replace />} />
         <Route path="/mapa" element={<MapPage tokenVersion={tokenVersion} />} />
         <Route path="/contenedores" element={<ContainersPage />} />
@@ -124,12 +133,15 @@ function Application() {
         <Route path="/rutas" element={<RoutesPage />} />
         <Route path="/intervenciones" element={<InterventionsPage />} />
         <Route path="/rutas/:id" element={<RouteDetailPage />} />
+        <Route path="/contingencias" element={<Suspense fallback={<p className="muted">Cargando inundaciones…</p>}><ContingenciesPage /></Suspense>} />
+        <Route path="/contingencias/clima" element={<Suspense fallback={<p className="muted">Cargando eventos climáticos…</p>}><ClimateEventsPage /></Suspense>} />
         <Route path="/metricas" element={<MetricsPage />} />
         <Route path="*" element={<Navigate to="/mapa" replace />} />
       </Route>
 
       <Route path="/cerca" element={<NearbyContainersPage />} />
-      <Route path="/chofer" element={<DriverStopsPage />} />
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/chofer" element={<Suspense fallback={<p className="muted">Cargando ruta…</p>}><DriverStopsPage /></Suspense>} />
     </Routes>
   );
 }

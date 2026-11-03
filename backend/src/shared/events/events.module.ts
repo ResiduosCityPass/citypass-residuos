@@ -1,3 +1,4 @@
+import { EstadoRecepcionBus } from './estado-recepcion-bus';
 import { Global, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -33,6 +34,7 @@ import { OutboxTypeormRepository } from './outbox/outbox.typeorm.repository';
     ContextoTransaccional,
     InMemoryEventPublisher,
     GatewayTransporte,
+    EstadoRecepcionBus,
     OutboxEventPublisher,
     DespachadorOutbox,
     { provide: OUTBOX_REPOSITORY, useClass: OutboxTypeormRepository },
@@ -70,6 +72,7 @@ import { OutboxTypeormRepository } from './outbox/outbox.typeorm.repository';
     ContextoTransaccional,
     OUTBOX_REPOSITORY,
     GatewayTransporte,
+    EstadoRecepcionBus,
   ],
 })
 export class EventsModule {}

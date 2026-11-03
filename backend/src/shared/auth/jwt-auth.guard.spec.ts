@@ -4,6 +4,7 @@ import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { UsuarioAutenticado } from './jwt-payload';
+import { JwksService } from './jwks.service';
 
 describe('JwtAuthGuard', () => {
   let reflector: Reflector;
@@ -53,6 +54,7 @@ describe('JwtAuthGuard', () => {
       reflector,
       jwtService as unknown as JwtService,
       config as unknown as ConfigService,
+      {} as JwksService,
     );
 
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);

@@ -11,7 +11,7 @@ import { Rol } from '../domain/enums';
 export interface JwtPayload {
   iss: string;
   sub: string;
-  aud: string[];
+  aud: string | string[];
   token_use: 'human' | 'service' | 'chofer-interno';
   ver: number;
   preferred_username: string;

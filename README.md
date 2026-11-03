@@ -57,11 +57,19 @@ La API queda en `http://localhost:3000` y la documentación Swagger en `http://l
 ## Documentación clave
 
 - [Desplegar el backend](docs/devops/despliegue-backend.md) — variables de entorno, migraciones y trampas del plan gratuito.
+- [Preparación de Login y EDA para cloud](docs/devops/preparacion-login-eda-2026-11-02.md) — configuración, pruebas de las imágenes y pasos pendientes al publicar.
 - [Evidencia de despliegue](docs/devops/evidencia-despliegue.md) — URLs publicas, CI y chequeos post-deploy.
 - [Guion de la demo del Hito 1](docs/sprints/guion-demo-hito-1.md) — que mostrar, en que orden y con que comandos.
 - [Backlog priorizado](docs/sprints/backlog-priorizado.md) — qué construimos y en qué orden, con el recorte de alcance justificado.
 - [Diagramas](docs/arquitectura/diagramas.md) — casos de uso, C4, secuencia y máquinas de estado.
 - [Modelo de datos](docs/arquitectura/modelo-de-datos.md)
 - [Contratos de eventos](docs/arquitectura/contratos-de-eventos.md) — qué publicamos y a qué nos suscribimos.
+- [Inundaciones: suspensión y recuperación](docs/arquitectura/contingencias-inundacion.md) — flujo, simulador, contrato provisional y demo local.
+- [Integración con Login y Espacios Públicos](docs/arquitectura/integracion-login-clima.md) — implementación, pruebas y datos pendientes de los equipos.
+- [Simulacro climático por EDA](docs/arquitectura/simulacro-clima-eda.md) — publicar inicio y fin con la cuenta de Residuos y probar suspensión y recuperación por Kafka.
+- [Datos reproducibles de la demo](docs/arquitectura/datos-demo-inundacion.md) — crear contenedores, zonas, camión, chofer y ruta inicial con un comando, conservando ensayos anteriores.
+- [Prueba completa con EDA real](docs/arquitectura/prueba-eda-real-2026-11-02.md) — ejecución del 02/11, recuperación completada y seis mensajes verificados en el bus.
+- [Prueba desde la web de Espacios Públicos](docs/arquitectura/prueba-espacios-web-2026-11-02.md) — nuevo intento del 02/11: la web confirmó y finalizó, pero sus publicaciones no llegaron a EDA.
+- [Mensajes para los equipos](docs/arquitectura/consultas-integracion-equipos.md) — pedidos listos para copiar a EDA, Login y Espacios Públicos.
 - [API preliminar](docs/arquitectura/api-preliminar.md)
 - [Definition of Ready / Done](docs/sprints/definition-of-ready-done.md)

@@ -1,3 +1,4 @@
+import { CONTRATOS_EDA, publicacionEda } from './contratos-climaticos';
 import { DomainEvent, EventTypes } from '../../domain/domain-event';
 
 /** Evento tal como lo recibe el gateway: el nombre corto del tipo y los campos de negocio. */
@@ -33,6 +34,10 @@ const ubicacion = (payload: Payload): { lat: number; lng: number } =>
  * gateway responde 404 y el evento queda FALLIDO en el outbox.
  */
 export function traducirAGateway(evento: DomainEvent): EventoGateway | null {
+  if (CONTRATOS_EDA[evento.eventType]) {
+    const publicado = publicacionEda(evento, 'com.citypass.residuos');
+    return { tipo: CONTRATOS_EDA[evento.eventType].name, datos: publicado.data };
+  }
   const p = evento.payload as Payload;
   const correlationId = evento.correlationId ?? null;
 

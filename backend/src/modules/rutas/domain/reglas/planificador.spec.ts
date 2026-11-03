@@ -16,6 +16,11 @@ const candidato = (id: string, gradosAlSur: number, litros = 100): CandidatoRute
 });
 
 describe('planificarRuta', () => {
+  it('prioriza la recuperacion antes de elegir el contenedor mas cercano', () => {
+    const pendiente = { ...candidato('recuperar', 0.05, 600), prioridadRecuperacion: true };
+    const plan = planificarRuta(DEPOSITO, [candidato('critico', 0.001, 600), pendiente], 1000);
+    expect(plan.paradas.map((p) => p.contenedorId)).toEqual(['recuperar']);
+  });
   describe('orden de las paradas', () => {
     it('arranca por el mas cercano al deposito', () => {
       const plan = planificarRuta(

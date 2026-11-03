@@ -82,3 +82,59 @@ describe('GatewayTransporte (CU-INT-01)', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+describe('Token compartido por publicador, catalogo y SASL', () => {
+  const original = global.fetch;
+  let fetchMock: jest.Mock;
+  let gateway: GatewayTransporte;
+  beforeEach(() => {
+    fetchMock = jest.fn();
+    global.fetch = fetchMock;
+    gateway = new GatewayTransporte(
+      new ConfigService({
+        GATEWAY_URL: 'https://gateway.example/',
+        GATEWAY_TOKEN_URL: 'https://auth.example/oauth/token',
+      }),
+    );
+  });
+  afterEach(() => {
+    global.fetch = original;
+  });
+  it('comparte una sola solicitud OAuth entre operaciones concurrentes', async () => {
+    fetchMock.mockResolvedValue(respuesta(200, { access_token: 'token', expires_in: 900 }));
+    expect(
+      await Promise.all([gateway.obtenerToken(), gateway.obtenerToken(), gateway.obtenerToken()]),
+    ).toEqual(['token', 'token', 'token']);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+  it('renueva una sola vez ante un 401 del gateway y normaliza la URL raiz', async () => {
+    fetchMock
+      .mockResolvedValueOnce(respuesta(200, { access_token: 'viejo' }))
+      .mockResolvedValueOnce(respuesta(401))
+      .mockResolvedValueOnce(respuesta(200, { access_token: 'nuevo' }))
+      .mockResolvedValueOnce(respuesta(200, []));
+    expect(await gateway.listarTipos()).toEqual([]);
+    expect(fetchMock.mock.calls[3][0]).toBe('https://gateway.example/api/v1/event-types');
+    expect(fetchMock.mock.calls[3][1].headers.Authorization).toBe('Bearer nuevo');
+  });
+  it.each([{ access_token: '' }, { access_token: 23 }, { access_token: 't', expires_in: -1 }])(
+    'rechaza una respuesta OAuth invalida %j',
+    async (cuerpo) => {
+      fetchMock.mockResolvedValue(respuesta(200, cuerpo));
+      await expect(gateway.obtenerToken()).rejects.toThrow('invalido');
+    },
+  );
+  it('un fallo OAuth no deja una promesa rechazada en cache', async () => {
+    fetchMock
+      .mockResolvedValueOnce(respuesta(503))
+      .mockResolvedValueOnce(respuesta(200, { access_token: 'recuperado' }));
+    await expect(gateway.obtenerToken()).rejects.toThrow('503');
+    expect(await gateway.obtenerToken()).toBe('recuperado');
+  });
+  it('propaga un fallo del catalogo sin exponer la respuesta del servidor', async () => {
+    fetchMock
+      .mockResolvedValueOnce(respuesta(200, { access_token: 't' }))
+      .mockResolvedValueOnce(respuesta(403, { secreto: 'oculto' }));
+    await expect(gateway.listarTipos()).rejects.toThrow('El gateway respondio 403');
+  });
+});

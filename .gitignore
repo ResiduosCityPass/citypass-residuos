@@ -38,6 +38,7 @@ desktop.ini
 
 # Datos locales / volumenes docker
 infra/data/
+.demo/
 *.sqlite
 *.sqlite3
 

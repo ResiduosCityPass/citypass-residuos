@@ -4,6 +4,7 @@ import { Zona } from '../domain/zona.entity';
 import { ZONA_REPOSITORY, ZonaRepository } from '../domain/zona.repository';
 import { ActualizarZonaDto } from './dto/actualizar-zona.dto';
 import { CrearZonaDto } from './dto/crear-zona.dto';
+import { ContingenciasService } from '../../contingencias/application/contingencias.service';
 
 /**
  * Casos de uso de Zona (CU-02).
@@ -16,6 +17,7 @@ export class ZonasService {
   constructor(
     @Inject(ZONA_REPOSITORY)
     private readonly zonas: ZonaRepository,
+    private readonly contingencias: ContingenciasService,
   ) {}
 
   async crear(dto: CrearZonaDto): Promise<Zona> {
@@ -31,8 +33,8 @@ export class ZonasService {
     return this.zonas.crear({ ...dto, bloqueada: false, bloqueoManual: false });
   }
 
-  listar(): Promise<Zona[]> {
-    return this.zonas.listar();
+  async listar(): Promise<Zona[]> {
+    return this.contingencias.decorarZonas(await this.zonas.listar());
   }
 
   async obtener(id: string): Promise<Zona> {
@@ -45,7 +47,7 @@ export class ZonasService {
       });
     }
 
-    return zona;
+    return (await this.contingencias.decorarZonas([zona]))[0];
   }
 
   async actualizar(id: string, dto: ActualizarZonaDto): Promise<Zona> {
@@ -95,6 +97,13 @@ export class ZonasService {
 
   async eliminar(id: string): Promise<void> {
     await this.obtener(id);
+
+    if (await this.contingencias.zonaTieneHistorial(id)) {
+      throw new ConflictException({
+        code: 'ZONA_CON_CONTINGENCIAS',
+        message: 'La zona tiene historial de inundaciones y debe conservarse.',
+      });
+    }
 
     const contenedores = await this.zonas.contarContenedores(id);
 

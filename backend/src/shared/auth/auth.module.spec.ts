@@ -36,4 +36,11 @@ describe('opcionesJwt', () => {
 
     expect(signOptions?.expiresIn).toBe('8h');
   });
+
+  it('firma las credenciales internas con HS256 aunque el IdP use RS256', () => {
+    const { signOptions } = opcionesJwt(
+      new ConfigService({ JWT_SECRET: 'secreto', AUTH_MODE: 'federated', JWT_ALGORITHM: 'RS256' }),
+    );
+    expect(signOptions?.algorithm).toBe('HS256');
+  });
 });

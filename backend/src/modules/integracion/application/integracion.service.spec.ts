@@ -1,3 +1,4 @@
+import { sinContingencias } from '../../../../test/helpers/doble-contingencias';
 import { BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventTypes } from '../../../shared/domain/domain-event';
@@ -87,14 +88,17 @@ describe('IntegracionService (CU-INT-01)', () => {
         { id, bloqueada: false, bloqueoManual: false } as Zona,
       ]),
     );
-    zonas = new ZonasService({
-      buscarPorId: async (id: string) => zonasGuardadas.get(id) ?? null,
-      listar: async () => [...zonasGuardadas.values()],
-      guardar: async (zona: Zona) => {
-        zonasGuardadas.set(zona.id, zona);
-        return zona;
-      },
-    } as unknown as ZonaRepository);
+    zonas = new ZonasService(
+      {
+        buscarPorId: async (id: string) => zonasGuardadas.get(id) ?? null,
+        listar: async () => [...zonasGuardadas.values()],
+        guardar: async (zona: Zona) => {
+          zonasGuardadas.set(zona.id, zona);
+          return zona;
+        },
+      } as unknown as ZonaRepository,
+      sinContingencias(),
+    );
     eventos = new InMemoryEventPublisher();
     intervenciones = { programarSiCorresponde: jest.fn().mockResolvedValue('programada') };
 

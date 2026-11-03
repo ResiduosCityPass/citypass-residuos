@@ -69,6 +69,10 @@ export class Ruta {
    * devuelve las paradas enteras y contarlas es trivial del lado del cliente.
    */
   avance?: AvanceParadas;
+  /** Proyeccion actual: nunca cambia el historial de paradas. */
+  paradasSuspendidas?: number;
+  contingenciaIds?: string[];
+  paradasBloqueadasManualmente?: number;
 
   @CreateDateColumn({ type: 'timestamptz' })
   generadaEn!: Date;

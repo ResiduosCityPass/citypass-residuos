@@ -1,3 +1,4 @@
+import { sinContingencias } from '../../../../test/helpers/doble-contingencias';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Zona } from '../domain/zona.entity';
 import { ZonaRepository } from '../domain/zona.repository';
@@ -27,7 +28,7 @@ describe('ZonasService', () => {
       contarContenedores: jest.fn(),
       eliminar: jest.fn(),
     };
-    service = new ZonasService(repo);
+    service = new ZonasService(repo, sinContingencias());
   });
 
   describe('crear', () => {
@@ -95,6 +96,14 @@ describe('ZonasService', () => {
   });
 
   describe('eliminar', () => {
+    it('conserva una zona con historial de inundaciones aunque ya no tenga contenedores', async () => {
+      repo.buscarPorId.mockResolvedValue(zonaDe());
+      const clima = sinContingencias();
+      jest.spyOn(clima, 'zonaTieneHistorial').mockResolvedValue(true);
+      service = new ZonasService(repo, clima);
+      await expect(service.eliminar('z-1')).rejects.toThrow(ConflictException);
+      expect(repo.eliminar).not.toHaveBeenCalled();
+    });
     it('elimina la zona cuando no tiene contenedores', async () => {
       repo.buscarPorId.mockResolvedValue(zonaDe());
       repo.contarContenedores.mockResolvedValue(0);

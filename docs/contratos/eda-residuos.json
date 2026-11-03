@@ -1,0 +1,213 @@
+{
+  "namespace": "com.citypass.residuos",
+  "tipos": [
+    {
+      "name": "ServicioAfectado",
+      "fields": [
+        {
+          "name": "eventId",
+          "type": "string"
+        },
+        {
+          "name": "occurredAt",
+          "type": "string"
+        },
+        {
+          "name": "correlationId",
+          "type": [
+            "null",
+            "string"
+          ],
+          "default": null
+        },
+        {
+          "name": "inundacionId",
+          "type": "string"
+        },
+        {
+          "name": "estado",
+          "type": "string"
+        },
+        {
+          "name": "zonaIds",
+          "type": {
+            "type": "array",
+            "items": "string"
+          }
+        },
+        {
+          "name": "alertaId",
+          "type": [
+            "null",
+            "string"
+          ],
+          "default": null
+        },
+        {
+          "name": "actorSub",
+          "type": [
+            "null",
+            "string"
+          ],
+          "default": null
+        }
+      ]
+    },
+    {
+      "name": "RecuperacionPendiente",
+      "fields": [
+        {
+          "name": "eventId",
+          "type": "string"
+        },
+        {
+          "name": "occurredAt",
+          "type": "string"
+        },
+        {
+          "name": "correlationId",
+          "type": [
+            "null",
+            "string"
+          ],
+          "default": null
+        },
+        {
+          "name": "inundacionId",
+          "type": "string"
+        },
+        {
+          "name": "estado",
+          "type": "string"
+        },
+        {
+          "name": "zonaIds",
+          "type": {
+            "type": "array",
+            "items": "string"
+          }
+        },
+        {
+          "name": "alertaId",
+          "type": [
+            "null",
+            "string"
+          ],
+          "default": null
+        },
+        {
+          "name": "actorSub",
+          "type": [
+            "null",
+            "string"
+          ],
+          "default": null
+        }
+      ]
+    },
+    {
+      "name": "RecuperacionHabilitada",
+      "fields": [
+        {
+          "name": "eventId",
+          "type": "string"
+        },
+        {
+          "name": "occurredAt",
+          "type": "string"
+        },
+        {
+          "name": "correlationId",
+          "type": [
+            "null",
+            "string"
+          ],
+          "default": null
+        },
+        {
+          "name": "inundacionId",
+          "type": "string"
+        },
+        {
+          "name": "estado",
+          "type": "string"
+        },
+        {
+          "name": "zonaIds",
+          "type": {
+            "type": "array",
+            "items": "string"
+          }
+        },
+        {
+          "name": "alertaId",
+          "type": [
+            "null",
+            "string"
+          ],
+          "default": null
+        },
+        {
+          "name": "actorSub",
+          "type": [
+            "null",
+            "string"
+          ],
+          "default": null
+        }
+      ]
+    },
+    {
+      "name": "ServicioRestablecido",
+      "fields": [
+        {
+          "name": "eventId",
+          "type": "string"
+        },
+        {
+          "name": "occurredAt",
+          "type": "string"
+        },
+        {
+          "name": "correlationId",
+          "type": [
+            "null",
+            "string"
+          ],
+          "default": null
+        },
+        {
+          "name": "inundacionId",
+          "type": "string"
+        },
+        {
+          "name": "estado",
+          "type": "string"
+        },
+        {
+          "name": "zonaIds",
+          "type": {
+            "type": "array",
+            "items": "string"
+          }
+        },
+        {
+          "name": "alertaId",
+          "type": [
+            "null",
+            "string"
+          ],
+          "default": null
+        },
+        {
+          "name": "actorSub",
+          "type": [
+            "null",
+            "string"
+          ],
+          "default": null
+        }
+      ]
+    }
+  ]
+}

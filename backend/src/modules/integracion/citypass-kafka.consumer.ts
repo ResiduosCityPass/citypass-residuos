@@ -1,5 +1,12 @@
+import { EstadoRecepcionBus } from '../../shared/events/estado-recepcion-bus';
+import {
+  SIMULACROS_EDA,
+  esTopicDe,
+  simulacroEdaHabilitado,
+} from '../contingencias/application/simulacro-eda';
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   Logger,
   OnApplicationBootstrap,
@@ -37,24 +44,34 @@ export class CitypassKafkaConsumer implements OnApplicationBootstrap, OnApplicat
   private readonly logger = new Logger(CitypassKafkaConsumer.name);
   private readonly registry: SchemaRegistry;
   private consumer: Consumer | null = null;
+  private stopped = false;
+  private timer?: NodeJS.Timeout;
 
   constructor(
     private readonly integracion: IntegracionService,
     private readonly gateway: GatewayTransporte,
     private readonly config: ConfigService,
+    private readonly estadoBus: EstadoRecepcionBus,
   ) {
-    const urlGateway = config.get<string>('GATEWAY_URL', 'http://localhost:8080');
+    const urlGateway = config
+      .get<string>('GATEWAY_URL', 'http://localhost:8080')
+      .replace(/\/$/, '');
     // El gateway responde /schemas/ids/{id} igual que un Schema Registry.
     this.registry = new SchemaRegistry({ host: `${urlGateway}/api/v1` });
   }
 
   async onApplicationBootstrap(): Promise<void> {
+    if (this.stopped) return;
     const brokers = this.config.get<string>('KAFKA_BROKERS', '');
 
     if (!brokers) {
       return;
     }
 
+    this.estadoBus.actualizar({
+      estado: 'CONECTANDO',
+      simulacroHabilitado: simulacroEdaHabilitado(this.config),
+    });
     const namespace = this.config.get<string>('GATEWAY_NAMESPACE', 'com.citypass.residuos');
 
     const kafka = new Kafka({
@@ -69,26 +86,92 @@ export class CitypassKafkaConsumer implements OnApplicationBootstrap, OnApplicat
     });
 
     // El broker solo deja usar grupos con el prefijo del namespace.
-    this.consumer = kafka.consumer({ groupId: `${namespace}.api` });
+    this.consumer = kafka.consumer({
+      groupId: this.config.get<string>('KAFKA_GROUP_ID', `${namespace}.api`),
+      allowAutoTopicCreation: false,
+    });
+    this.consumer.on(this.consumer.events.CRASH, () =>
+      this.estadoBus.actualizar({
+        estado: 'ERROR',
+        ultimoError: 'El consumidor reintentara el mensaje pendiente.',
+      }),
+    );
+    this.consumer.on(this.consumer.events.GROUP_JOIN, () =>
+      this.estadoBus.actualizar({ estado: 'CONECTADO' }),
+    );
 
     // Sin await: conectarse reintenta varios segundos y frenaria el arranque. Si
     // el bus no responde, la API arranca igual y el webhook sigue andando.
-    this.conectar(this.consumer).catch((error: Error) =>
-      this.logger.error(`No se pudo conectar a Kafka: ${error.message}`),
-    );
+    void this.conectar(this.consumer).catch(async () => {
+      this.estadoBus.actualizar({
+        estado: 'ERROR',
+        ultimoError: 'No se pudo conectar al bus; se reintentara.',
+      });
+      this.logger.error('No se pudo conectar a Kafka; se reintentara en 30 segundos');
+      await this.consumer?.disconnect().catch(() => undefined);
+      if (!this.stopped) {
+        this.timer = setTimeout(() => void this.onApplicationBootstrap(), 30000);
+        this.timer.unref();
+      }
+    });
   }
 
   private async conectar(consumer: Consumer): Promise<void> {
+    const topics: Array<string | RegExp> = [TOPICOS];
+    if (simulacroEdaHabilitado(this.config)) {
+      const catalogo = await this.gateway.listarTipos();
+      const pendientes = SIMULACROS_EDA.filter(
+        (s) => !catalogo.some((t) => t.fqn === s.fqn && esTopicDe(t.topic, s.fqn)),
+      );
+      this.estadoBus.actualizar({ simulacrosPendientesRegistro: pendientes.map((s) => s.fqn) });
+      if (!pendientes.length)
+        topics.push(
+          ...catalogo
+            .filter((t) => SIMULACROS_EDA.some((s) => s.fqn === t.fqn))
+            .map((t) => t.topic),
+        );
+    }
+    if (this.stopped) return;
     await consumer.connect();
-    // Desde lo ultimo: el historial traeria emergencias viejas que bloquearian zonas.
-    await consumer.subscribe({ topics: [TOPICOS], fromBeginning: false });
+    if (this.stopped) {
+      await consumer.disconnect();
+      return;
+    }
+    // No se reproducen emergencias viejas al incorporar el consumidor unificado.
+    await consumer.subscribe({ topics, fromBeginning: false });
     await consumer.run({
-      eachMessage: ({ message }) => this.alRecibir(message.value),
+      autoCommit: false,
+      eachMessage: async ({ topic, partition, message }) => {
+        try {
+          await this.alRecibir(message.value, topic);
+          await consumer.commitOffsets([
+            { topic, partition, offset: (BigInt(message.offset) + 1n).toString() },
+          ]);
+          this.estadoBus.actualizar({
+            estado: 'CONECTADO',
+            ultimoError: null,
+            ultimoEventoEn: new Date().toISOString(),
+          });
+        } catch (error) {
+          this.estadoBus.actualizar({
+            estado: 'ERROR',
+            ultimoError: 'Entrega pendiente: se reintentara sin confirmar el offset.',
+          });
+          throw error;
+        }
+      },
+    });
+    this.estadoBus.actualizar({
+      estado: 'CONECTADO',
+      ultimoError: null,
+      topicos: topics.map(String),
     });
     this.logger.log('Consumiendo del bus por Kafka');
   }
 
   async onApplicationShutdown(): Promise<void> {
+    this.stopped = true;
+    clearTimeout(this.timer);
     await this.consumer?.disconnect();
   }
 
@@ -98,7 +181,7 @@ export class CitypassKafkaConsumer implements OnApplicationBootstrap, OnApplicat
    * loguea y se sigue. Cualquier otro error (el registry o la base caidos) se
    * relanza para que se reintente.
    */
-  async alRecibir(valor: Buffer | null): Promise<void> {
+  async alRecibir(valor: Buffer | null, topic?: string): Promise<void> {
     const sobre = await this.decodificar(valor);
 
     if (sobre === null) {
@@ -106,9 +189,12 @@ export class CitypassKafkaConsumer implements OnApplicationBootstrap, OnApplicat
     }
 
     try {
-      await this.integracion.procesar(sobre as SobreGateway);
+      await this.integracion.procesar(
+        sobre as SobreGateway,
+        topic && valor ? { topic, schemaId: valor.readUInt32BE(1) } : undefined,
+      );
     } catch (error) {
-      if (!(error instanceof BadRequestException)) {
+      if (!(error instanceof BadRequestException) && !(error instanceof ConflictException)) {
         throw error;
       }
       // Error y no warning: si todos caen aca, el sobre de Kafka no es el esperado.

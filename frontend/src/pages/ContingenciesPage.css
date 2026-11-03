@@ -1,0 +1,14 @@
+.flood-screen { max-width: 1200px; }
+.flood-list { display: grid; gap: 1rem; }
+.flood-list .detail-header { flex-wrap: wrap; gap: .75rem; }
+.flood-list h2 { overflow-wrap: anywhere; }
+.flood-simulator { margin-bottom: 1rem; }
+.flood-simulator form, .flood-list form { display: grid; gap: 1rem; }
+.flood-simulator fieldset, .flood-list fieldset { border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; min-width: 0; }
+.flood-zones { display: flex; flex-wrap: wrap; gap: .75rem 1.5rem; }
+.flood-zones label { display: flex; align-items: center; gap: .5rem; cursor: pointer; }
+.flood-zones input { width: auto; }
+.flood-containers { padding: .5rem 0; list-style: none; }
+.flood-containers li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .5rem; padding: .5rem 0; }
+.flood-list details { margin-top: 1rem; }
+.flood-list summary { cursor: pointer; }

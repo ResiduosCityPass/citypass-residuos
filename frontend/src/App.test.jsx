@@ -8,6 +8,7 @@ import {
   fetchMapContainers,
   fetchContainers,
   fetchMyRoute,
+  fetchFloods,
 } from './api/waste.js';
 
 vi.mock('./api/waste.js', () => ({
@@ -36,6 +37,8 @@ vi.mock('./api/waste.js', () => ({
   fetchInterventions: vi.fn(() => Promise.resolve([])),
   completeIntervention: vi.fn(),
   fetchRoutes: vi.fn(() => Promise.resolve([])),
+  fetchFloods: vi.fn(() => Promise.resolve({ simuladorHabilitado: false, contingencias: [] })),
+  simulateFloodStart: vi.fn(), simulateFloodEnd: vi.fn(), enableFloodRecovery: vi.fn(),
 }));
 
 vi.mock('./components/ContainersMap.jsx', () => ({
@@ -97,11 +100,20 @@ describe('shell de la aplicacion', () => {
    * Los modulos de otros squads se muestran para dejar ver donde encaja
    * Residuos dentro de CityPass+, pero no son navegables: no existen.
    */
-  it('los modulos de otros squads no son enlaces', () => {
+  it('los modulos de otros squads no son enlaces', async () => {
     render(<App />);
 
     expect(screen.queryByRole('link', { name: /Movilidad/ })).not.toBeInTheDocument();
     expect(screen.getByTitle(/Movilidad lo desarrolla el Squad 3/)).toBeInTheDocument();
+    await waitFor(() => expect(fetchMapContainers).toHaveBeenCalled());
+  });
+
+  it('navega desde el menu a la gestion de inundaciones', async () => {
+    const user = userEvent.setup(); render(<App />);
+    await user.click(await screen.findByRole('link', { name: 'Inundaciones' }));
+    expect(await screen.findByRole('heading', { name: 'Inundaciones' })).toBeInTheDocument();
+    expect(await screen.findByText('No hay inundaciones registradas')).toBeInTheDocument();
+    expect(fetchFloods).toHaveBeenCalled();
   });
 
   it('el globo cuenta solo las alertas que alguien todavia tiene que atender', async () => {

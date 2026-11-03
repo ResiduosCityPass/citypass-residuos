@@ -44,6 +44,11 @@ export default function ContainersMap({ containers, selectedId, onSelect, massEv
 
         return (
           <Fragment key={container.id}>
+            {container.recoleccionSuspendida && <CircleMarker
+              center={[container.lat, container.lng]} radius={23}
+              pathOptions={{ color: '#2563A6', weight: 3, dashArray: '4 4', fillOpacity: 0 }}
+              interactive={false}
+            />}
             {/* Halo de incendio: va APARTE del color de estado, porque un contenedor
                 puede estar verde y estar prendido fuego al mismo tiempo. */}
             {hasFire && (
@@ -72,6 +77,7 @@ export default function ContainersMap({ containers, selectedId, onSelect, massEv
                 {container.zonaNombre && <span className="tooltip-zone"> · {container.zonaNombre}</span>}
                 <br />
                 {STATE_LABEL[container.estado]} · {container.nivelLlenadoPct}%
+                {container.recoleccionSuspendida && <><br /><strong>Recolección suspendida por inundación</strong></>}
                 {/* "94% sobre un umbral de 70" se entiende mucho mejor que un 94%
                     solo. El umbral viene en el payload del mapa, asi que no hay
                     que pedir la zona aparte para mostrarlo. */}

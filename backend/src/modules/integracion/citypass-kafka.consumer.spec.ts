@@ -1,3 +1,4 @@
+import { EstadoRecepcionBus } from '../../shared/events/estado-recepcion-bus';
 import { BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SchemaRegistry } from '@kafkajs/confluent-schema-registry';
@@ -10,6 +11,9 @@ const kafka = {
   subscribe: jest.fn(),
   run: jest.fn(),
   disconnect: jest.fn(),
+  commitOffsets: jest.fn(),
+  on: jest.fn(),
+  events: { CRASH: 'crash', GROUP_JOIN: 'join' },
 };
 let configKafka: Record<string, unknown> = {};
 
@@ -38,6 +42,7 @@ describe('CitypassKafkaConsumer', () => {
       integracion as unknown as IntegracionService,
       {} as GatewayTransporte,
       new ConfigService({}),
+      new EstadoRecepcionBus(),
     );
   });
 
@@ -47,7 +52,7 @@ describe('CitypassKafkaConsumer', () => {
     await consumer.alRecibir(mensaje);
 
     expect(getSchema).toHaveBeenCalledWith(7);
-    expect(integracion.procesar).toHaveBeenCalledWith(sobre);
+    expect(integracion.procesar).toHaveBeenCalledWith(sobre, undefined);
   });
 
   it('un evento mal formado se descarta: si tirara, trabaria la cola', async () => {
@@ -107,11 +112,15 @@ describe('CitypassKafkaConsumer', () => {
         integracion as unknown as IntegracionService,
         { obtenerToken: jest.fn().mockResolvedValue('jwt') } as unknown as GatewayTransporte,
         new ConfigService({ KAFKA_BROKERS: 'bus:9092, bus2:9092' }),
+        new EstadoRecepcionBus(),
       );
     const conectado = () => new Promise((resolver) => setImmediate(resolver));
 
     beforeEach(() => {
-      Object.values(kafka).forEach((f) => f.mockReset());
+      Object.values(kafka).forEach((f) => {
+        if (typeof f === 'function') f.mockReset();
+      });
+      kafka.disconnect.mockResolvedValue(undefined);
     });
 
     it('se suscribe desde lo ultimo y manda cada mensaje a alRecibir', async () => {
@@ -125,8 +134,8 @@ describe('CitypassKafkaConsumer', () => {
       );
 
       const { eachMessage } = kafka.run.mock.calls[0][0];
-      await eachMessage({ message: { value: mensaje } });
-      expect(integracion.procesar).toHaveBeenCalledWith(sobre);
+      await eachMessage({ message: { value: mensaje, offset: '10' } });
+      expect(integracion.procesar).toHaveBeenCalledWith(sobre, undefined);
     });
 
     it('pide el token del SASL al mismo emisor que el gateway', async () => {
