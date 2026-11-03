@@ -6,6 +6,8 @@ import Chip from '../ui/Chip.jsx';
 import Button from '../ui/Button.jsx';
 import { USING_MOCKS } from '../../api/waste.js';
 import { usingDevToken, decodeTokenClaims } from '../../api/client.js';
+import { federatedEnabled, logout } from '../../auth/session.js';
+import { useOperatorSession } from '../../auth/SessionContext.js';
 
 /**
  * Grupo del token (ADR-009) -> etiqueta para mostrar. Es cosmetico, no
@@ -37,9 +39,10 @@ function currentRoleLabel() {
  */
 export default function TopBar({ title, subtitle, openAlerts, onTokenChange, menuOpen, onToggleMenu }) {
   const [tokenOpen, setTokenOpen] = useState(false);
+  const session = useOperatorSession();
 
   // Sin backend no hay token que pegar; con token de desarrollo, tampoco.
-  const mostrarToken = !USING_MOCKS && !usingDevToken();
+  const mostrarToken = !federatedEnabled() && !USING_MOCKS && !usingDevToken();
 
   return (
     <header className="topbar">
@@ -85,8 +88,10 @@ export default function TopBar({ title, subtitle, openAlerts, onTokenChange, men
 
         <div className="topbar-profile">
           <Icons.profile />
-          <span>{currentRoleLabel()}</span>
+          <span>{session?.nombre ?? currentRoleLabel()}</span>
+          {session && <span className="muted" title="Rol en Residuos">{ROLE_LABEL[session.rol?.toLowerCase()] ?? session.rol}</span>}
         </div>
+        {session && <Button variant="ghost" size="sm" onClick={logout}>Cerrar sesión</Button>}
       </div>
 
       {tokenOpen && mostrarToken && (

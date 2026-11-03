@@ -1,5 +1,7 @@
+import { dobleContingencias, sinContingencias } from '../../../../test/helpers/doble-contingencias';
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ContingenciasService } from '../../contingencias/application/contingencias.service';
 import { EventTypes } from '../../../shared/domain/domain-event';
 import {
   EstadoCamion,
@@ -37,6 +39,7 @@ describe('ParadasService (CU-10)', () => {
   let alertas: jest.Mocked<Pick<AlertasService, 'resolverAbiertasPorTipo'>>;
   let choferes: jest.Mocked<Pick<ChoferesService, 'buscarActivoPorUsuarioSub'>>;
   let flota: jest.Mocked<Pick<FlotaService, 'obtener' | 'guardarEstado'>>;
+  let contingencias: ReturnType<typeof dobleContingencias>;
   let service: ParadasService;
 
   let parada: Parada;
@@ -112,6 +115,7 @@ describe('ParadasService (CU-10)', () => {
       guardarEstado: jest.fn().mockImplementation(async (c) => c),
     };
 
+    contingencias = dobleContingencias();
     service = new ParadasService(
       paradas,
       rutas,
@@ -122,10 +126,43 @@ describe('ParadasService (CU-10)', () => {
       flota as unknown as FlotaService,
       { ejecutar: <T>(b: () => Promise<T>) => b() } as unknown as ContextoTransaccional,
       new ConfigService({}),
+      contingencias as unknown as ContingenciasService,
     );
   });
 
   describe('cierre del ciclo', () => {
+    it.each(['confirmar', 'omitir'] as const)(
+      'no permite %s una parada suspendida ni modifica llenado o alertas',
+      async (accion) => {
+        contingencias.exigirZonaHabilitada.mockRejectedValue(
+          new ConflictException({ code: 'PARADA_SUSPENDIDA_INUNDACION' }),
+        );
+        const operacion =
+          accion === 'confirmar'
+            ? service.confirmar('pd-1', SESION, EN_EL_CONTENEDOR)
+            : service.omitir('pd-1', SESION, { motivo: 'Inundacion' });
+        await expect(operacion).rejects.toThrow(ConflictException);
+        expect(paradas.guardar).not.toHaveBeenCalled();
+        expect(contenedores.guardar).not.toHaveBeenCalled();
+        expect(alertas.resolverAbiertasPorTipo).not.toHaveBeenCalled();
+        expect(contenedor.nivelLlenadoPct).toBe(94);
+        expect(contingencias.registrarVaciado).not.toHaveBeenCalled();
+      },
+    );
+
+    it('informa el vaciado efectivo para avanzar la recuperacion', async () => {
+      await service.confirmar('pd-1', SESION, EN_EL_CONTENEDOR);
+      expect(contingencias.registrarVaciado).toHaveBeenCalledWith(
+        'c-1',
+        expect.any(Date),
+        expect.any(String),
+      );
+    });
+
+    it('omitir no da por recuperado el servicio', async () => {
+      await service.omitir('pd-1', SESION, { motivo: 'Auto estacionado' });
+      expect(contingencias.registrarVaciado).not.toHaveBeenCalled();
+    });
     it('marca la parada como confirmada', async () => {
       const resultado = await service.confirmar('pd-1', SESION, EN_EL_CONTENEDOR);
 
@@ -209,6 +246,7 @@ describe('ParadasService (CU-10)', () => {
         flota as unknown as FlotaService,
         { ejecutar: <T>(b: () => Promise<T>) => b() } as unknown as ContextoTransaccional,
         new ConfigService({ RADIO_CONFIRMACION_VACIADO_METROS: 20_000 }),
+        sinContingencias(),
       );
 
       await expect(conRadioGrande.confirmar('pd-1', SESION, A_CINCO_KM)).resolves.toBeDefined();

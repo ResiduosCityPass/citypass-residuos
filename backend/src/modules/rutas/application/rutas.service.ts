@@ -28,6 +28,7 @@ import {
 import { CandidatoRuteo, litrosOcupados, planificarRuta } from '../domain/reglas/planificador';
 import { AsignarRutaDto } from './dto/asignar-ruta.dto';
 import { GenerarRutaDto } from './dto/generar-ruta.dto';
+import { ContingenciasService } from '../../contingencias/application/contingencias.service';
 
 /** Deposito por defecto: el Obelisco. Configurable por entorno. */
 export const DEPOSITO_DEFAULT: Punto = { lat: -34.6037, lng: -58.3816 };
@@ -57,6 +58,7 @@ export class RutasService {
     private readonly zonas: ZonasService,
     private readonly transaccion: ContextoTransaccional,
     config: ConfigService,
+    private readonly contingencias: ContingenciasService,
   ) {
     this.deposito = {
       lat: Number(config.get('DEPOSITO_LAT', DEPOSITO_DEFAULT.lat)),
@@ -66,6 +68,13 @@ export class RutasService {
 
   /** CU-08 · Arma una propuesta de recorrido. No toma el camion todavia. */
   async generar(dto: GenerarRutaDto): Promise<Ruta> {
+    return this.transaccion.ejecutar(async () => {
+      await this.contingencias.bloquearOperacion();
+      return this.generarEnTransaccion(dto);
+    });
+  }
+
+  private async generarEnTransaccion(dto: GenerarRutaDto): Promise<Ruta> {
     const camion = await this.flota.obtener(dto.camionId);
 
     if (camion.estado !== EstadoCamion.DISPONIBLE) {
@@ -80,7 +89,7 @@ export class RutasService {
     if (candidatos.length === 0) {
       throw new ConflictException({
         message:
-          `No hay contenedores criticos de tipo ${camion.tipoResiduoHabilitado} ` +
+          `No hay contenedores criticos o pendientes de recuperacion de tipo ${camion.tipoResiduoHabilitado} ` +
           `sin rutear para este camion`,
         code: 'RUTA_SIN_CONTENEDORES',
       });
@@ -91,53 +100,60 @@ export class RutasService {
     if (plan.paradas.length === 0) {
       throw new ConflictException({
         message:
-          `Ningun contenedor critico entra en la capacidad de ${camion.capacidadLitros} litros ` +
+          `Ningun contenedor candidato entra en la capacidad de ${camion.capacidadLitros} litros ` +
           `del camion ${camion.patente}`,
         code: 'RUTA_SIN_CONTENEDORES',
       });
     }
 
-    return this.transaccion.ejecutar(async () => {
-      const ruta = await this.rutas.crear({
-        camionId: camion.id,
-        choferId: null,
-        estado: EstadoRuta.PROPUESTA,
-        distanciaEstimadaKm: plan.distanciaKm,
-        litrosEstimados: plan.litros,
-      });
-
-      await this.paradas.crearVarias(
-        plan.paradas.map((parada, indice) => ({
-          rutaId: ruta.id,
-          contenedorId: parada.contenedorId,
-          orden: indice + 1,
-        })),
-      );
-
-      await this.eventos.publish(
-        buildEvent(EventTypes.RUTA_GENERADA, {
-          rutaId: ruta.id,
-          camionId: camion.patente,
-          cantidadParadas: plan.paradas.length,
-          distanciaEstimadaKm: plan.distanciaKm,
-          cargaEstimadaLitros: plan.litros,
-          generadaEn: new Date().toISOString(),
-        }),
-      );
-
-      return this.obtener(ruta.id);
+    const ruta = await this.rutas.crear({
+      camionId: camion.id,
+      choferId: null,
+      estado: EstadoRuta.PROPUESTA,
+      distanciaEstimadaKm: plan.distanciaKm,
+      litrosEstimados: plan.litros,
     });
+
+    await this.paradas.crearVarias(
+      plan.paradas.map((parada, indice) => ({
+        rutaId: ruta.id,
+        contenedorId: parada.contenedorId,
+        orden: indice + 1,
+      })),
+    );
+
+    await this.eventos.publish(
+      buildEvent(EventTypes.RUTA_GENERADA, {
+        rutaId: ruta.id,
+        camionId: camion.patente,
+        cantidadParadas: plan.paradas.length,
+        distanciaEstimadaKm: plan.distanciaKm,
+        cargaEstimadaLitros: plan.litros,
+        generadaEn: new Date().toISOString(),
+      }),
+    );
+
+    return this.obtener(ruta.id);
   }
 
   /** CU-09 · Una persona confirma la propuesta y compromete el camion. */
   async asignar(id: string, dto: AsignarRutaDto): Promise<Ruta> {
     return this.transaccion.ejecutar(async () => {
+      await this.contingencias.bloquearOperacion();
       const ruta = await this.obtener(id);
 
       if (ruta.estado !== EstadoRuta.PROPUESTA) {
         throw new ConflictException({
           message: `La ruta ya esta en estado ${ruta.estado}`,
           code: 'RUTA_NO_PROPUESTA',
+        });
+      }
+
+      if (ruta.paradasSuspendidas || ruta.paradasBloqueadasManualmente) {
+        throw new ConflictException({
+          code: 'RUTA_CON_PARADAS_SUSPENDIDAS',
+          message:
+            'La propuesta tiene paradas suspendidas. Descartala y genera una nueva o espera la habilitacion.',
         });
       }
 
@@ -222,7 +238,7 @@ export class RutasService {
       ruta.avance = avances.get(ruta.id) ?? AVANCE_VACIO;
     }
 
-    return rutas;
+    return this.contingencias.decorarRutas(rutas);
   }
 
   async obtener(id: string): Promise<Ruta> {
@@ -235,7 +251,7 @@ export class RutasService {
       });
     }
 
-    return ruta;
+    return (await this.contingencias.decorarRutas([ruta]))[0];
   }
 
   /**
@@ -257,38 +273,49 @@ export class RutasService {
       return null;
     }
 
-    return this.rutas.buscarActivaDeChofer(chofer.id);
+    const ruta = await this.rutas.buscarActivaDeChofer(chofer.id);
+    return ruta ? (await this.contingencias.decorarRutas([ruta]))[0] : null;
   }
 
   /**
-   * Contenedores criticos que este camion puede levantar y que todavia no
+   * Contenedores criticos o pendientes de recuperacion que este camion puede levantar y que no
    * estan comprometidos en otra ruta viva.
    */
   private async buscarCandidatos(
     tipoResiduo: TipoResiduo,
     zonaId?: string,
   ): Promise<CandidatoRuteo[]> {
-    const [contenedores, yaRuteados, zonas] = await Promise.all([
+    const [contenedores, yaRuteados, zonas, recuperacion] = await Promise.all([
       this.contenedores.listar({
-        estado: EstadoContenedor.CRITICO,
         tipoResiduo,
         zonaId,
         soloActivos: true,
       }),
       this.rutas.contenedoresEnRutasVivas(),
       this.zonas.listar(),
+      this.contingencias.pendientesDeRecuperacion(),
     ]);
 
     const comprometidos = new Set(yaRuteados);
-    const bloqueadas = new Set(zonas.filter((z) => z.bloqueada).map((z) => z.id));
+    const bloqueadas = new Set(
+      zonas.filter((z) => z.bloqueada || z.restriccionesInundacion?.length).map((z) => z.id),
+    );
+    const pendientesRecuperacion = new Set(recuperacion);
 
     return contenedores
-      .filter((c) => !comprometidos.has(c.id) && !bloqueadas.has(c.zonaId))
+      .filter(
+        (c) =>
+          !comprometidos.has(c.id) &&
+          !bloqueadas.has(c.zonaId) &&
+          c.estado !== EstadoContenedor.FUERA_DE_SERVICIO &&
+          (c.estado === EstadoContenedor.CRITICO || pendientesRecuperacion.has(c.id)),
+      )
       .map((c) => ({
         contenedorId: c.id,
         lat: c.lat,
         lng: c.lng,
         litrosOcupados: litrosOcupados(c.capacidadLitros, c.nivelLlenadoPct),
+        prioridadRecuperacion: pendientesRecuperacion.has(c.id),
       }));
   }
 }

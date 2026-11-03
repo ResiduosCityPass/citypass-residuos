@@ -15,6 +15,7 @@ import {
   confirmStop,
   skipStop,
   fetchNearbyContainers,
+  fetchFloods, simulateFloodStart, simulateFloodEnd, enableFloodRecovery,
 } from './waste.http.js';
 import { saveToken } from './client.js';
 
@@ -34,6 +35,28 @@ describe('rutas contra la API real', () => {
 
   const calledPath = () => globalThis.fetch.mock.calls[0][0];
   const calledOptions = () => globalThis.fetch.mock.calls[0][1];
+
+  it('consulta contingencias y sus capacidades con autenticacion', async () => {
+    await fetchFloods();
+    expect(calledPath()).toMatch(/\/contingencias$/);
+    expect(calledOptions().headers.Authorization).toBe('Bearer un.jwt.valido');
+  });
+  it('envia las zonas y descripcion al simulador de inicio', async () => {
+    const payload = { descripcion: 'Inundacion', zonaIds: ['z1'] };
+    await simulateFloodStart(payload);
+    expect(calledPath()).toMatch(/\/contingencias\/simulador\/inicio$/);
+    expect(calledOptions().method).toBe('POST');
+    expect(JSON.parse(calledOptions().body)).toEqual(payload);
+  });
+  it('finalizar y habilitar son acciones diferentes', async () => {
+    await simulateFloodEnd('f1');
+    expect(calledPath()).toMatch(/\/simulador\/f1\/finalizacion$/);
+    expect(calledOptions().method).toBe('POST');
+    globalThis.fetch.mockClear();
+    await enableFloodRecovery('f1');
+    expect(calledPath()).toMatch(/\/contingencias\/f1\/recuperar$/);
+    expect(calledOptions().method).toBe('PATCH');
+  });
 
   it('el bloqueo de zona manda el valor por query, no en el cuerpo', async () => {
     await setZoneBlocked('zn-1', true);

@@ -27,6 +27,10 @@ export const EventTypes = {
   RUTA_GENERADA: 'residuos.ruta.generada',
   RUTA_ASIGNADA: 'residuos.ruta.asignada',
   PARADA_OMITIDA: 'residuos.parada.omitida',
+  SERVICIO_AFECTADO: 'residuos.servicio.afectado',
+  RECUPERACION_PENDIENTE: 'residuos.recuperacion.pendiente',
+  RECUPERACION_HABILITADA: 'residuos.recuperacion.habilitada',
+  SERVICIO_RESTABLECIDO: 'residuos.servicio.restablecido',
 } as const;
 
 export type EventType = (typeof EventTypes)[keyof typeof EventTypes];

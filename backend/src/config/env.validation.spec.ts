@@ -48,4 +48,68 @@ describe('validarEntorno', () => {
   it('rechaza un NODE_ENV desconocido', () => {
     expect(() => validarEntorno({ ...entornoValido, NODE_ENV: 'staging' })).toThrow(/NODE_ENV/);
   });
+
+  it('exige issuer, audiencia y JWKS confirmados para el modo federado', () => {
+    expect(() => validarEntorno({ ...entornoValido, AUTH_MODE: 'federated' })).toThrow(
+      'JWT_ISSUER',
+    );
+    const config = {
+      ...entornoValido,
+      AUTH_MODE: 'federated',
+      JWT_ISSUER: 'idp-confirmado',
+      JWT_AUDIENCE: 'api-confirmada',
+    };
+    expect(() => validarEntorno(config)).toThrow('JWT_JWKS_URL');
+    expect(() => validarEntorno({ ...config, JWT_JWKS_URL: 'http://idp/jwks' })).toThrow('HTTPS');
+    expect(validarEntorno({ ...config, JWT_JWKS_URL: 'https://idp/jwks' }).AUTH_MODE).toBe(
+      'federated',
+    );
+  });
+
+  it('no permite un mismo grupo para dos roles', () => {
+    expect(() =>
+      validarEntorno({
+        ...entornoValido,
+        JWT_ADMIN_GROUPS: 'delegados',
+        JWT_OPERATOR_GROUPS: 'delegados',
+      }),
+    ).toThrow('mas de un rol');
+  });
+  it('exige credenciales propias, namespace y TLS para habilitar EDA', () => {
+    expect(() => validarEntorno({ ...entornoValido, EVENT_BUS_DRIVER: 'platform' })).toThrow(
+      'EDA_CLIENT_SECRET',
+    );
+    const base = {
+      ...entornoValido,
+      EVENT_BUS_DRIVER: 'platform',
+      EDA_CLIENT_SECRET: 'test',
+      EDA_CONSUMER_ENABLED: 'true',
+    };
+    expect(validarEntorno(base).EDA_KAFKA_SSL).toBe('true');
+    expect(() => validarEntorno({ ...base, EDA_NAMESPACE: 'com.citypass.turismo' })).toThrow(
+      'EDA_NAMESPACE',
+    );
+    expect(() => validarEntorno({ ...base, EDA_KAFKA_GROUP_ID: 'otro-grupo' })).toThrow('GROUP_ID');
+    expect(() => validarEntorno({ ...base, EDA_KAFKA_BROKERS: '' })).toThrow('BROKERS');
+    expect(() =>
+      validarEntorno({ ...base, NODE_ENV: 'production', EDA_KAFKA_SSL: 'false' }),
+    ).toThrow('TLS');
+    expect(() => validarEntorno({ ...base, EDA_AUTH_URL: 'http://otro-idp' })).toThrow('HTTPS');
+    expect(
+      validarEntorno({ ...base, EDA_GATEWAY_URL: 'http://localhost:8080/api/v1' }).EDA_GATEWAY_URL,
+    ).toContain('localhost');
+  });
+  it('no permite habilitar los tipos de simulacro EDA en produccion', () => {
+    expect(validarEntorno(entornoValido).EDA_CLIMA_SIMULACRO_ENABLED).toBe('false');
+    expect(() =>
+      validarEntorno({
+        ...entornoValido,
+        NODE_ENV: 'production',
+        EDA_CLIMA_SIMULACRO_ENABLED: 'true',
+      }),
+    ).toThrow('simulacros');
+    expect(() =>
+      validarEntorno({ ...entornoValido, EDA_CLIMA_SIMULACRO_ENABLED: 'quizas' }),
+    ).toThrow('EDA_CLIMA_SIMULACRO_ENABLED');
+  });
 });

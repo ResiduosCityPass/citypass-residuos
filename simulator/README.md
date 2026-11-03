@@ -82,3 +82,16 @@ está funcionando: el evento se emite solo en la transición, no en cada lectura
 
 El nivel de llenado crece de forma monótona con ruido (entre 0,5% y 3% por ciclo). Esa monotonía
 es deliberada: es lo que le da algo que predecir a la regresión lineal de CU-12.
+
+## Simulador de inundaciones
+
+Con backend local y JWT de operador o administrador:
+
+```bash
+TOKEN=<jwt-local> npm run inundacion -- inicio <zonaId[,zonaId]> "Inundación de prueba"
+TOKEN=<jwt-local> npm run inundacion -- fin <inundacionId>
+```
+
+La respuesta del inicio incluye el identificador de la inundación. La habilitación de la
+recuperación se realiza desde `/contingencias` en el frontend. El simulador está deshabilitado
+en producción. Ver [el flujo completo](../docs/arquitectura/contingencias-inundacion.md).

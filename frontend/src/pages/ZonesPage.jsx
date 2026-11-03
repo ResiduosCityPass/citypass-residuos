@@ -69,7 +69,9 @@ export default function ZonesPage() {
       await setZoneBlocked(zone.id, !zone.bloqueada);
       setSuccess(
         zone.bloqueada
-          ? `La zona ${zone.nombre} vuelve a entrar en el ruteo.`
+          ? zone.restriccionesInundacion?.length
+            ? `Se quitó el bloqueo manual de ${zone.nombre}. La restricción por inundación sigue vigente.`
+            : `La zona ${zone.nombre} vuelve a entrar en el ruteo.`
           : `La zona ${zone.nombre} queda excluida del ruteo.`,
       );
       load();
@@ -98,10 +100,11 @@ export default function ZonesPage() {
     {
       key: 'bloqueo',
       title: 'Ruteo',
-      render: (z) =>
-        z.bloqueada
-          ? <Chip variant="warning">Bloqueada</Chip>
-          : <Chip variant="success">Activa</Chip>,
+      render: (z) => <div>
+        {z.bloqueada && <Chip variant="warning">Bloqueo manual</Chip>}
+        {z.restriccionesInundacion?.map((r) => <p key={r.contingenciaId} className="text-warning">Inundación: {r.descripcion}</p>)}
+        {!z.bloqueada && !z.restriccionesInundacion?.length && <Chip variant="success">Activa</Chip>}
+      </div>,
     },
     {
       key: 'acciones',
@@ -133,7 +136,7 @@ export default function ZonesPage() {
       <Notice type="info" title="Qué define una zona">
         El umbral de llenado decide a partir de qué porcentaje un contenedor pasa a CRÍTICO. El de
         temperatura dispara las alertas de incendio, sin importar cuán lleno esté. Una zona
-        bloqueada queda excluida del ruteo.
+        bloqueada queda excluida del ruteo. Las restricciones por inundación se gestionan desde Inundaciones y se conservan al quitar un bloqueo manual.
       </Notice>
 
       <div className="filter-bar">

@@ -7,6 +7,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Contenedor } from '../../contenedores/domain/contenedor.entity';
+import type { RestriccionInundacion } from '../../contingencias/domain/contingencia.repository';
 
 /**
  * Zona de la ciudad (CU-02).
@@ -17,6 +18,8 @@ import { Contenedor } from '../../contenedores/domain/contenedor.entity';
  */
 @Entity('zona')
 export class Zona {
+  /** Independientes del bloqueo manual persistido en `bloqueada`. */
+  restriccionesInundacion?: RestriccionInundacion[];
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
@@ -32,8 +35,8 @@ export class Zona {
   umbralTemperaturaC!: number;
 
   /**
-   * Se activa al recibir `emergencias.incidente.creado`. Los contenedores de una
-   * zona bloqueada quedan excluidos del ruteo de CU-08.
+   * Bloqueo manual. Las causas por inundacion se guardan por separado:
+   * finalizar una contingencia nunca modifica esta columna.
    */
   @Column({ default: false })
   bloqueada!: boolean;

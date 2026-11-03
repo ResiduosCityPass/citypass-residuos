@@ -105,9 +105,20 @@ Para crear el entorno en Render:
 
 1. Crear un Blueprint desde el repositorio.
 2. Usar `render.yaml` desde la rama `main`.
-3. Completar `JWT_SECRET` cuando Render lo pida. Ese valor no se versiona.
-4. Mantener el mismo valor en el entorno local usado para `npm run token:dev`, si hace falta generar
-   tokens de demo hasta que llegue el login federado.
+3. Completar `JWT_SECRET` y `EDA_CLIENT_SECRET` cuando Render lo pida. Para un Blueprint
+   existente, cargar manualmente la nueva variable `EDA_CLIENT_SECRET` antes de sincronizar.
+4. El Blueprint activa Login federado y EDA real. El delegado entra por el IdP; no se
+   generan tokens humanos locales. `JWT_SECRET` se reserva al chofer interno.
+
+La preparación de esta versión está documentada en
+[`despliegue-backend.md`](../docs/devops/despliegue-backend.md). `npm run deploy:verificar`
+desde `backend` valida su configuración sin red ni secretos. El compose local original
+sigue siendo un perfil autónomo con bus en memoria; para Login/EDA reales usar
+los perfiles `.env.integration.example`, no asumir que ese compose habilita la integración.
+
+Los [datos de demo](../docs/arquitectura/datos-demo-inundacion.md) se crean con
+`demo:preparar`, tanto desde TypeScript como desde la imagen compilada. No se cargan
+automáticamente durante el despliegue.
 
 El backend usa la `connectionString` interna que Render inyecta con `fromDatabase`, por eso
 `DB_SSL=false` dentro del Blueprint. Si se corre `migration:run:prod` desde una máquina externa

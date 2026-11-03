@@ -30,6 +30,7 @@ import { Ruta } from '../domain/ruta.entity';
 import { RUTA_REPOSITORY, RutaRepository } from '../domain/ruta.repository';
 import { ConfirmarParadaDto } from './dto/confirmar-parada.dto';
 import { OmitirParadaDto } from './dto/omitir-parada.dto';
+import { ContingenciasService } from '../../contingencias/application/contingencias.service';
 
 export const RADIO_CONFIRMACION_DEFAULT_METROS = 100;
 
@@ -88,6 +89,7 @@ export class ParadasService {
     private readonly flota: FlotaService,
     private readonly transaccion: ContextoTransaccional,
     config: ConfigService,
+    private readonly contingencias: ContingenciasService,
   ) {
     this.radioMetros = Number(
       config.get('RADIO_CONFIRMACION_VACIADO_METROS', RADIO_CONFIRMACION_DEFAULT_METROS),
@@ -107,6 +109,7 @@ export class ParadasService {
     sub: string,
     posicion: ConfirmarParadaDto,
   ): Promise<ResultadoConfirmacion> {
+    await this.contingencias.bloquearOperacion();
     const { parada, ruta } = await this.buscarParadaPendiente(paradaId, sub);
 
     const contenedor = await this.contenedores.buscarPorId(parada.contenedorId);
@@ -117,6 +120,8 @@ export class ParadasService {
         code: 'CONTENEDOR_NO_ENCONTRADO',
       });
     }
+
+    await this.contingencias.exigirZonaHabilitada(contenedor.zonaId);
 
     const metros = Math.round(distanciaMetros(posicion, contenedor));
 
@@ -166,6 +171,8 @@ export class ParadasService {
       ),
     );
 
+    await this.contingencias.registrarVaciado(contenedor.id, confirmadaEn, sub);
+
     return {
       paradaId: parada.id,
       estado: parada.estado,
@@ -201,6 +208,7 @@ export class ParadasService {
     sub: string,
     dto: OmitirParadaDto,
   ): Promise<ResultadoOmision> {
+    await this.contingencias.bloquearOperacion();
     const { parada, ruta } = await this.buscarParadaPendiente(paradaId, sub);
 
     const contenedor = await this.contenedores.buscarPorId(parada.contenedorId);
@@ -211,6 +219,8 @@ export class ParadasService {
         code: 'CONTENEDOR_NO_ENCONTRADO',
       });
     }
+
+    await this.contingencias.exigirZonaHabilitada(contenedor.zonaId);
 
     const omitidaEn = new Date();
 

@@ -213,8 +213,8 @@ export const isRouteLive = (route) => route?.estado === 'ASIGNADA' || route?.est
  * 409. Si el auto que tapaba el contenedor se movio, se genera una ruta nueva.
  * Por eso las dos preguntas son la misma.
  */
-export const canConfirmStop = (stop) => stop?.estado === 'PENDIENTE';
-export const canSkipStop = (stop) => stop?.estado === 'PENDIENTE';
+export const canConfirmStop = (stop) => stop?.estado === 'PENDIENTE' && !stop.bloqueoManual && !stop.restriccionesInundacion?.length;
+export const canSkipStop = canConfirmStop;
 
 /**
  * "2 de 3 vaciados" en la cabecera del chofer.

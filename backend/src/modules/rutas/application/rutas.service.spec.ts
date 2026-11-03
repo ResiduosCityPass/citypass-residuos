@@ -1,5 +1,7 @@
+import { dobleContingencias } from '../../../../test/helpers/doble-contingencias';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ContingenciasService } from '../../contingencias/application/contingencias.service';
 import { EventTypes } from '../../../shared/domain/domain-event';
 import {
   EstadoCamion,
@@ -55,6 +57,7 @@ describe('RutasService (CU-08, CU-09)', () => {
   let flota: jest.Mocked<Pick<FlotaService, 'obtener' | 'guardarEstado'>>;
   let choferes: jest.Mocked<Pick<ChoferesService, 'obtenerActivo' | 'buscarActivoPorUsuarioSub'>>;
   let zonas: jest.Mocked<Pick<ZonasService, 'listar'>>;
+  let contingencias: ReturnType<typeof dobleContingencias>;
   let service: RutasService;
 
   const rutaCreada = (parcial: Partial<Ruta> = {}): Ruta =>
@@ -106,6 +109,7 @@ describe('RutasService (CU-08, CU-09)', () => {
     };
     zonas = { listar: jest.fn().mockResolvedValue([ZONA]) };
 
+    contingencias = dobleContingencias();
     service = new RutasService(
       rutas,
       paradas,
@@ -116,10 +120,48 @@ describe('RutasService (CU-08, CU-09)', () => {
       zonas as unknown as ZonasService,
       { ejecutar: <T>(b: () => Promise<T>) => b() } as unknown as ContextoTransaccional,
       new ConfigService({}),
+      contingencias as unknown as ContingenciasService,
     );
   });
 
   describe('CU-08 · generar', () => {
+    it('incluye pendientes de recuperacion no criticos sin incluir otros contenedores normales', async () => {
+      const recuperacion = {
+        ...contenedor('c-recuperar', 0.03, 30),
+        estado: EstadoContenedor.NORMAL,
+      };
+      const normal = { ...contenedor('c-normal', 0.001, 20), estado: EstadoContenedor.NORMAL };
+      contenedores.listar.mockResolvedValue([recuperacion, normal]);
+      contingencias.pendientesDeRecuperacion.mockResolvedValue(['c-recuperar']);
+      await service.generar({ camionId: 'cm-1' });
+      expect(paradas.crearVarias.mock.calls[0][0].map((p) => p.contenedorId)).toEqual([
+        'c-recuperar',
+      ]);
+    });
+
+    it('excluye contenedores de zonas con restricciones por inundacion aunque no tengan bloqueo manual', async () => {
+      zonas.listar.mockResolvedValue([
+        { ...ZONA, restriccionesInundacion: [{ zonaId: ZONA.id, contingenciaId: 'f1' }] } as Zona,
+      ]);
+      await expect(service.generar({ camionId: 'cm-1' })).rejects.toThrow(ConflictException);
+      expect(rutas.crear).not.toHaveBeenCalled();
+    });
+
+    it('una propuesta suspendida no se asigna ni compromete camion o chofer', async () => {
+      rutas.buscarPorId.mockResolvedValue(rutaCreada({ paradasSuspendidas: 1 }));
+      await expect(service.asignar('rt-1', { choferId: CHOFER.id })).rejects.toThrow(
+        ConflictException,
+      );
+      expect(flota.guardarEstado).not.toHaveBeenCalled();
+      expect(rutas.guardar).not.toHaveBeenCalled();
+    });
+
+    it('tampoco asigna una propuesta que conserva un bloqueo manual', async () => {
+      rutas.buscarPorId.mockResolvedValue(rutaCreada({ paradasBloqueadasManualmente: 1 }));
+      await expect(service.asignar('rt-1', { choferId: CHOFER.id })).rejects.toThrow(
+        ConflictException,
+      );
+    });
     it('crea la ruta en estado PROPUESTA', async () => {
       await service.generar({ camionId: 'cm-1' });
 
@@ -151,12 +193,11 @@ describe('RutasService (CU-08, CU-09)', () => {
       expect(publicados[0].payload).toMatchObject({ cantidadParadas: 2 });
     });
 
-    it('solo considera contenedores criticos del tipo que el camion puede levantar', async () => {
+    it('busca por tipo y filtra criticos o pendientes de recuperacion en la aplicacion', async () => {
       await service.generar({ camionId: 'cm-1' });
 
       expect(contenedores.listar).toHaveBeenCalledWith(
         expect.objectContaining({
-          estado: EstadoContenedor.CRITICO,
           tipoResiduo: TipoResiduo.RECICLABLE,
           soloActivos: true,
         }),

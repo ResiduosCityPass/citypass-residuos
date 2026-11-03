@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { isZoneRestricted } from '../../domain/contingencies.js';
 import Modal from '../ui/Modal.jsx';
 import Field from '../ui/Field.jsx';
 import Button from '../ui/Button.jsx';
@@ -75,7 +76,7 @@ export default function GenerateRouteModal({ trucks, zones, onGenerate, onClose 
                    hint="Opcional. Sin zona, la heurística busca en toda la ciudad.">
               <select id="zonaId" value={values.zonaId} onChange={change('zonaId')}>
                 <option value="">Todas las zonas</option>
-                {zones.filter((z) => !z.bloqueada).map((zone) => (
+                {zones.filter((z) => !isZoneRestricted(z)).map((zone) => (
                   <option key={zone.id} value={zone.id}>{zone.nombre}</option>
                 ))}
               </select>
@@ -83,9 +84,9 @@ export default function GenerateRouteModal({ trucks, zones, onGenerate, onClose 
 
             {selected && (
               <Notice type="info" title="Qué va a hacer">
-                Busca contenedores en estado <strong>CRÍTICO</strong> de tipo{' '}
+                Busca contenedores en estado <strong>CRÍTICO</strong> o pendientes de recuperación de tipo{' '}
                 {WASTE_TYPE_LABEL[selected.tipoResiduoHabilitado]} que no estén ya en otra ruta, y
-                los ordena por cercanía sin pasarse de los{' '}
+                prioriza los pendientes de recuperación y los ordena por cercanía sin pasarse de los{' '}
                 {selected.capacidadLitros.toLocaleString('es-AR')} L del camión. Las zonas
                 bloqueadas quedan afuera. <strong>La ruta queda como propuesta</strong>: no se
                 asigna hasta que la confirmes.

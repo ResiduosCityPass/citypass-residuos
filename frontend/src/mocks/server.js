@@ -1,4 +1,11 @@
 import { ApiError } from '../api/client.js';
+
+// La simulacion climatica modifica negocio real y requiere la API.
+export const fetchFloods = async () => ({ simuladorHabilitado: false, contingencias: [] });
+const requiresFloodApi = async () => { throw new ApiError({ code: 'CONTINGENCIAS_REQUIEREN_API', status: 409, message: 'Conectá el backend para simular inundaciones.' }); };
+export const simulateFloodStart = requiresFloodApi;
+export const simulateFloodEnd = requiresFloodApi;
+export const enableFloodRecovery = requiresFloodApi;
 import { ZONES, CONTAINERS, SENSORS, ALERTS, TRUCKS, DRIVERS, ROUTES, STOPS } from './data.js';
 import { DEPOT, distanceKm, distanceMeters } from '../domain/geo.js';
 
@@ -1101,3 +1108,7 @@ export function fetchNearbyContainers(filters = {}) {
       })),
   );
 }
+// El contrato externo se prueba contra el backend; los mocks no simulan el bus.
+export const fetchClimateAlerts = async () => ({ alertas: [], simuladorHabilitado: false });
+export const simulateClimateEvent = async () => { throw new Error('Usá el backend para probar el contrato climático.'); };
+export const resolveClimateAlert = async () => { throw new Error('Usá el backend para revisar alertas climáticas.'); };

@@ -77,6 +77,20 @@ describe('CU-08 / CU-09 · revisar y asignar una ruta', () => {
     fetchDrivers.mockResolvedValue([JUANA, SIN_ACCESO]);
   });
 
+  it('muestra paradas suspendidas y no permite asignar la propuesta afectada', async () => {
+    const suspended = route();
+    suspended.paradasSuspendidas = 1;
+    suspended.paradas[0].restriccionesInundacion = [{ contingenciaId: 'f1', descripcion: 'Inundacion Centro' }];
+    fetchRoute.mockResolvedValue(suspended);
+    const user = userEvent.setup(); mount();
+    await screen.findByText('Recolección suspendida por inundación');
+    await user.selectOptions(await screen.findByLabelText(/Asignar a/), JUANA.id);
+    expect(screen.getByRole('button', { name: 'Confirmar y asignar' })).toBeDisabled();
+    expect(screen.getByText(/Suspendida por inundación: Inundacion Centro/)).toBeInTheDocument();
+    expect(assignRoute).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Descartar propuesta' })).toBeEnabled();
+  });
+
   /**
    * El motivo se le pide al chofer como obligatorio. Este es el unico lugar
    * donde el operador lo lee, y de aca sale la decision de si vuelve a rutear

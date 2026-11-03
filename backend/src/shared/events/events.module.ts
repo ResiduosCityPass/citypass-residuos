@@ -10,6 +10,8 @@ import { EventoPendiente } from './outbox/evento-pendiente.entity';
 import { OutboxEventPublisher } from './outbox/outbox.event-publisher';
 import { OUTBOX_REPOSITORY } from './outbox/outbox.repository';
 import { OutboxTypeormRepository } from './outbox/outbox.typeorm.repository';
+import { EdaTransportModule } from './eda/eda-transport.module';
+import { EdaEventPublisher } from './eda/eda-event.publisher';
 
 /**
  * Modulo global de eventos (ADR-003).
@@ -21,13 +23,13 @@ import { OutboxTypeormRepository } from './outbox/outbox.typeorm.repository';
  * El transporte se elige por EVENT_BUS_DRIVER:
  *   inmemory  -> sprints 1 y 2, y tests
  *   rabbitmq  -> pendiente
- *   platform  -> bus real del Squad 1, sprint 3
+ *   platform  -> gateway HTTP real con identidad de servicio de Residuos
  *
  * Cuando esos existan, el unico archivo que cambia sigue siendo este.
  */
 @Global()
 @Module({
-  imports: [TypeOrmModule.forFeature([EventoPendiente])],
+  imports: [TypeOrmModule.forFeature([EventoPendiente]), EdaTransportModule],
   providers: [
     ContextoTransaccional,
     InMemoryEventPublisher,
@@ -36,17 +38,22 @@ import { OutboxTypeormRepository } from './outbox/outbox.typeorm.repository';
     { provide: OUTBOX_REPOSITORY, useClass: OutboxTypeormRepository },
     {
       provide: TRANSPORTE_EVENTOS,
-      inject: [ConfigService, InMemoryEventPublisher],
-      useFactory: (config: ConfigService, inMemory: InMemoryEventPublisher) => {
+      inject: [ConfigService, InMemoryEventPublisher, EdaEventPublisher],
+      useFactory: (
+        config: ConfigService,
+        inMemory: InMemoryEventPublisher,
+        eda: EdaEventPublisher,
+      ) => {
         const driver = config.get<string>('EVENT_BUS_DRIVER', 'inmemory');
 
         if (driver === 'inmemory') {
           return inMemory;
         }
+        if (driver === 'platform') return eda;
 
         throw new Error(
           `EVENT_BUS_DRIVER="${driver}" todavia no esta implementado. ` +
-            `Drivers disponibles: inmemory. Ver ADR-003.`,
+            `Drivers disponibles: inmemory, platform. Ver ADR-003.`,
         );
       },
     },

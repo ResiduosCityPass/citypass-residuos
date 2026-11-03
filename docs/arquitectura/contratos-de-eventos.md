@@ -160,5 +160,32 @@ pierden y por qué. Es el dato que justifica cambiar un horario o una frecuencia
   revierte por una falla de publicación —el contenedor se marca crítico aunque el bus esté caído—
   y el evento no se pierde: queda pendiente hasta que salga. Tras agotar los reintentos pasa a
   `FALLIDO` y queda en la tabla para inspección.
-- **Consumo:** procesamiento idempotente por `eventId`. Tras 3 intentos fallidos el mensaje va a una
-  *dead letter queue* para inspección manual.
+- **Consumo Kafka:** inbox y aplicación de negocio en una transacción, con deduplicación por
+  `metadata.eventId`. Se confirma el offset después del guardado. Un mensaje inválido queda
+  sin confirmar para revisión; no se descarta en una DLQ automática.
+
+## Extensión: inundaciones (19/10/2026)
+
+Residuos implementa el consumo interno de `espaciospublicos.inundacion.iniciada` y
+`espaciospublicos.inundacion.finalizada` y publica `residuos.servicio.afectado`,
+`residuos.recuperacion.pendiente`, `residuos.recuperacion.habilitada` y
+`residuos.servicio.restablecido`. Estos nombres describen el contrato interno del simulador aislado.
+La integración real usa los FQN y el sobre de EDA descritos abajo.
+
+Ver [el contrato y el flujo completos](contingencias-inundacion.md).
+
+
+## Integración real con EDA (01/11/2026)
+
+Se consumen `com.citypass.espacios.CriticidadClimaticaConfirmada` y
+`com.citypass.espacios.CriticidadClimaticaFinalizada` por Kafka autenticado. El adaptador
+conserva la metadata del gateway y aplica `data` al flujo de revisión y recuperación.
+
+El driver `platform` publica los diez tipos de `com.citypass.residuos` definidos en el
+[JSON de contratos Avro](../contratos/eda-residuos.json). Las cuatro respuestas climáticas son
+`ServicioAfectado`, `RecuperacionPendiente`, `RecuperacionHabilitada` y `ServicioRestablecido`.
+La credencial es de servicio; `actorSub` identifica al humano cuando corresponde.
+
+`data.eventId` es estable entre reintentos del outbox; `metadata.eventId` lo genera EDA en
+cada publicación. `data.alertaId` y `data.correlationId` relacionan las respuestas de Residuos
+con Espacios Públicos. Ver [configuración y validaciones](integracion-login-clima.md).

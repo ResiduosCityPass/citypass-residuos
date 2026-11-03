@@ -59,4 +59,17 @@ describe('ContextoTransaccional', () => {
 
     expect(contexto.managerActual()).toBeNull();
   });
+
+  it('compone servicios en la misma transaccion y propaga su fallo a la exterior', async () => {
+    await expect(
+      contexto.ejecutar(async () => {
+        await contexto.ejecutar(async () => {
+          expect(contexto.managerActual()).toBe(managerFalso);
+          throw new Error('fallo del adaptador');
+        });
+      }),
+    ).rejects.toThrow('fallo del adaptador');
+    expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+    expect(contexto.managerActual()).toBeNull();
+  });
 });

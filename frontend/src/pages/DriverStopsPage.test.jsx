@@ -64,6 +64,44 @@ beforeEach(() => {
   saveToken('jwt.del.chofer');
 });
 
+describe('Suspension por inundacion en la vista del chofer', () => {
+  it('mantiene el llenado y no ofrece confirmar ni omitir una parada suspendida', async () => {
+    fetchMyRoute.mockResolvedValue({ ...route([stop({ restriccionesInundacion: [{ contingenciaId: 'f1', descripcion: 'Inundacion Centro' }] })]), paradasSuspendidas: 1 });
+    render(<DriverStopsPage />);
+    expect(await screen.findByText('Parada suspendida por inundación')).toBeInTheDocument();
+    expect(screen.getByText('88%')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Confirmar vaciado' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'No pude vaciar' })).not.toBeInTheDocument();
+    expect(confirmStop).not.toHaveBeenCalled();
+  });
+
+  it('puede continuar con las paradas habilitadas de la misma ruta', async () => {
+    fetchMyRoute.mockResolvedValue(route([stop({ id: 'p1', restriccionesInundacion: [{ contingenciaId: 'f1', descripcion: 'Inundacion Centro' }] }), stop({ id: 'p2', orden: 3 })]));
+    render(<DriverStopsPage />);
+    await screen.findByText('Parada suspendida por inundación');
+    expect(screen.getAllByRole('button', { name: 'Confirmar vaciado' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'No pude vaciar' })).toHaveLength(1);
+  });
+
+  it('recarga las restricciones cuando el backend rechaza confirmar desde una pantalla vieja', async () => {
+    const user = userEvent.setup();
+    confirmStop.mockRejectedValue(new ApiError({ code: 'PARADA_SUSPENDIDA_INUNDACION', status: 409, message: 'Suspendida' }));
+    render(<DriverStopsPage />);
+    await user.click(await screen.findByRole('button', { name: 'Confirmar vaciado' }));
+    expect(await screen.findByText('Recolección suspendida por inundación')).toBeInTheDocument();
+    expect(fetchMyRoute).toHaveBeenCalledTimes(2);
+  });
+
+  it('revisa la ruta nuevamente cuando el operador habilita la recuperacion', async () => {
+    fetchMyRoute.mockResolvedValueOnce(route([stop({ restriccionesInundacion: [{ contingenciaId: 'f1', descripcion: 'Inundacion Centro' }] })])).mockResolvedValue(route());
+    const user = userEvent.setup(); render(<DriverStopsPage />);
+    await screen.findByText('Parada suspendida por inundación');
+    await user.click(screen.getByRole('button', { name: 'Actualizar ruta' }));
+    expect(await screen.findByRole('button', { name: 'Confirmar vaciado' })).toBeInTheDocument();
+    expect(screen.queryByText('Parada suspendida por inundación')).not.toBeInTheDocument();
+  });
+});
+
 afterEach(() => {
   delete globalThis.navigator.geolocation;
   clearToken();

@@ -7,7 +7,7 @@ import Notice from '../components/ui/Notice.jsx';
 import Field from '../components/ui/Field.jsx';
 import TokenBar from '../components/TokenBar.jsx';
 import { USING_MOCKS, fetchMyRoute, confirmStop, skipStop } from '../api/waste.js';
-import { readToken } from '../api/client.js';
+import { readDriverToken as readToken } from '../api/client.js';
 import { fieldErrors, generalMessage } from '../domain/errors.js';
 import {
   STOP_STATE_LABEL,
@@ -20,6 +20,7 @@ import {
 } from '../domain/states.js';
 import { distanceMeters, formatDistance } from '../domain/geo.js';
 import { useGeolocation, GEO_STATUS } from '../hooks/useGeolocation.js';
+import { isStopSuspended } from '../domain/contingencies.js';
 
 /**
  * CU-10 · Confirmar vaciado.
@@ -102,8 +103,8 @@ export default function DriverStopsPage() {
   //
   // El backend devuelve cuerpo vacio con 200 cuando no hay ruta activa, y
   // client.js lo convierte en `null`. Terminar el turno no es un error.
-  const load = useCallback(() => {
-    setLoading(true);
+  const load = useCallback((background = false) => {
+    if (!background) setLoading(true);
     setError(null);
     return fetchMyRoute()
       .then(setRoute)
@@ -115,6 +116,10 @@ export default function DriverStopsPage() {
     // La carga inicial es la sincronizacion con el backend, no un derivado.
     // oxlint-disable-next-line react/set-state-in-effect
     load();
+    const timer = setInterval(() => {
+      if (USING_MOCKS || readToken()) load(true);
+    }, 15000);
+    return () => clearInterval(timer);
   }, [load]);
 
   /**
@@ -230,6 +235,9 @@ export default function DriverStopsPage() {
           body: 'Puede que te hayan reasignado. Estamos recargando tu ruta actual.',
         });
         await load();
+      } else if (err.code === 'PARADA_SUSPENDIDA_INUNDACION') {
+        setFeedback({ stopId: stop.id, type: 'warning', title: 'Recolección suspendida por inundación', body: 'La parada sigue pendiente. Esperá la habilitación del operador.' });
+        await load();
       } else if (err.code === 'PARADA_YA_CONFIRMADA') {
         // Casi siempre es un doble tap o el otro dispositivo. No es una falla.
         setFeedback({ stopId: stop.id, type: 'info', title: 'Esta parada ya figura confirmada' });
@@ -322,6 +330,10 @@ export default function DriverStopsPage() {
           title: 'Esta parada no es de tu ruta',
           body: 'Puede que te hayan reasignado. Estamos recargando tu ruta actual.',
         });
+        await load();
+      } else if (err.code === 'PARADA_SUSPENDIDA_INUNDACION') {
+        setSkippingId(null);
+        setFeedback({ stopId: stop.id, type: 'warning', title: 'Recolección suspendida por inundación', body: 'La parada sigue pendiente. Esperá la habilitación del operador.' });
         await load();
       } else if (err.code === 'PARADA_YA_OMITIDA' || err.code === 'PARADA_YA_CONFIRMADA') {
         // Una parada cerrada no se reabre por ninguno de los dos caminos. Casi
@@ -445,6 +457,10 @@ export default function DriverStopsPage() {
 
         {route && (
           <>
+            {route.paradasSuspendidas > 0 && <Notice type="warning" title="Hay paradas suspendidas por inundación">
+              Podés continuar con las paradas habilitadas. Las suspendidas conservan su llenado y quedan pendientes hasta la habilitación.
+            </Notice>}
+            <Button variant="secondary" onClick={() => load()} disabled={confirmingId !== null || submittingSkip}>Actualizar ruta</Button>
             <RouteMap stops={paradas} me={geo.position} />
 
             {geo.message && (
@@ -491,6 +507,10 @@ export default function DriverStopsPage() {
                         para decidir si vuelve a rutear este contenedor hoy o si
                         el problema es de la calle. Por eso se muestra, no se
                         guarda y se olvida. */}
+                    {stop.bloqueoManual && <Notice type="warning" title="Zona con bloqueo manual">Esperá la habilitación del operador antes de recolectar.</Notice>}
+                    {isStopSuspended(stop) && <Notice type="warning" title="Parada suspendida por inundación">
+                      {stop.restriccionesInundacion.map((r) => r.descripcion).join(', ')}. Esperá la habilitación antes de recolectar.
+                    </Notice>}
                     {stop.estado === 'OMITIDA' && stop.motivo && (
                       <p className="stop-motivo">No se pudo vaciar: {stop.motivo}</p>
                     )}
@@ -519,7 +539,7 @@ export default function DriverStopsPage() {
                       </div>
                     )}
 
-                    {skippingId === stop.id && (
+                    {skippingId === stop.id && !isStopSuspended(stop) && !stop.bloqueoManual && (
                       <div className="stop-skip-form">
                         <Field
                           label="¿Por qué no se pudo vaciar?"

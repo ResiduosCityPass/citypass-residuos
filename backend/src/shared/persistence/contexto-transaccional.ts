@@ -27,6 +27,9 @@ export class ContextoTransaccional {
    * manager con `managerActual()` va a escribir en ella.
    */
   ejecutar<T>(bloque: () => Promise<T>): Promise<T> {
+    // Un adaptador puede componer varios servicios. Sus escrituras y outbox
+    // deben confirmar o revertir juntas, usando el manager ya abierto.
+    if (this.managerActual()) return bloque();
     return this.dataSource.transaction((manager) => this.almacen.run(manager, bloque));
   }
 

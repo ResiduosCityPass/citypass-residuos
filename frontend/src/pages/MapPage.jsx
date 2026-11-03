@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import ContainersMap from '../components/ContainersMap.jsx';
 import ContainerPanel from '../components/ContainerPanel.jsx';
 import Button from '../components/ui/Button.jsx';
@@ -79,6 +80,10 @@ export default function MapPage({ tokenVersion }) {
 
   return (
     <div className="screen screen-map">
+      {containers.some((c) => c.recoleccionSuspendida) && <Notice type="warning" title="Recolección suspendida por inundación">
+        {containers.filter((c) => c.recoleccionSuspendida).length} contenedor(es) afectados en esta vista.
+        El borde azul punteado indica suspensión; el color interior conserva el estado de llenado. <Link to="/contingencias">Ver inundaciones</Link>
+      </Notice>}
       {/* Tarjetas de resumen: el conteo por estado se lee de un vistazo, sin
           tener que contar marcadores sobre el mapa. Las cinco son botones que
           filtran el mapa; antes la de incendios se veia igual que las otras

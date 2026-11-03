@@ -283,3 +283,12 @@ export const skipStop = (id, motivo) => api.patch(`/paradas/${id}/omitir`, { mot
  */
 export const fetchNearbyContainers = (filters) =>
   apiPublic.get('/publico/contenedores/cercanos', filters);
+
+/* Contingencias climaticas: el simulador procesa eventos reales en el backend. */
+export const fetchFloods = () => api.get('/contingencias');
+export const simulateFloodStart = (data) => api.post('/contingencias/simulador/inicio', data);
+export const simulateFloodEnd = (id) => api.post(`/contingencias/simulador/${id}/finalizacion`);
+export const enableFloodRecovery = (id) => api.patch(`/contingencias/${id}/recuperar`);
+export const fetchClimateAlerts = () => api.get('/contingencias/clima');
+export const simulateClimateEvent = (data) => api.post('/contingencias/clima/simulador', data);
+export const resolveClimateAlert = (id, decision) => api.patch(`/contingencias/clima/${encodeURIComponent(id)}/resolver`, decision);
