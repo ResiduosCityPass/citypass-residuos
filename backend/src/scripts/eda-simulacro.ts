@@ -69,16 +69,12 @@ async function main() {
     payload,
   );
   console.log(
-    JSON.stringify(
-      {
-        tipo: contract.fqn,
-        alertaId: payload.alertaId,
-        payload,
-        eventIdEda: result?.metadata?.eventId ?? result?.eventId ?? null,
-      },
-      null,
-      2,
-    ),
+    JSON.stringify({
+      tipo: contract.fqn,
+      alertaId: payload.alertaId,
+      payload,
+      eventIdEda: result?.metadata?.eventId ?? result?.eventId ?? null,
+    }).replace(/[\r\n]/g, ''),
   );
 }
 void main().catch((error: unknown) => {

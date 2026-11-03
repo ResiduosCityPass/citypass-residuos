@@ -67,4 +67,10 @@ describe('Simulacros propios publicados por EDA', () => {
     expect(esTopicDe(`${fqn}Otro`, fqn)).toBe(false);
     expect(esTopicDe(`${fqn}.v2.ajeno`, fqn)).toBe(false);
   });
+  it.each(['a\nregistro-falso', 'a\r\nregistro-falso', 'a\u001b[31m', 'a\u2028otro'])(
+    'rechaza controles de consola en el identificador: %j',
+    (suffix) => {
+      expect(() => crearFinSimulacro(PREFIJO_SIMULACRO + suffix)).toThrow(PREFIJO_SIMULACRO);
+    },
+  );
 });

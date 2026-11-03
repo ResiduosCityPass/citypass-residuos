@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { JwksService } from '../../auth/jwks.service';
+import { sinBarrasFinales } from './eda-url';
 
 @Injectable()
 export class EdaTokenService {
@@ -11,7 +12,7 @@ export class EdaTokenService {
   constructor(private readonly config: ConfigService) {
     this.jwks = new JwksService(
       new ConfigService({
-        JWT_JWKS_URL: `${config.get<string>('EDA_AUTH_URL', 'https://api.citypass-login.pp.ua').replace(/\/+$/, '')}/.well-known/jwks.json`,
+        JWT_JWKS_URL: `${sinBarrasFinales(config.get<string>('EDA_AUTH_URL', 'https://api.citypass-login.pp.ua'))}/.well-known/jwks.json`,
       }),
     );
   }
@@ -32,9 +33,9 @@ export class EdaTokenService {
     const clientId = this.config.getOrThrow<string>('EDA_CLIENT_ID');
     const secret = this.config.getOrThrow<string>('EDA_CLIENT_SECRET');
     const namespace = this.config.get<string>('EDA_NAMESPACE', 'com.citypass.residuos');
-    const auth = this.config
-      .get<string>('EDA_AUTH_URL', 'https://api.citypass-login.pp.ua')
-      .replace(/\/+$/, '');
+    const auth = sinBarrasFinales(
+      this.config.get<string>('EDA_AUTH_URL', 'https://api.citypass-login.pp.ua'),
+    );
     const response = await fetch(`${auth}/oauth/token`, {
       method: 'POST',
       redirect: 'error',

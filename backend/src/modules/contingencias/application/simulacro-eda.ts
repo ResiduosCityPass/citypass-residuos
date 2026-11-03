@@ -102,7 +102,9 @@ export function crearInicioSimulacro(now = Date.now()) {
 }
 
 export function crearFinSimulacro(alertaId: string, now = Date.now()) {
-  if (!alertaId.startsWith(PREFIJO_SIMULACRO) || alertaId.length > 200)
-    throw new Error(`El alertaId de prueba debe comenzar con ${PREFIJO_SIMULACRO}`);
+  if (!/^SIMULACRO-RES-[A-Za-z0-9-]{1,186}$/.test(alertaId))
+    throw new Error(
+      `El alertaId de prueba debe comenzar con ${PREFIJO_SIMULACRO} y usar solo letras, numeros y guiones (maximo 200 caracteres)`,
+    );
   return { alertaId, finalizadaEn: now, actorSub: ACTOR_SIMULACRO };
 }

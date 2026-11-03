@@ -1,3 +1,5 @@
+import { sinBarrasFinales } from '../domain/url.js';
+
 const KEY = 'citypass.federated-session';
 let memory = null;
 let revision = 0;
@@ -26,7 +28,7 @@ export const accessToken = () => readSession()?.access_token ?? '';
 
 function configuration() {
   const clientId = import.meta.env.VITE_IDP_CLIENT_ID?.trim();
-  const origin = import.meta.env.VITE_IDP_URL?.replace(/\/+$/, '');
+  const origin = import.meta.env.VITE_IDP_URL && sinBarrasFinales(import.meta.env.VITE_IDP_URL);
   if (!origin) throw new Error('Falta configurar el servicio de Login.');
   const url = new URL(origin);
   if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) {

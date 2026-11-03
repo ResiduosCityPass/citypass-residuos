@@ -166,7 +166,7 @@ export class ContingenciasService {
         c &&
         c
           .zonas!.map((z) => z.zonaId)
-          .sort()
+          .sort((a, b) => a.localeCompare(b))
           .join() !== p.zonaIds.join()
       ) {
         throw new ConflictException({

@@ -94,7 +94,7 @@ export default function ClimateEventsPage() {
     {feedback && <Notice type="success">{feedback}</Notice>}
     {data.simuladorHabilitado && <details className="panel-card flood-simulator"><summary>Probar el contrato de Espacios Públicos</summary>
       <p className="muted">Simulación local: conserva el payload recibido y modifica la operación de Residuos. No publica mensajes en EDA.</p>
-      <form onSubmit={(event) => { event.preventDefault(); act(() => simulateClimateEvent({ tipo: type, payload: JSON.parse(payload) }), 'Evento procesado. Las reentregas idénticas no repiten acciones.'); }}>
+      <form onSubmit={(event) => { event.preventDefault(); void act(() => simulateClimateEvent({ tipo: type, payload: JSON.parse(payload) }), 'Evento procesado. Las reentregas idénticas no repiten acciones.'); }}>
         <Field label="Tipo de evento" htmlFor="climate-type"><select id="climate-type" value={type} onChange={(e) => setType(e.target.value)} disabled={busy}>
           <option value={CONFIRMED}>CriticidadClimaticaConfirmada</option><option value={ENDED}>CriticidadClimaticaFinalizada</option>
         </select></Field>

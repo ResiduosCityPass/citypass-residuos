@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EdaTokenService } from './eda-token.service';
+import { sinBarrasFinales } from './eda-url';
 
 export interface TipoEda {
   fqn: string;
@@ -16,7 +17,7 @@ export class EdaGatewayClient {
     private readonly tokens: EdaTokenService,
   ) {}
   async request<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
-    const base = this.config.getOrThrow<string>('EDA_GATEWAY_URL').replace(/\/+$/, '');
+    const base = sinBarrasFinales(this.config.getOrThrow<string>('EDA_GATEWAY_URL'));
     let token = await this.tokens.obtener();
     const send = () =>
       fetch(`${base}${path}`, {

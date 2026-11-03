@@ -49,8 +49,9 @@ export function planificarRuta(
 
     const recuperacion = alcanzables.filter((c) => c.prioridadRecuperacion);
     const prioritarios = recuperacion.length ? recuperacion : alcanzables;
-    const masCercano = prioritarios.reduce((mejor, c) =>
-      distanciaKm(posicion, c) < distanciaKm(posicion, mejor) ? c : mejor,
+    const masCercano = prioritarios.reduce(
+      (mejor, c) => (distanciaKm(posicion, c) < distanciaKm(posicion, mejor) ? c : mejor),
+      prioritarios[0],
     );
 
     distancia += distanciaKm(posicion, masCercano);
