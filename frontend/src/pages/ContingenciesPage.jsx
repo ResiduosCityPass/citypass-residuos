@@ -90,7 +90,7 @@ export default function ContingenciesPage() {
                 {zones.map((zone) => (
                   <label key={zone.id}>
                     <input type="checkbox" checked={zoneIds.includes(zone.id)} onChange={(e) => setZoneIds((ids) => e.target.checked ? [...ids, zone.id] : ids.filter((id) => id !== zone.id))} />
-                    {zone.nombre}{zone.bloqueada ? ' · bloqueo manual' : ''}
+                    {zone.nombre}{zone.bloqueoManual ? ' · bloqueo manual' : zone.bloqueada ? ' · bloqueo por emergencia' : ''}
                   </label>
                 ))}
               </div>

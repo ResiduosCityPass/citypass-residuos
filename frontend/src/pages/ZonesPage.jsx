@@ -101,7 +101,7 @@ export default function ZonesPage() {
       key: 'bloqueo',
       title: 'Ruteo',
       render: (z) => <div>
-        {z.bloqueada && <Chip variant="warning">Bloqueo manual</Chip>}
+        {z.bloqueada && <Chip variant="warning">{z.bloqueoManual ? 'Bloqueo manual' : 'Bloqueo por emergencia'}</Chip>}
         {z.restriccionesInundacion?.map((r) => <p key={r.contingenciaId} className="text-warning">Inundación: {r.descripcion}</p>)}
         {!z.bloqueada && !z.restriccionesInundacion?.length && <Chip variant="success">Activa</Chip>}
       </div>,

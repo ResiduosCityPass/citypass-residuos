@@ -14,7 +14,8 @@ export class EventoRechazadoPorGateway extends Error {}
 /**
  * Driver `platform` de TRANSPORTE_EVENTOS (ADR-003): el bus del Squad 1.
  *
- * Lo usa solo el DespachadorOutbox. Si publish() tira, el despachador reintenta
+ * Publica el DespachadorOutbox; el catalogo y Kafka comparten su token.
+ * Si publish() tira, el despachador reintenta
  * con backoff y al agotar intentos deja el evento FALLIDO en la tabla, igual que
  * con cualquier otro transporte. El dominio no se entera.
  */

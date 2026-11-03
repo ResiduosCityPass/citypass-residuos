@@ -1,7 +1,8 @@
 # Login e inundaciones integrados con develop — 03/11/2026
 
 La rama `feat/inundaciones-login-eda` incorpora `develop` hasta `870e30b` (#51–#68).
-Reemplaza el PR #70 y se revisa contra `develop`; el release posterior a `main` queda
+El [PR #71](https://github.com/ResiduosCityPass/citypass-residuos/pull/71)
+reemplaza el PR #70 y se revisa contra `develop`; el release posterior a `main` queda
 separado. No se ejecutó un despliegue al preparar esta integración.
 
 ## Un solo bus
@@ -36,7 +37,7 @@ conservan; `delegados` sigue siendo OPERADOR, sin permisos de administrador.
 - Backend: 761 tests unitarios; cobertura de líneas 89,97 %.
 - PostgreSQL local en base exclusiva de tests: 144 E2E, incluidas migraciones,
   gateway HTTP/Avro, Login, obstrucciones y bloqueo simultáneo por emergencia.
-- Frontend: 406 tests; cobertura de líneas 94,21 %.
+- Frontend: 407 tests; cobertura de líneas 94,21 %.
 - Lint, TypeScript, builds y verificador del Blueprint correctos.
 - Verificación remota: el cliente compartido obtuvo token y catálogo; Kafka/TLS
   en `test.citypass.mrfranco.net.ar:9092` devolvió metadata de los dos tópicos

@@ -209,7 +209,7 @@ export default function RouteDetailPage() {
                       pedirlo no sirve para nada: la decision de si vuelve a
                       rutear este contenedor hoy o si el problema es de la
                       calle sale de aca. */}
-                  {stop.bloqueoManual && <p className="text-warning">Parada pendiente: zona con bloqueo manual.</p>}
+                  {stop.bloqueoManual && <p className="text-warning">Parada pendiente: zona bloqueada.</p>}
                   {isStopSuspended(stop) && <p className="text-warning">Suspendida por inundación: {stop.restriccionesInundacion.map((r) => r.descripcion).join(', ')}</p>}
                   {stop.estado === 'OMITIDA' && stop.motivo && (
                     <p className="stop-motivo">No se pudo vaciar: {stop.motivo}</p>
@@ -340,7 +340,7 @@ export default function RouteDetailPage() {
                 </Notice>
               )}
 
-              <Button variant="success" onClick={confirm} disabled={assigning || !driverId || (route.paradasSuspendidas > 0 || route.paradasBloqueadasManualmente > 0)} disabledReason={route.paradasSuspendidas > 0 || route.paradasBloqueadasManualmente > 0 ? 'La propuesta tiene paradas suspendidas o zonas con bloqueo manual' : 'Elegí un chofer activo'}>
+              <Button variant="success" onClick={confirm} disabled={assigning || !driverId || (route.paradasSuspendidas > 0 || route.paradasBloqueadasManualmente > 0)} disabledReason={route.paradasSuspendidas > 0 || route.paradasBloqueadasManualmente > 0 ? 'La propuesta tiene paradas suspendidas o zonas bloqueadas' : 'Elegí un chofer activo'}>
                 {assigning ? 'Asignando…' : 'Confirmar y asignar'}
               </Button>
             </>
