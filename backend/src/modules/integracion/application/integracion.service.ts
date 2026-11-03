@@ -151,6 +151,11 @@ export class IntegracionService {
     }
 
     return this.transaccion.ejecutar(async () => {
+      // ponytail: lock global compartido con clima y ruteo. Pone en fila las
+      // transacciones de eventos (reclamos, emergencias, actividades y clima)
+      // para evitar carreras entre suspensiones, bloqueos y cambios de rutas.
+      // Para la escala del TPO es suficiente, aunque limita el paralelismo.
+      // Si crece el volumen, revisar locks por zona y su orden de adquisicion.
       await this.contingencias?.bloquearOperacion();
       if (!(await this.integracion.registrarEvento(eventId, eventType))) {
         return 'duplicado';
