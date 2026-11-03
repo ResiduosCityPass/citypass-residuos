@@ -17,6 +17,7 @@ import { PublicoModule } from './modules/publico/publico.module';
 import { FlotaModule } from './modules/flota/flota.module';
 import { RutasModule } from './modules/rutas/rutas.module';
 import { ContingenciasModule } from './modules/contingencias/contingencias.module';
+import { IntegracionModule } from './modules/integracion/integracion.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { ContingenciasModule } from './modules/contingencias/contingencias.modul
     ChoferesModule,
     RutasModule,
     ContingenciasModule,
+    IntegracionModule,
     // Sprint 4: FlotaModule (CU-03), RutasModule (CU-08..CU-10), PublicoModule (CU-11)
   ],
 })

@@ -5,7 +5,7 @@
 - `render.yaml`: Login federado en backend/frontend, JWKS y roles confirmados,
   publicación por `platform`, consumidor Kafka con TLS y grupo cloud separado del
   local. Simuladores climáticos, mocks y GPS simulado apagados en producción.
-- `JWT_SECRET` se conserva como secreto de choferes; `EDA_CLIENT_SECRET` se declara
+- `JWT_SECRET` se conserva como secreto de choferes; `GATEWAY_CLIENT_SECRET` se declara
   como secreto externo con `sync: false`. No hay credenciales del servicio en el frontend.
 - CI verifica el Blueprint con el validador real de la aplicación y comprueba su
   coherencia con el frontend. El build Docker de frontend también usa Login federado.
@@ -89,7 +89,7 @@ escenario, renovar la credencial con otro archivo y recorrer la demo.
 
 ## Pasos pendientes al publicar
 
-1. Cargar manualmente `EDA_CLIENT_SECRET` en el backend Render existente y conservar
+1. Cargar manualmente `GATEWAY_CLIENT_SECRET` en el backend Render existente y conservar
    su `JWT_SECRET`. `sync: false` no agrega secretos nuevos a un Blueprint existente.
 2. Publicar los cambios revisados mediante el flujo de CI/deploy del proyecto.
 3. Confirmar migraciones, health, login federado y **Kafka conectado** desde el entorno

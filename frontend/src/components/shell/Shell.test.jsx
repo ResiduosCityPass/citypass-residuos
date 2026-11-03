@@ -91,7 +91,8 @@ describe('menu lateral y barra superior', () => {
 
     const links = within(sidebar()).getAllByRole('link').map((link) => link.getAttribute('href'));
     expect(links).toEqual([
-      '/mapa', '/contenedores', '/zonas', '/alertas', '/flota', '/choferes', '/rutas', '/contingencias',
+      '/mapa', '/contenedores', '/zonas', '/alertas', '/flota', '/choferes', '/rutas',
+      '/contingencias', '/intervenciones', '/metricas',
       '/cerca', '/chofer',
     ]);
   });

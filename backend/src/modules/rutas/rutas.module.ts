@@ -4,6 +4,7 @@ import { ChoferesModule } from '../choferes/choferes.module';
 import { AlertasModule } from '../alertas/alertas.module';
 import { ContenedoresModule } from '../contenedores/contenedores.module';
 import { FlotaModule } from '../flota/flota.module';
+import { IntegracionModule } from '../integracion/integracion.module';
 import { ZonasModule } from '../zonas/zonas.module';
 import { ParadasService } from './application/paradas.service';
 import { RutasService } from './application/rutas.service';
@@ -26,6 +27,7 @@ import { ContingenciasModule } from '../contingencias/contingencias.module';
     ZonasModule,
     AlertasModule,
     ContingenciasModule,
+    forwardRef(() => IntegracionModule),
   ],
   controllers: [RutasController, ParadasController],
   providers: [

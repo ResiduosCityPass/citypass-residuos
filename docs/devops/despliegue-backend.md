@@ -38,7 +38,7 @@ válidos: `DATABASE_URL` o las variables separadas.
 |---|---|---|
 | `DATABASE_URL` | Connection string de PostgreSQL | Inyectada con `fromDatabase.property: connectionString` |
 | `JWT_SECRET` | Clave de firma de tokens | **Secreto**, no va en el repo |
-| `EDA_CLIENT_SECRET` | Credencial del servicio Residuos ante EDA | **Secreto**, no va en el repo |
+| `GATEWAY_CLIENT_SECRET` | Credencial del servicio Residuos ante EDA | **Secreto**, no va en el repo |
 
 Si no se usa `DATABASE_URL`, entonces son obligatorias:
 
@@ -57,7 +57,7 @@ exclusivo y aleatorio. No usar el ejemplo de desarrollo.
 
 Render solicita `sync: false` al crear un Blueprint, pero **ignora las variables
 nuevas de ese tipo al sincronizar uno existente**. Antes de actualizar este backend,
-cargar manualmente `EDA_CLIENT_SECRET` en su Environment y comprobar que `JWT_SECRET`
+cargar manualmente `GATEWAY_CLIENT_SECRET` en su Environment y comprobar que `JWT_SECRET`
 ya existe. No se versionan ni se pasan como `VITE_*`.
 Fuente: [secretos en Blueprints](https://render.com/docs/blueprint-spec#prompting-for-secret-values).
 
@@ -85,14 +85,12 @@ ahí corresponde `DB_SSL=true`, porque esa conexión sale por internet y requier
 | `JWT_ISSUER_CHOFERES` | `citypass-residuos-choferes`, distinto del emisor humano |
 | `JWT_OPERATOR_GROUPS` | `operador,delegados`; `delegados` no tiene rol administrador |
 | `EVENT_BUS_DRIVER` | `platform`, publica por el gateway real |
-| `EDA_CLIENT_ID` / `EDA_NAMESPACE` | `grupo6` / `com.citypass.residuos` |
-| `EDA_GATEWAY_URL` | `https://test.citypass.mrfranco.net.ar/api/v1` |
-| `EDA_AUTH_URL` / `EDA_TOKEN_ISSUER` | `https://api.citypass-login.pp.ua` / `https://idp.citypass.local` |
-| `EDA_CONSUMER_ENABLED` / `EDA_KAFKA_SSL` | `true` / `true` |
-| `EDA_KAFKA_BROKERS` | `test.citypass.mrfranco.net.ar:9092` |
-| `EDA_KAFKA_GROUP_ID` | `com.citypass.residuos.residuos-clima-v1` |
-| `EDA_KAFKA_FROM_BEGINNING` | `true`, recupera eventos retenidos sin offset previo; conserva revisión manual |
-| `CLIMA_SIMULADOR_HABILITADO` / `EDA_CLIMA_SIMULACRO_ENABLED` | `false` / `false` |
+| `GATEWAY_CLIENT_ID` / `GATEWAY_NAMESPACE` | `grupo6` / `com.citypass.residuos` |
+| `GATEWAY_URL` | `https://test.citypass.mrfranco.net.ar` (raíz, sin `/api/v1`) |
+| `GATEWAY_TOKEN_URL` | `https://api.citypass-login.pp.ua/oauth/token` |
+| `KAFKA_BROKERS` | `test.citypass.mrfranco.net.ar:9092` |
+| `KAFKA_GROUP_ID` | `com.citypass.residuos.api` |
+| `CLIMA_SIMULADOR_HABILITADO` / `CLIMA_SIMULACRO_EDA_HABILITADO` | `false` / `false` |
 
 El grupo local del ejemplo es `com.citypass.residuos.residuos-clima-local-v1`.
 No usar el mismo grupo para el servidor cloud y una prueba local: repartirían

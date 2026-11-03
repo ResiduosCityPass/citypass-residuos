@@ -1,3 +1,7 @@
+> Actualización del 03/11: integración sobre `develop` (#51–#68), transporte y
+> consumidor unificados. Las cifras y comprobaciones remotas de las secciones
+> históricas corresponden a sus fechas; no acreditan un nuevo despliegue.
+
 # Integración de Residuos con Login y EDA
 
 Se prepararon el [despliegue federado con EDA](../devops/preparacion-login-eda-2026-11-02.md)
@@ -83,33 +87,33 @@ frontend hay que verificar o pedir el alta de ese origen.
 
 ## Recepción desde EDA
 
-Se usa **Kafka con TLS y SASL/OAUTHBEARER**. El backend solicita su token de servicio al
-IdP (`POST /oauth/token`, Basic, `grant_type=client_credentials`), verifica firma/claims y
-lo renueva antes del vencimiento. No hace falta una URL pública de webhook. El dispatcher
-opcional del repositorio no añade firma ni autenticación a sus entregas HTTP; no se abrió
-un endpoint anónimo para aplicar contingencias.
+Se reutilizan **GatewayTransporte** y **CitypassKafkaConsumer** incorporados en
+`develop`. Outbox, CLI de catálogo y SASL/OAUTHBEARER comparten un solo token OAuth
+de servicio y las variables `GATEWAY_*`. Kafka usa `KAFKA_BROKERS`, `KAFKA_SSL` y
+`KAFKA_GROUP_ID`. No hay un segundo cliente, token ni consumidor climático.
+El gateway y el broker validan la identidad de servicio; la validación RS256/JWKS
+de los tokens humanos permanece en el backend de Residuos.
 
-Tipos confirmados en el catálogo real:
+Se consumen `com.citypass.espacios.CriticidadClimaticaConfirmada` y
+`com.citypass.espacios.CriticidadClimaticaFinalizada`, junto con los eventos de
+Reclamos, Emergencias y Espacios que ya procesa `IntegracionService`.
+Kafka resuelve las versiones existentes al suscribirse por namespace. Los schemas
+se leen del framing Confluent y del endpoint público `/api/v1/schemas/ids/{id}`.
 
-- `com.citypass.espacios.CriticidadClimaticaConfirmada` (schema observado 28).
-- `com.citypass.espacios.CriticidadClimaticaFinalizada` (schema observado 27).
+Los dos canales (Kafka y webhook autenticado por `GATEWAY_WEBHOOK_TOKEN`) llaman a
+`IntegracionService.procesar`. Los mensajes climáticos pasan por su inbox con hash,
+validación de tipo/tópico/schema y transacción con el outbox; no se insertan antes
+en el inbox genérico. Una entrega repetida por ambos canales es idempotente.
 
-Los IDs de schema no se fijan en código. Se resuelven el tópico vigente desde el catálogo
-y el schema indicado en el framing Confluent `[0x00][schemaId][Avro]`, mediante el endpoint
-público `/api/v1/schemas/ids/{id}` del gateway. Si el productor migra a otra versión,
-reiniciar el consumidor resuelve el tópico vigente del catálogo.
+Se confirma **offset + 1** con BigInt después del guardado. Fallos transitorios de
+base, registry o commit dejan el offset pendiente para reintentar. Mensajes
+permanentemente inválidos (framing, Avro, schema inexistente o contrato rechazado)
+se registran en el log y se descartan, como en #68, para no trabar la partición.
 
-Cada mensaje contiene `{data,metadata}`. Se comprueba la correspondencia del tipo, tópico
-y schema; se conserva la metadata del gateway en `entrega_eda`. La deduplicación por
-`metadata.eventId` y la aplicación del payload comparten una transacción con el outbox.
-Después del commit de la base, se confirma **offset + 1** en Kafka, usando BigInt para
-no perder precisión. Si falla Avro, la base o el commit del offset, no se acusa el mensaje.
-Una reentrega vuelve a procesarse de forma idempotente.
-
-El consumer group es exclusivo de Residuos. El primer arranque puede recuperar mensajes
-históricos (`fromBeginning=true`); no cambia offsets de otros equipos. Un mensaje inválido
-permanece sin confirmar y requiere revisar el contrato/dato, sin descartarlo silenciosamente.
-La pantalla `/contingencias/clima` muestra conexión, último error y alertas recibidas.
+El grupo cloud es `com.citypass.residuos.api`; local usa otro grupo. Las primeras
+suscripciones usan `fromBeginning=false`: no se reproducen emergencias históricas
+que podrían bloquear zonas antiguas. Un grupo con offsets ya confirmados retoma
+desde ellos. La pantalla `/contingencias/clima` muestra el estado del único consumidor.
 
 ## Afectación y recuperación
 
@@ -151,8 +155,10 @@ cuando corresponde. `correlationId` referencia la alerta externa. `eventId` en *
 el ID estable del outbox de Residuos: permite deduplicar publicaciones repetidas si se pierde
 la respuesta HTTP. El `metadata.eventId` del gateway puede ser nuevo en cada POST.
 
-También se definen contratos para los seis eventos existentes de contenedores/rutas. El
-[JSON de los diez tipos](../contratos/eda-residuos.json) es revisable y está validado con Avro.
+Se conservan las traducciones de `develop`: alertas → `AlertaGenerada`, vaciados →
+`RecoleccionCompletada`, refuerzos, reclamos e intervenciones. Rutas y omisiones
+siguen siendo eventos internos. El [JSON climático](../contratos/eda-residuos.json)
+contiene únicamente las cuatro respuestas nuevas y está validado con Avro.
 La herramienta registra solo tipos faltantes del namespace de Residuos; no edita ni elimina
 contratos existentes. Si un contrato existente difiere, informa el conflicto.
 
@@ -212,7 +218,7 @@ Validación final del 01/11/2026: **536 tests unitarios de backend**, **377 de f
 **109 E2E** pasaron. Cobertura global de líneas: backend unitario **91,87%**, frontend
 **93,98%**. También pasaron lint, tipado y builds.
 
-Se registraron los diez schemas de Residuos en el gateway real y se repitió el registro para
+En la prueba histórica del 01/11 se registraron diez schemas de Residuos en el gateway real y se repitió el registro para
 confirmar que los reconoce sin modificarlos. En Chrome se probó login/logout reales y se
 recibieron dos mensajes históricos de Espacios Públicos, con el delegado como OPERADOR y
 Kafka conectado. No se emitieron eventos de negocio en el bus compartido durante esas

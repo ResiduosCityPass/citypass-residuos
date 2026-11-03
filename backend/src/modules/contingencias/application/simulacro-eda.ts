@@ -78,7 +78,7 @@ export const SIMULACROS_EDA = [
 export function simulacroEdaHabilitado(config: ConfigService): boolean {
   return (
     ['development', 'test'].includes(config.get<string>('NODE_ENV', 'development')) &&
-    config.get<string>('EDA_CLIMA_SIMULACRO_ENABLED', 'false') === 'true'
+    config.get<string>('CLIMA_SIMULACRO_EDA_HABILITADO', 'false') === 'true'
   );
 }
 

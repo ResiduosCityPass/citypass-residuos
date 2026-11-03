@@ -1,9 +1,8 @@
 import 'reflect-metadata';
 import { config as cargarEnv } from 'dotenv';
 import { ConfigService } from '@nestjs/config';
-import { EdaTokenService } from '../shared/events/eda/eda-token.service';
-import { EdaGatewayClient } from '../shared/events/eda/eda-gateway.client';
-import { canonicalJson } from '../shared/events/eda/canonical-json';
+import { GatewayTransporte } from '../shared/events/gateway/gateway.transporte';
+import { canonicalJson } from '../shared/events/gateway/canonical-json';
 import {
   crearFinSimulacro,
   crearInicioSimulacro,
@@ -22,17 +21,17 @@ async function main() {
   const config = new ConfigService(process.env);
   if (!simulacroEdaHabilitado(config))
     throw new Error(
-      'Habilita EDA_CLIMA_SIMULACRO_ENABLED=true en desarrollo/test; no se permite en produccion',
+      'Habilita CLIMA_SIMULACRO_EDA_HABILITADO=true en desarrollo/test; no se permite en produccion',
     );
   if (!process.argv.includes('--apply')) throw new Error('La publicacion requiere --apply');
-  if (config.get<string>('EDA_NAMESPACE') !== 'com.citypass.residuos')
+  if (config.get<string>('GATEWAY_NAMESPACE') !== 'com.citypass.residuos')
     throw new Error('Los simulacros solo se publican en com.citypass.residuos');
-  for (const setting of ['EDA_GATEWAY_URL', 'EDA_AUTH_URL']) {
+  for (const setting of ['GATEWAY_URL', 'GATEWAY_TOKEN_URL']) {
     const url = new URL(config.getOrThrow<string>(setting));
     if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash)
       throw new Error(`${setting} debe usar HTTPS sin credenciales`);
   }
-  const gateway = new EdaGatewayClient(config, new EdaTokenService(config));
+  const gateway = new GatewayTransporte(config);
   const types = await gateway.listarTipos();
   if (command === 'registrar') {
     for (const proposal of proposals) {

@@ -4,14 +4,14 @@ import { CriticidadClimaticaService } from './application/criticidad-climatica.s
 import { CRITICIDAD_CONFIRMADA } from './application/dto/criticidad-climatica.dto';
 import { ROLES_KEY } from '../../shared/auth/roles.decorator';
 import { Rol } from '../../shared/domain/enums';
-import { EdaClimaConsumer } from './infrastructure/eda-clima.consumer';
+import { EstadoRecepcionBus } from '../../shared/events/estado-recepcion-bus';
 
 describe('CriticidadClimaticaController', () => {
   it('exige un rol operativo y toma el actor de la sesion autenticada', async () => {
     const service = { listar: jest.fn(), simular: jest.fn(), resolver: jest.fn() };
     const controller = new CriticidadClimaticaController(
       service as unknown as CriticidadClimaticaService,
-      { estado: () => ({ estado: 'DESHABILITADO' }) } as EdaClimaConsumer,
+      { estado: () => ({ estado: 'DESHABILITADO' }) } as EstadoRecepcionBus,
     );
     expect(Reflect.getMetadata(ROLES_KEY, CriticidadClimaticaController)).toEqual([
       Rol.ADMINISTRADOR,

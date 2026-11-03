@@ -49,6 +49,72 @@ contenedor **verde** puede estar prendido fuego, porque el incendio se evalúa c
 y no contra el llenado. Si es el mismo que acabás de saturar, está rojo, y no se puede mostrar que
 las dos reglas son independientes.
 
+## Actividad masiva (caso transversal del squad 3)
+
+Simula a Espacios publicando `com.citypass.espacios.ActividadCreada`: le pega al webhook de
+Residuos igual que lo haría el bus. Sirve para la demo y como plan B si el bus o Espacios se caen
+en vivo.
+
+```bash
+TOKEN=<token-de-administrador> npm run actividad -- --contenedor CT-0005
+```
+
+Arma un "Festival de Primavera" de 5.000 personas al lado de CT-0005, que empezó hace 3 h y
+termina en 10 minutos. En el mapa aparece la zona con la cuenta regresiva y, cuando termina, los
+contenedores de la zona entran a la próxima ruta que se genere.
+
+| Opción | Qué hace |
+|---|---|
+| `--contenedor <codigo>` | Arma la actividad al lado de ese contenedor (necesita `TOKEN`) |
+| `--termina-en <minutos>` | Cuándo termina; `0` = ya terminó y la escuadrilla puede salir ya. Default 10 |
+| `--titulo`, `--capacidad` | Default "Festival de Primavera", 5000 |
+| `--lat`, `--lng` | Ubicación a mano, sin `--contenedor`. Default el Obelisco |
+
+Usa `WEBHOOK_TOKEN` (default `local-dev`), que tiene que coincidir con `GATEWAY_WEBHOOK_TOKEN` del
+backend. Sin `--contenedor` la actividad cae en el Obelisco, pero el seed reparte los contenedores
+hasta a 1 km, así que puede quedar sin ninguno dentro de los 300 m.
+
+## Suscribirse al bus real
+
+`bus.js` da de alta el webhook de Residuos en Render para que el bus le mande `ActividadCreada`.
+No es un simulador: habla con el bus de verdad.
+
+```bash
+BUS_URL=<url-del-bus> CLIENT_ID=<id> CLIENT_SECRET=<secreto> WEBHOOK_TOKEN=<el-de-render> npm run bus -- suscribir
+```
+
+| Comando | Qué hace |
+|---|---|
+| `suscribir` | Prueba que el webhook de Render responda y lo registra. Devuelve el `id` |
+| `listar` | Las suscripciones de Residuos, y si el bus silenció alguna |
+| `fallidos` | Los eventos que el bus no pudo entregar, con el error |
+| `baja <id>` | Da de baja una suscripción |
+
+`--topico` cambia el tipo de evento (default `com.citypass.espacios.ActividadCreada`). En vez de
+`CLIENT_ID` y `CLIENT_SECRET` se puede pasar un token ya emitido en `BUS_TOKEN`. Los pasos completos
+para Render están en `docs/sprints/plan-maximo-residuos.md`.
+## Reclamo por un auto que bloquea la bicisenda (CU-INT-02)
+
+`reclamo.js` hace de módulo de Reclamos: le manda al webhook de Residuos los mismos eventos que
+mandaría el gateway, con el formato del contrato de Reclamos del 22/10. Sirve para la demo sin
+depender de que ellos estén publicando. Guion completo en `docs/sprints/guion-demo-reclamos.md`.
+
+Necesita una ruta `EN_CURSO` o `ASIGNADA`, el token de administrador y el
+`GATEWAY_WEBHOOK_TOKEN` del backend:
+
+```bash
+TOKEN=<jwt> WEBHOOK_TOKEN=webhook-local npm run reclamo
+```
+
+| Comando | Qué provoca |
+|---|---|
+| `npm run reclamo` | Un auto a ~5 m de la próxima parada pendiente: la parada se omite y la ruta se reordena |
+| `npm run reclamo -- --lejos` | El auto a ~100 m: no tapa nada, `afectaRecoleccion: false` |
+| `npm run reclamo -- --ruta <id>` | Elige la ruta en vez de tomar la primera activa |
+| `npm run reclamo:resuelto` | Reclamos avisa que se retiró el auto (usa el último reclamo enviado) |
+
+El id del último reclamo queda en `ultimo-reclamo.txt`, que no se versiona.
+
 ## El nivel sobrevive entre corridas
 
 Los niveles se guardan en `estado.json` al final de cada ciclo y se recuperan al arrancar. Sin eso

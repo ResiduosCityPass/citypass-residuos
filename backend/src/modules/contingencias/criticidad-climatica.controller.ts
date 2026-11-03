@@ -3,7 +3,7 @@ import { Request } from 'express';
 import { Roles } from '../../shared/auth/roles.decorator';
 import { Rol } from '../../shared/domain/enums';
 import { CriticidadClimaticaService } from './application/criticidad-climatica.service';
-import { EdaClimaConsumer } from './infrastructure/eda-clima.consumer';
+import { EstadoRecepcionBus } from '../../shared/events/estado-recepcion-bus';
 import {
   ResolverCriticidadDto,
   SimularCriticidadDto,
@@ -14,7 +14,7 @@ import {
 export class CriticidadClimaticaController {
   constructor(
     private readonly clima: CriticidadClimaticaService,
-    private readonly consumer: EdaClimaConsumer,
+    private readonly consumer: EstadoRecepcionBus,
   ) {}
   @Get() async listar() {
     return { ...(await this.clima.listar()), integracion: this.consumer.estado() };

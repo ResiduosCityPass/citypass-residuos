@@ -80,7 +80,7 @@ describe('Inbox transaccional de entregas EDA', () => {
     await expect(service.procesar(START, START, 28, null)).rejects.toThrow('Sobre EDA');
   });
   it('recibe un simulacro opt-in, conserva su origen y lo deduplica por la entrega real', async () => {
-    settings.EDA_CLIMA_SIMULACRO_ENABLED = 'true';
+    settings.CLIMA_SIMULACRO_EDA_HABILITADO = 'true';
     const value = { ...envelope(), data: crearInicioSimulacro() };
     value.metadata.source = 'grupo6';
     value.metadata.eventType = SIMULACRO_CONFIRMADO;
@@ -95,7 +95,7 @@ describe('Inbox transaccional de entregas EDA', () => {
   it.each(['deshabilitado', 'produccion', 'otra identidad', 'id real', 'actor real'])(
     'rechaza simulacros que no cumplen las condiciones: %s',
     async (condition) => {
-      settings.EDA_CLIMA_SIMULACRO_ENABLED = condition === 'deshabilitado' ? 'false' : 'true';
+      settings.CLIMA_SIMULACRO_EDA_HABILITADO = condition === 'deshabilitado' ? 'false' : 'true';
       if (condition === 'produccion') settings.NODE_ENV = 'production';
       const value = { ...envelope(), data: crearInicioSimulacro() };
       value.metadata.eventType = SIMULACRO_CONFIRMADO;

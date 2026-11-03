@@ -35,11 +35,19 @@ export class Zona {
   umbralTemperaturaC!: number;
 
   /**
-   * Bloqueo manual. Las causas por inundacion se guardan por separado:
-   * finalizar una contingencia nunca modifica esta columna.
+   * Los contenedores de una zona bloqueada quedan excluidos del ruteo de CU-08.
+   * Es el estado efectivo: la bloquea un operador a mano o una emergencia que
+   * corta la circulacion (CU-INT-01).
    */
   @Column({ default: false })
   bloqueada!: boolean;
+
+  /**
+   * Un operador la bloqueo a mano. Se guarda aparte de `bloqueada` para que el
+   * fin de una emergencia no levante un bloqueo que pidio una persona.
+   */
+  @Column({ default: false })
+  bloqueoManual!: boolean;
 
   @OneToMany(() => Contenedor, (contenedor) => contenedor.zona)
   contenedores?: Contenedor[];

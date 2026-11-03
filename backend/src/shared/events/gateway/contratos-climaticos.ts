@@ -3,12 +3,6 @@ import { DomainEvent, EventTypes } from '../../domain/domain-event';
 type AvroField = { name: string; type: unknown; default?: unknown };
 const strings = (...names: string[]): AvroField[] =>
   names.map((name) => ({ name, type: 'string' }));
-const numbers = (...names: string[]): AvroField[] =>
-  names.map((name) => ({ name, type: 'double' }));
-const location: AvroField = {
-  name: 'ubicacion',
-  type: { type: 'record', name: 'Ubicacion', fields: numbers('lat', 'lng') },
-};
 const climate: AvroField[] = [
   ...strings('inundacionId', 'estado'),
   { name: 'zonaIds', type: { type: 'array', items: 'string' } },
@@ -22,58 +16,6 @@ export const CONTRATOS_EDA: Record<string, { name: string; fields: AvroField[] }
   [EventTypes.RECUPERACION_PENDIENTE]: { name: 'RecuperacionPendiente', fields: climate },
   [EventTypes.RECUPERACION_HABILITADA]: { name: 'RecuperacionHabilitada', fields: climate },
   [EventTypes.SERVICIO_RESTABLECIDO]: { name: 'ServicioRestablecido', fields: climate },
-  [EventTypes.CONTENEDOR_CRITICO]: {
-    name: 'ContenedorCritico',
-    fields: [
-      ...strings('contenedorId', 'zonaId', 'tipoResiduo', 'detectadoEn'),
-      ...numbers('nivelLlenado', 'umbralConfigurado'),
-      location,
-    ],
-  },
-  [EventTypes.INCENDIO_DETECTADO]: {
-    name: 'IncendioDetectado',
-    fields: [
-      ...strings('contenedorId', 'zonaId', 'severidad', 'detectadoEn'),
-      ...numbers('temperaturaCelsius', 'umbralConfigurado'),
-      location,
-    ],
-  },
-  [EventTypes.CONTENEDOR_VACIADO]: {
-    name: 'ContenedorVaciado',
-    fields: [
-      ...strings('contenedorId', 'rutaId', 'camionId', 'choferId', 'confirmadoEn'),
-      ...numbers('nivelPrevio'),
-    ],
-  },
-  [EventTypes.PARADA_OMITIDA]: {
-    name: 'ParadaOmitida',
-    fields: [
-      ...strings(
-        'paradaId',
-        'rutaId',
-        'contenedorId',
-        'camionId',
-        'choferId',
-        'motivo',
-        'omitidaEn',
-      ),
-      ...numbers('nivelLlenadoPct'),
-    ],
-  },
-  [EventTypes.RUTA_GENERADA]: {
-    name: 'RutaGenerada',
-    fields: [
-      ...strings('rutaId', 'camionId', 'generadaEn'),
-      ...numbers('cantidadParadas', 'distanciaEstimadaKm', 'cargaEstimadaLitros'),
-    ],
-  },
-  [EventTypes.RUTA_ASIGNADA]: {
-    name: 'RutaAsignada',
-    fields: [
-      ...strings('rutaId', 'camionId', 'choferId', 'choferNombre', 'asignadaEn'),
-      ...numbers('cantidadParadas'),
-    ],
-  },
 };
 export function registroEda(contract: { name: string; fields: AvroField[] }) {
   return {

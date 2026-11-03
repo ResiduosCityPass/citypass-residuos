@@ -26,16 +26,15 @@ const validated = validarEntorno(config);
 assert.equal(validated.NODE_ENV, 'production');
 assert.equal(validated.AUTH_MODE, 'federated');
 assert.equal(validated.EVENT_BUS_DRIVER, 'platform');
-assert.equal(validated.EDA_CONSUMER_ENABLED, 'true');
-assert.equal(validated.EDA_KAFKA_SSL, 'true');
+assert.equal(validated.KAFKA_SSL, 'true');
 assert.equal(validated.CLIMA_SIMULADOR_HABILITADO, 'false');
-assert.equal(validated.EDA_CLIMA_SIMULACRO_ENABLED, 'false');
+assert.equal(validated.CLIMA_SIMULACRO_EDA_HABILITADO, 'false');
 assert.equal(validated.DB_SYNCHRONIZE, 'false');
 assert.equal(validated.DB_MIGRATIONS_RUN, 'true');
 assert.notEqual(validated.JWT_ISSUER, validated.JWT_ISSUER_CHOFERES);
 assert(validated.JWT_OPERATOR_GROUPS.split(',').includes('delegados'));
 assert(!validated.JWT_ADMIN_GROUPS.split(',').includes('delegados'));
-for (const key of ['JWT_SECRET', 'EDA_CLIENT_SECRET']) {
+for (const key of ['JWT_SECRET', 'GATEWAY_CLIENT_SECRET']) {
   assert.equal(apiVars[key]?.sync, false, `${key} debe cargarse fuera del repo`);
   assert(!('value' in apiVars[key]), `${key} no debe tener valor versionado`);
 }
@@ -48,7 +47,7 @@ assert.equal(apiVars.CORS_ORIGIN?.fromService?.name, web.name);
 for (const flag of ['VITE_USE_MOCKS', 'VITE_SIMULAR_GPS']) assert.equal(webVars[flag]?.value, 'false');
 assert(!Object.keys(webVars).some(k => /SECRET|TOKEN|PASSWORD/.test(k)), 'El frontend no lleva secretos');
 const local = backendRequire('dotenv').parse(fs.readFileSync(path.join(root, 'backend/.env.integration.example')));
-assert.notEqual(local.EDA_KAFKA_GROUP_ID, validated.EDA_KAFKA_GROUP_ID, 'Local y cloud deben usar grupos Kafka distintos');
+assert.notEqual(local.KAFKA_GROUP_ID, validated.KAFKA_GROUP_ID, 'Local y cloud deben usar grupos Kafka distintos');
 assert.equal(api.autoDeployTrigger, 'off');
 assert.equal(web.autoDeployTrigger, 'off');
 console.log('Blueprint válido para Login federado y EDA; secretos externos, simuladores apagados y grupo Kafka separado.');

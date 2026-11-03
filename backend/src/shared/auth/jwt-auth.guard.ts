@@ -119,8 +119,8 @@ export class JwtAuthGuard implements CanActivate {
   private rol(payload: JwtPayload): Rol | undefined {
     if (payload.token_use === 'chofer-interno') return resolverRol(payload.groups ?? []);
     const roles: Array<[string, string, Rol]> = [
-      ['JWT_ADMIN_GROUPS', 'administrador', Rol.ADMINISTRADOR],
-      ['JWT_OPERATOR_GROUPS', 'operador,delegados', Rol.OPERADOR],
+      ['JWT_ADMIN_GROUPS', 'administrador,residuos-administradores', Rol.ADMINISTRADOR],
+      ['JWT_OPERATOR_GROUPS', 'operador,delegados,residuos-operadores', Rol.OPERADOR],
       ['JWT_DRIVER_GROUPS', 'chofer', Rol.CHOFER],
     ];
     const mapping = new Map(

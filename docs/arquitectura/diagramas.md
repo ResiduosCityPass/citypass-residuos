@@ -509,6 +509,71 @@ y a volver a tomar un camión que ya se liberó.
 
 ---
 
+## 8. Secuencia — recolección después de un evento masivo (caso transversal del squad 3)
+
+Espacios publica una actividad masiva y Residuos reacciona solo: marca la zona y, cuando termina el
+evento, la escuadrilla limpia los contenedores. Ver el contrato en
+[contratos-de-eventos.md](contratos-de-eventos.md#comcitypassespaciosactividadcreada--caso-transversal-del-squad-3).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant ESP as Espacios Públicos
+    participant BUS as Bus de CityPass+<br/>(EDA)
+    participant WH as API de Residuos
+    participant AM as ActividadesMasivasService
+    participant DB as PostgreSQL
+    actor OP as Operador
+    actor CH as Chofer
+
+    Note over ESP,BUS: Se crea el festival
+    ESP->>BUS: publica com.citypass.espacios.ActividadCreada
+    BUS->>WH: POST /webhooks/citypass {metadata, data}
+    WH->>DB: ¿ya recibí este eventId?
+    alt repetido
+        WH-->>BUS: 204 (no hace nada)
+    end
+    WH->>AM: registrar(data)
+    alt mal formado, cancelada o menos de 1.000 personas
+        AM-->>WH: se ignora (queda en el log)
+    else actividad masiva
+        AM->>DB: contenedores activos a 300 m o menos
+        rect rgb(232, 244, 239)
+            Note over AM,DB: Una sola transacción
+            AM->>DB: guardar actividad_masiva
+            AM->>DB: refuerzo act-<id>: desde el fin, por 6 h
+        end
+    end
+    WH-->>BUS: 204
+
+    Note over OP,DB: Durante el evento · CU-07
+    OP->>WH: GET /actividades-masivas
+    WH-->>OP: zona (300 m) + hora de fin
+    Note over OP: El mapa dibuja la zona<br/>con la cuenta regresiva
+
+    Note over OP,CH: Termina el evento · CU-08, CU-09, CU-10
+    OP->>WH: POST /rutas/generar {camionId}
+    WH->>DB: críticos + contenedores reforzados vigentes
+    Note over WH,DB: Los tachos de la plaza entran<br/>aunque no estén llenos
+    WH-->>OP: ruta PROPUESTA
+    OP->>WH: PATCH /rutas/:id/asignar {choferId}
+    loop por cada parada
+        CH->>WH: PATCH /paradas/:id/confirmar {lat, lng}
+        WH->>DB: contenedor vaciado
+    end
+    Note over CH,DB: La última parada cierra la ruta:<br/>la plaza quedó limpia
+```
+
+**Por qué la ruta no se arma sola a la hora de fin:** en CU-08 la heurística propone y una persona
+confirma, porque elegir camión y chofer es decisión del operador. El evento solo hace que los
+contenedores de la plaza ya estén en la próxima ruta.
+
+**Por qué se reusa el refuerzo de CU-INT-01:** el ruteo ya sabía sumar contenedores no críticos
+durante una ventana de tiempo. La escuadrilla es eso mismo, así que no hizo falta tocar el módulo
+`rutas`.
+
+---
+
 ## Documentos relacionados
 
 | Documento | Qué tiene |

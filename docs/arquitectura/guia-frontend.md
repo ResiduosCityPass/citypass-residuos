@@ -1190,6 +1190,70 @@ la ruta pasa a `COMPLETADA` y el camión vuelve a `DISPONIBLE`.
 
 ---
 
+## 8f. CU-INT-02 · Rutas que cambian solas por un reclamo
+
+**No hay endpoints nuevos.** Lo que cambia es que una ruta ahora se puede modificar **sin que nadie
+toque la pantalla**: un ciudadano denuncia un auto mal estacionado, el reclamo llega por el bus, y
+si el auto tapa un contenedor, el backend lo saca de las rutas que lo tenían. Lo ves en las mismas
+respuestas de siempre (`GET /rutas/mias`, `GET /rutas/:id`, `GET /rutas`).
+
+> El backend publica `residuos.ruta.recalculada`, pero **ese evento no le llega al front**: no hay
+> WebSocket (sección 10). Te enterás volviendo a pedir la ruta.
+
+### Qué cambia según el estado de la ruta
+
+| Estado | Qué hace el backend | Qué ves en la respuesta |
+|---|---|---|
+| `PROPUESTA` | Borra la parada del contenedor tapado y renumera las demás | La parada **desaparece** y `orden` vuelve a empezar en 1. Si no le queda ninguna, la ruta pasa a `CANCELADA` |
+| `ASIGNADA` / `EN_CURSO` | Omite la parada y reordena las pendientes desde la última confirmada | La parada queda `OMITIDA`, con `omitidaEn` y `motivo`. Las `PENDIENTE` tienen otro `orden` |
+| Cualquiera | Recalcula el recorrido | Cambia `distanciaEstimadaKm`. `litrosEstimados` no se toca |
+
+Si la parada omitida era la **última pendiente**, la ruta pasa a `COMPLETADA` y el camión vuelve a
+`DISPONIBLE`, igual que cuando el chofer omite la última.
+
+### Cómo se reconoce una parada que omitió el sistema
+
+Por el `motivo`, que siempre arranca igual:
+
+```json
+{
+  "estado": "OMITIDA",
+  "omitidaEn": "2026-10-22T18:00:00.000Z",
+  "motivo": "Acceso bloqueado por vehiculo (reclamo RC-123)"
+}
+```
+
+El prefijo `Acceso bloqueado por vehiculo (reclamo ` es fijo, y adentro del paréntesis viene el id
+del reclamo. Sirve para mostrarla distinto, por ejemplo "Cancelada por un reclamo: auto
+mal estacionado", en vez de como si la hubiera omitido el chofer. Si preferís un campo aparte (por
+ejemplo `omitidaPor: "SISTEMA"`), pedímelo: es chico.
+
+### Los tres casos que la pantalla tiene que manejar
+
+1. **La pantalla del chofer quedó vieja.** Mientras el chofer mira su ruta, el sistema le puede
+   omitir una parada o reordenar las demás. Refrescá `GET /rutas/mias` cada tanto (el mismo
+   polling que el mapa) y **siempre después de confirmar u omitir**: la respuesta de esas acciones
+   no trae la ruta reordenada.
+2. **El chofer confirma una parada que el sistema ya omitió.** Recibe
+   `409 PARADA_YA_OMITIDA`, y el `message` incluye el motivo ("La parada 2 ya fue omitida: Acceso
+   bloqueado por vehiculo (reclamo RC-123)"). No es un error del chofer: mostrá el motivo y
+   refrescá la ruta. Lo mismo si intenta omitirla.
+3. **El operador asigna una propuesta que cambió.** Entre generar y asignar, la propuesta pudo
+   perder paradas (se asigna igual, con las que quedan) o pasar a `CANCELADA` si las perdió todas.
+   En ese caso, asignar devuelve `409 RUTA_NO_PROPUESTA`: mostrá que la propuesta se canceló y que
+   hay que generar otra.
+
+### Lo que NO cambia
+
+- **El contenedor sigue `CRITICO` en el mapa**, con su alerta abierta: nadie lo vació. No hay
+  ningún campo que diga que está tapado; si lo necesitás para el mapa, pedímelo.
+- **Mientras siga tapado, no entra en ninguna ruta nueva.** Si todos los críticos de ese tipo están
+  tapados, `POST /rutas/generar` devuelve el `409 RUTA_SIN_CONTENEDORES` de siempre.
+- **Vuelve a entrar solo** cuando otro squad avisa que el auto ya no está, o a las 4 horas si
+  nadie avisa. No hay nada que hacer desde el front.
+
+---
+
 ## 9. CU-04 · Lecturas — para entender, no para llamar
 
 **Este endpoint no lo vas a usar desde el frontend.** Lo llaman los sensores. Te lo documento

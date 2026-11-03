@@ -30,7 +30,7 @@ export class ZonasService {
       });
     }
 
-    return this.zonas.crear({ ...dto, bloqueada: false });
+    return this.zonas.crear({ ...dto, bloqueada: false, bloqueoManual: false });
   }
 
   async listar(): Promise<Zona[]> {
@@ -70,11 +70,27 @@ export class ZonasService {
   }
 
   /**
-   * Marca o desmarca el bloqueo manual sin retirar restricciones climaticas.
+   * Bloqueo manual de un operador (PATCH /zonas/:id/bloqueo). Queda anotado en
+   * `bloqueoManual` para que el fin de una emergencia no lo levante.
+   *
+   * Desbloquear a mano libera la zona aunque una emergencia la tenga bloqueada:
+   * manda el operador, que puede saber que la calle ya esta habilitada.
    */
   async cambiarBloqueo(id: string, bloqueada: boolean): Promise<Zona> {
     const zona = await this.obtener(id);
+    zona.bloqueoManual = bloqueada;
     zona.bloqueada = bloqueada;
+
+    return this.zonas.guardar(zona);
+  }
+
+  /**
+   * Bloqueo por una emergencia que corta la circulacion (CU-INT-01). Al
+   * levantarlo, la zona sigue bloqueada si un operador la bloqueo a mano.
+   */
+  async cambiarBloqueoPorIncidente(id: string, bloqueada: boolean): Promise<Zona> {
+    const zona = await this.obtener(id);
+    zona.bloqueada = bloqueada || zona.bloqueoManual;
 
     return this.zonas.guardar(zona);
   }

@@ -82,12 +82,15 @@ describe('RutasService (CU-08, CU-09)', () => {
       buscarActivaDeChofer: jest.fn().mockResolvedValue(null),
       contenedoresEnRutasVivas: jest.fn().mockResolvedValue([]),
       avanceDeParadas: jest.fn().mockResolvedValue(new Map()),
+      rutasVivasConPendientes: jest.fn().mockResolvedValue([]),
+      ultimosVaciados: jest.fn().mockResolvedValue(new Map()),
     };
     paradas = {
       crearVarias: jest.fn().mockResolvedValue([]),
       guardar: jest.fn(),
       buscarPorId: jest.fn(),
       listarDeRuta: jest.fn().mockResolvedValue([]),
+      borrar: jest.fn(),
     };
     contenedores = {
       crear: jest.fn(),
@@ -409,6 +412,133 @@ describe('RutasService (CU-08, CU-09)', () => {
 
       await expect(service.rutaActivaDeSesion('alguien-mas')).resolves.toBeNull();
       expect(rutas.buscarActivaDeChofer).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('CU-INT-01 · refuerzo por evento cultural', () => {
+    it('suma al ruteo los contenedores reforzados aunque no esten criticos', async () => {
+      const normal = {
+        ...contenedor('c-3', 0.01, 30),
+        estado: EstadoContenedor.NORMAL,
+      } as Contenedor;
+      contenedores.listar.mockImplementation(async (filtro) =>
+        filtro.estado === EstadoContenedor.CRITICO
+          ? [contenedor('c-1', 0.005)]
+          : [contenedor('c-1', 0.005), normal],
+      );
+      const refuerzos = { vigentes: jest.fn().mockResolvedValue([{ contenedorIds: ['c-3'] }]) };
+
+      const conRefuerzos = new RutasService(
+        rutas,
+        paradas,
+        contenedores,
+        eventos,
+        flota as unknown as FlotaService,
+        choferes as unknown as ChoferesService,
+        zonas as unknown as ZonasService,
+        { ejecutar: <T>(b: () => Promise<T>) => b() } as unknown as ContextoTransaccional,
+        new ConfigService({}),
+        contingencias as unknown as ContingenciasService,
+        refuerzos,
+      );
+
+      await conRefuerzos.generar({ camionId: 'cm-1' });
+
+      const creadas = paradas.crearVarias.mock.calls[0][0];
+      expect(creadas.map((p) => p.contenedorId).sort()).toEqual(['c-1', 'c-3']);
+    });
+
+    describe('un contenedor reforzado que ya se vacio', () => {
+      const DESDE = new Date('2026-11-01T20:00:00.000Z');
+      const generarConVaciado = async (vaciadoEn: Date, estado = EstadoContenedor.NORMAL) => {
+        const reforzado = { ...contenedor('c-3', 0.005), estado } as Contenedor;
+        contenedores.listar.mockImplementation(async (filtro) =>
+          filtro.estado === EstadoContenedor.CRITICO
+            ? [
+                contenedor('c-1', 0.005),
+                ...(estado === EstadoContenedor.CRITICO ? [reforzado] : []),
+              ]
+            : [contenedor('c-1', 0.005), reforzado],
+        );
+        rutas.ultimosVaciados.mockResolvedValue(new Map([['c-3', vaciadoEn]]));
+
+        await new RutasService(
+          rutas,
+          paradas,
+          contenedores,
+          eventos,
+          flota as unknown as FlotaService,
+          choferes as unknown as ChoferesService,
+          zonas as unknown as ZonasService,
+          { ejecutar: <T>(b: () => Promise<T>) => b() } as unknown as ContextoTransaccional,
+          new ConfigService({}),
+          contingencias as unknown as ContingenciasService,
+          { vigentes: jest.fn().mockResolvedValue([{ contenedorIds: ['c-3'], desde: DESDE }]) },
+        ).generar({ camionId: 'cm-1' });
+
+        return paradas.crearVarias.mock.calls[0][0].map((p) => p.contenedorId).sort();
+      };
+
+      it('no vuelve a entrar si se vacio despues de que arranco el refuerzo', async () => {
+        expect(await generarConVaciado(new Date('2026-11-01T21:00:00.000Z'))).toEqual(['c-1']);
+      });
+
+      it('entra si el vaciado fue antes de que arrancara el refuerzo', async () => {
+        expect(await generarConVaciado(new Date('2026-11-01T19:00:00.000Z'))).toEqual([
+          'c-1',
+          'c-3',
+        ]);
+      });
+
+      it('entra si se lleno de nuevo y esta critico', async () => {
+        expect(
+          await generarConVaciado(new Date('2026-11-01T21:00:00.000Z'), EstadoContenedor.CRITICO),
+        ).toEqual(['c-1', 'c-3']);
+      });
+    });
+  });
+
+  describe('CU-INT-02 · contenedor tapado por un auto', () => {
+    const conObstrucciones = (obstruidos: string[]) =>
+      new RutasService(
+        rutas,
+        paradas,
+        contenedores,
+        eventos,
+        flota as unknown as FlotaService,
+        choferes as unknown as ChoferesService,
+        zonas as unknown as ZonasService,
+        { ejecutar: <T>(b: () => Promise<T>) => b() } as unknown as ContextoTransaccional,
+        new ConfigService({}),
+        contingencias as unknown as ContingenciasService,
+        { vigentes: jest.fn().mockResolvedValue([{ contenedorIds: ['c-2'] }]) },
+        { contenedoresObstruidos: jest.fn().mockResolvedValue(obstruidos) },
+      );
+
+    beforeEach(() => {
+      contenedores.listar.mockResolvedValue([contenedor('c-1', 0.005), contenedor('c-2', 0.01)]);
+    });
+
+    it('deja afuera del ruteo al contenedor obstruido', async () => {
+      await conObstrucciones(['c-1']).generar({ camionId: 'cm-1' });
+
+      const creadas = paradas.crearVarias.mock.calls[0][0];
+      expect(creadas.map((p) => p.contenedorId)).toEqual(['c-2']);
+    });
+
+    it('lo deja afuera aunque este reforzado por un evento', async () => {
+      await conObstrucciones(['c-2']).generar({ camionId: 'cm-1' });
+
+      const creadas = paradas.crearVarias.mock.calls[0][0];
+      expect(creadas.map((p) => p.contenedorId)).toEqual(['c-1']);
+    });
+
+    it('si todos estan tapados, no hay ruta que generar', async () => {
+      await expect(conObstrucciones(['c-1', 'c-2']).generar({ camionId: 'cm-1' })).rejects.toThrow(
+        expect.objectContaining({
+          response: expect.objectContaining({ code: 'RUTA_SIN_CONTENEDORES' }),
+        }),
+      );
     });
   });
 });

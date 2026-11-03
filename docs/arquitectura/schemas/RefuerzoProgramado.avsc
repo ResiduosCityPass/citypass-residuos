@@ -1,0 +1,14 @@
+{
+  "type": "record",
+  "name": "RefuerzoProgramado",
+  "namespace": "com.citypass.residuos",
+  "doc": "Residuos programo un refuerzo de recoleccion por un evento (CU-INT-01 y squad 3). Metrica para BI: refuerzoId distintos con eventoId que empieza con act-, agrupando por occurredAt.",
+  "fields": [
+    { "name": "refuerzoId", "type": "string", "doc": "Id del refuerzo. Clave para contar: puede repetirse en mas de un evento." },
+    { "name": "eventoId", "type": "string", "doc": "Evento que lo origino. Con el prefijo act- viene de una actividad masiva del squad 3." },
+    { "name": "zona", "type": "string", "doc": "Zona del evento. Vacia si el evento no la trae." },
+    { "name": "contenedores", "type": "int", "doc": "Cantidad de contenedores reforzados." },
+    { "name": "programadoPara", "type": "string", "doc": "Cuando arranca el refuerzo, en ISO-8601 (UTC)." },
+    { "name": "occurredAt", "type": "string", "doc": "Cuando se programo, en ISO-8601 (UTC)." }
+  ]
+}

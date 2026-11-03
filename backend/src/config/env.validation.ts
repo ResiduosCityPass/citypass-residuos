@@ -110,27 +110,15 @@ class VariablesEntorno {
   JWT_JWKS_URL?: string;
 
   @IsString() @IsOptional() JWT_MODULE: string = 'residuos';
-  @IsString() @IsOptional() EDA_GATEWAY_URL: string =
-    'https://test.citypass.mrfranco.net.ar/api/v1';
-  @IsString() @IsOptional() EDA_AUTH_URL: string = 'https://api.citypass-login.pp.ua';
-  @IsString() @IsOptional() EDA_TOKEN_ISSUER: string = 'https://idp.citypass.local';
-  @IsString() @IsOptional() EDA_CLIENT_ID: string = 'grupo6';
-  @IsString() @IsOptional() EDA_CLIENT_SECRET?: string;
-  @IsString() @IsOptional() EDA_NAMESPACE: string = 'com.citypass.residuos';
-  @IsIn(['true', 'false']) @IsOptional() EDA_CONSUMER_ENABLED: string = 'false';
-  @IsIn(['true', 'false']) @IsOptional() EDA_CLIMA_SIMULACRO_ENABLED: string = 'false';
-  @IsString() @IsOptional() EDA_KAFKA_BROKERS: string = 'test.citypass.mrfranco.net.ar:9092';
-  @IsString() @IsOptional() EDA_KAFKA_GROUP_ID: string = 'com.citypass.residuos.residuos-clima-v1';
-  @IsIn(['true', 'false']) @IsOptional() EDA_KAFKA_SSL: string = 'true';
-  @IsIn(['true', 'false']) @IsOptional() EDA_KAFKA_FROM_BEGINNING: string = 'true';
+  @IsIn(['true', 'false']) @IsOptional() CLIMA_SIMULACRO_EDA_HABILITADO: string = 'false';
 
   @IsString()
   @IsOptional()
-  JWT_ADMIN_GROUPS: string = 'administrador';
+  JWT_ADMIN_GROUPS: string = 'administrador,residuos-administradores';
 
   @IsString()
   @IsOptional()
-  JWT_OPERATOR_GROUPS: string = 'operador,delegados';
+  JWT_OPERATOR_GROUPS: string = 'operador,delegados,residuos-operadores';
 
   @IsString()
   @IsOptional()
@@ -143,6 +131,40 @@ class VariablesEntorno {
   @IsIn(['true', 'false'])
   @IsOptional()
   CLIMA_SIMULADOR_HABILITADO: string = 'true';
+  // --- Bus de CityPass+ (CU-INT-01). Solo se usan con EVENT_BUS_DRIVER=platform.
+  @IsString()
+  @IsOptional()
+  GATEWAY_URL?: string;
+
+  @IsString()
+  @IsOptional()
+  GATEWAY_TOKEN_URL?: string;
+
+  @IsString()
+  @IsOptional()
+  GATEWAY_CLIENT_ID?: string;
+
+  @IsString()
+  @IsOptional()
+  GATEWAY_CLIENT_SECRET?: string;
+
+  @IsString() @IsOptional() GATEWAY_NAMESPACE: string = 'com.citypass.residuos';
+  @IsString() @IsOptional() KAFKA_GROUP_ID: string = 'com.citypass.residuos.api';
+
+  /** Brokers de Kafka separados por coma. Vacio: no se consume por Kafka, solo por webhook. */
+  @IsString()
+  @IsOptional()
+  KAFKA_BROKERS?: string;
+
+  /** `false` solo para el bus local (SASL_PLAINTEXT). En produccion es SASL_SSL. */
+  @IsIn(['true', 'false'])
+  @IsOptional()
+  KAFKA_SSL: string = 'true';
+
+  /** Secreto de la URL del webhook (?token=...). Vacio: el webhook rechaza todo. */
+  @IsString()
+  @IsOptional()
+  GATEWAY_WEBHOOK_TOKEN?: string;
 
   @IsString()
   @IsOptional()
@@ -182,7 +204,10 @@ export function validarEntorno(config: Record<string, unknown>) {
     );
   }
 
-  if (instancia.NODE_ENV === Entorno.Production && instancia.EDA_CLIMA_SIMULACRO_ENABLED === 'true')
+  if (
+    instancia.NODE_ENV === Entorno.Production &&
+    instancia.CLIMA_SIMULACRO_EDA_HABILITADO === 'true'
+  )
     throw new Error('Los simulacros climaticos por EDA no se habilitan en produccion');
 
   if (instancia.AUTH_MODE === 'federated') {
@@ -209,20 +234,22 @@ export function validarEntorno(config: Record<string, unknown>) {
   if (new Set(grupos).size !== grupos.length) {
     throw new Error('Un grupo JWT no puede asignar mas de un rol');
   }
-  if (instancia.EVENT_BUS_DRIVER === 'platform' || instancia.EDA_CONSUMER_ENABLED === 'true') {
+  if (instancia.EVENT_BUS_DRIVER === 'platform' || Boolean(instancia.KAFKA_BROKERS?.trim())) {
     for (const key of [
-      'EDA_CLIENT_ID',
-      'EDA_CLIENT_SECRET',
-      'EDA_NAMESPACE',
-      'EDA_GATEWAY_URL',
-      'EDA_AUTH_URL',
+      'GATEWAY_CLIENT_ID',
+      'GATEWAY_CLIENT_SECRET',
+      'GATEWAY_NAMESPACE',
+      'GATEWAY_URL',
+      'GATEWAY_TOKEN_URL',
     ] as const) {
       if (!instancia[key]?.trim()) throw new Error(`${key} es obligatorio para EDA`);
     }
-    if (instancia.EDA_NAMESPACE !== 'com.citypass.residuos')
-      throw new Error('EDA_NAMESPACE debe ser com.citypass.residuos');
-    for (const key of ['EDA_GATEWAY_URL', 'EDA_AUTH_URL'] as const) {
-      const url = new URL(instancia[key]);
+    if (new URL(instancia.GATEWAY_URL!).pathname.replace(/\/$/, '') !== '')
+      throw new Error('GATEWAY_URL debe ser la raiz del gateway, sin /api/v1');
+    if (instancia.GATEWAY_NAMESPACE !== 'com.citypass.residuos')
+      throw new Error('GATEWAY_NAMESPACE debe ser com.citypass.residuos');
+    for (const key of ['GATEWAY_URL', 'GATEWAY_TOKEN_URL'] as const) {
+      const url = new URL(instancia[key]!);
       const local =
         instancia.NODE_ENV !== Entorno.Production &&
         ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
@@ -235,11 +262,10 @@ export function validarEntorno(config: Record<string, unknown>) {
       )
         throw new Error(`${key} requiere HTTPS (HTTP solo en localhost de desarrollo/test)`);
     }
-    if (instancia.EDA_CONSUMER_ENABLED === 'true') {
-      if (!instancia.EDA_KAFKA_GROUP_ID.startsWith(`${instancia.EDA_NAMESPACE}.`))
-        throw new Error('EDA_KAFKA_GROUP_ID debe pertenecer al namespace de Residuos');
-      if (!instancia.EDA_KAFKA_BROKERS.trim()) throw new Error('Falta EDA_KAFKA_BROKERS');
-      if (instancia.NODE_ENV === Entorno.Production && instancia.EDA_KAFKA_SSL !== 'true')
+    if (instancia.KAFKA_BROKERS?.trim()) {
+      if (!instancia.KAFKA_GROUP_ID.startsWith(`${instancia.GATEWAY_NAMESPACE}.`))
+        throw new Error('KAFKA_GROUP_ID debe pertenecer al namespace de Residuos');
+      if (instancia.NODE_ENV === Entorno.Production && instancia.KAFKA_SSL !== 'true')
         throw new Error('Kafka de produccion requiere TLS');
     }
   }

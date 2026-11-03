@@ -19,17 +19,17 @@ describe('Simulacros propios publicados por EDA', () => {
     for (const NODE_ENV of ['development', 'test'])
       expect(
         simulacroEdaHabilitado(
-          new ConfigService({ NODE_ENV, EDA_CLIMA_SIMULACRO_ENABLED: 'true' }),
+          new ConfigService({ NODE_ENV, CLIMA_SIMULACRO_EDA_HABILITADO: 'true' }),
         ),
       ).toBe(true);
     expect(
       simulacroEdaHabilitado(
-        new ConfigService({ NODE_ENV: 'production', EDA_CLIMA_SIMULACRO_ENABLED: 'true' }),
+        new ConfigService({ NODE_ENV: 'production', CLIMA_SIMULACRO_EDA_HABILITADO: 'true' }),
       ),
     ).toBe(false);
     expect(
       simulacroEdaHabilitado(
-        new ConfigService({ NODE_ENV: 'staging', EDA_CLIMA_SIMULACRO_ENABLED: 'true' }),
+        new ConfigService({ NODE_ENV: 'staging', CLIMA_SIMULACRO_EDA_HABILITADO: 'true' }),
       ),
     ).toBe(false);
   });

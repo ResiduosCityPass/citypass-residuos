@@ -71,6 +71,24 @@ describe('Login federado: firma real y limites de confianza', () => {
       rol: null,
     });
   });
+  it.each([
+    ['residuos-administradores', 'ADMINISTRADOR'],
+    ['residuos-operadores', 'OPERADOR'],
+  ])('conserva el grupo de develop %s', async (grupo, rol) => {
+    guard = new JwtAuthGuard(
+      new Reflector(),
+      jwt,
+      new ConfigService({
+        AUTH_MODE: 'federated',
+        JWT_SECRET: 'local-driver-secret',
+        JWT_ISSUER: 'https://idp.example',
+      }),
+      { clave: jest.fn().mockResolvedValue(publicKey) } as unknown as JwksService,
+    );
+    const check = verify(sign({ groups: [grupo] }));
+    await check.run();
+    expect(check.req.usuario?.rol).toBe(rol);
+  });
   it('resuelve solamente los grupos configurados', async () => {
     const check = verify(sign({ groups: ['residuos-operador'] }));
     await check.run();

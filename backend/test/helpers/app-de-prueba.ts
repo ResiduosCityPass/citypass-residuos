@@ -54,7 +54,7 @@ export async function crearAppDePrueba(
       // El orden importa menos con CASCADE, pero se listan igual de la hoja a
       // la raiz para que el dia que se saque el CASCADE esto siga andando.
       await dataSource.query(
-        'TRUNCATE TABLE "entrega_eda", "alerta_climatica_externa", "evento_climatico_recibido", "contingencia", "evento_pendiente", "alerta", "lectura", "sensor", "contenedor", "camion", "chofer", "zona" RESTART IDENTITY CASCADE',
+        `TRUNCATE TABLE ${dataSource.entityMetadatas.map((meta) => '"' + meta.tableName.replaceAll('"', '""') + '"').join(', ')} RESTART IDENTITY CASCADE`,
       );
     },
     cerrar: async () => {

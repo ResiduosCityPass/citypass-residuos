@@ -49,9 +49,9 @@ services:
       - key: JWT_MODULE
         value: residuos
       - key: JWT_ADMIN_GROUPS
-        value: administrador
+        value: administrador,residuos-administradores
       - key: JWT_OPERATOR_GROUPS
-        value: operador,delegados
+        value: operador,delegados,residuos-operadores
       - key: JWT_DRIVER_GROUPS
         value: chofer
       # HS256 corresponde solo a las credenciales internas del chofer.
@@ -69,31 +69,27 @@ services:
         value: platform
       - key: CLIMA_SIMULADOR_HABILITADO
         value: "false"
-      - key: EDA_GATEWAY_URL
-        value: https://test.citypass.mrfranco.net.ar/api/v1
-      - key: EDA_AUTH_URL
-        value: https://api.citypass-login.pp.ua
-      - key: EDA_TOKEN_ISSUER
-        value: https://idp.citypass.local
-      - key: EDA_CLIENT_ID
-        value: grupo6
-      - key: EDA_CLIENT_SECRET
-        sync: false
-      - key: EDA_NAMESPACE
-        value: com.citypass.residuos
-      - key: EDA_CONSUMER_ENABLED
-        value: "true"
-      - key: EDA_CLIMA_SIMULACRO_ENABLED
+      - key: CLIMA_SIMULACRO_EDA_HABILITADO
         value: "false"
-      - key: EDA_KAFKA_BROKERS
+      - key: GATEWAY_URL
+        value: https://test.citypass.mrfranco.net.ar
+      - key: GATEWAY_TOKEN_URL
+        value: https://api.citypass-login.pp.ua/oauth/token
+      - key: GATEWAY_CLIENT_ID
+        value: grupo6
+      - key: GATEWAY_CLIENT_SECRET
+        sync: false
+      - key: GATEWAY_NAMESPACE
+        value: com.citypass.residuos
+      - key: KAFKA_BROKERS
         value: test.citypass.mrfranco.net.ar:9092
-      - key: EDA_KAFKA_SSL
+      - key: KAFKA_SSL
         value: "true"
-      # Separado del consumidor de la demo local.
-      - key: EDA_KAFKA_GROUP_ID
-        value: com.citypass.residuos.residuos-clima-v1
-      - key: EDA_KAFKA_FROM_BEGINNING
-        value: "true"
+      - key: KAFKA_GROUP_ID
+        value: com.citypass.residuos.api
+      # Alternativa de entrega HTTP del mismo bus.
+      - key: GATEWAY_WEBHOOK_TOKEN
+        sync: false
 
   - type: web
     name: citypass-residuos-frontend
@@ -122,6 +118,8 @@ services:
         value: "false"
       - key: VITE_SIMULAR_GPS
         value: "false"
+      - key: VITE_BI_DASHBOARD_URL
+        sync: false
     routes:
       - type: rewrite
         source: /*

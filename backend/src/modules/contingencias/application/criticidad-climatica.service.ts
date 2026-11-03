@@ -24,7 +24,7 @@ import {
   SimularCriticidadDto,
 } from './dto/criticidad-climatica.dto';
 import { EVENTO_FIN, EVENTO_INICIO } from './dto/evento-inundacion.dto';
-import { canonicalJson as canonico } from '../../../shared/events/eda/canonical-json';
+import { canonicalJson as canonico } from '../../../shared/events/gateway/canonical-json';
 
 @Injectable()
 export class CriticidadClimaticaService {

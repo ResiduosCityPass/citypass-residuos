@@ -6,10 +6,12 @@ import ContainersPage from './pages/ContainersPage.jsx';
 import ContainerDetailPage from './pages/ContainerDetailPage.jsx';
 import ZonesPage from './pages/ZonesPage.jsx';
 import AlertsPage from './pages/AlertsPage.jsx';
+import InterventionsPage from './pages/InterventionsPage.jsx';
 import FleetPage from './pages/FleetPage.jsx';
 import DriversPage from './pages/DriversPage.jsx';
 import RoutesPage from './pages/RoutesPage.jsx';
 import RouteDetailPage from './pages/RouteDetailPage.jsx';
+import MetricsPage from './pages/MetricsPage.jsx';
 import NearbyContainersPage from './pages/NearbyContainersPage.jsx';
 import { fetchAlerts } from './api/waste.js';
 import { seedDevToken } from './api/client.js';
@@ -40,6 +42,8 @@ const TITLES = {
   '/rutas': ['Rutas', 'Generación y asignación'],
   '/contingencias': ['Inundaciones', 'Suspensión del servicio y recuperación de la recolección'],
   '/contingencias/clima': ['Eventos climáticos', 'Recepción y revisión de alertas de Espacios Públicos'],
+  '/intervenciones': ['Intervenciones', 'Emergencias cuya causa fue residuos'],
+  '/metricas': ['Métricas', 'El dashboard de Residuos que arma Analítica'],
 };
 
 function titleFor(pathname) {
@@ -127,9 +131,11 @@ function Application() {
         <Route path="/flota" element={<FleetPage />} />
         <Route path="/choferes" element={<DriversPage />} />
         <Route path="/rutas" element={<RoutesPage />} />
+        <Route path="/intervenciones" element={<InterventionsPage />} />
         <Route path="/rutas/:id" element={<RouteDetailPage />} />
         <Route path="/contingencias" element={<Suspense fallback={<p className="muted">Cargando inundaciones…</p>}><ContingenciesPage /></Suspense>} />
         <Route path="/contingencias/clima" element={<Suspense fallback={<p className="muted">Cargando eventos climáticos…</p>}><ClimateEventsPage /></Suspense>} />
+        <Route path="/metricas" element={<MetricsPage />} />
         <Route path="*" element={<Navigate to="/mapa" replace />} />
       </Route>
 

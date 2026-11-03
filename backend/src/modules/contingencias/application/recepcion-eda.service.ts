@@ -4,7 +4,7 @@ import { createHash } from 'crypto';
 import { isUUID } from 'class-validator';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
-import { canonicalJson } from '../../../shared/events/eda/canonical-json';
+import { canonicalJson } from '../../../shared/events/gateway/canonical-json';
 import { ContextoTransaccional } from '../../../shared/persistence/contexto-transaccional';
 import { EntregaEda } from '../domain/entrega-eda.entity';
 import { ContingenciasService } from './contingencias.service';
@@ -57,7 +57,7 @@ export class RecepcionEdaService {
       const payload = event.data as Record<string, unknown>;
       if (
         !simulacroEdaHabilitado(this.config) ||
-        meta.source !== this.config.get<string>('EDA_CLIENT_ID', 'grupo6') ||
+        meta.source !== this.config.get<string>('GATEWAY_CLIENT_ID', 'grupo6') ||
         typeof payload.alertaId !== 'string' ||
         !payload.alertaId.startsWith(PREFIJO_SIMULACRO) ||
         payload.actorSub !== ACTOR_SIMULACRO

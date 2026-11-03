@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { ContextoTransaccional } from '../../../shared/persistence/contexto-transaccional';
 import { RepositorioTypeorm } from '../../../shared/persistence/repositorio-typeorm';
 import { Parada } from '../domain/parada.entity';
@@ -36,5 +36,11 @@ export class ParadaTypeormRepository
 
   listarDeRuta(rutaId: string): Promise<Parada[]> {
     return this.repo().find({ where: { rutaId }, order: { orden: 'ASC' } });
+  }
+
+  async borrar(ids: string[]): Promise<void> {
+    if (ids.length > 0) {
+      await this.repo().delete({ id: In(ids) });
+    }
   }
 }

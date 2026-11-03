@@ -1,3 +1,4 @@
+import { EstadoRecepcionBus } from './estado-recepcion-bus';
 import { Global, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -5,13 +6,12 @@ import { ContextoTransaccional } from '../persistence/contexto-transaccional';
 import { EVENT_PUBLISHER } from './event-publisher';
 import { InMemoryEventPublisher } from './in-memory.event-publisher';
 import { TRANSPORTE_EVENTOS } from './transporte-eventos';
+import { GatewayTransporte } from './gateway/gateway.transporte';
 import { DespachadorOutbox } from './outbox/despachador-outbox';
 import { EventoPendiente } from './outbox/evento-pendiente.entity';
 import { OutboxEventPublisher } from './outbox/outbox.event-publisher';
 import { OUTBOX_REPOSITORY } from './outbox/outbox.repository';
 import { OutboxTypeormRepository } from './outbox/outbox.typeorm.repository';
-import { EdaTransportModule } from './eda/eda-transport.module';
-import { EdaEventPublisher } from './eda/eda-event.publisher';
 
 /**
  * Modulo global de eventos (ADR-003).
@@ -23,33 +23,38 @@ import { EdaEventPublisher } from './eda/eda-event.publisher';
  * El transporte se elige por EVENT_BUS_DRIVER:
  *   inmemory  -> sprints 1 y 2, y tests
  *   rabbitmq  -> pendiente
- *   platform  -> gateway HTTP real con identidad de servicio de Residuos
+ *   platform  -> bus real del Squad 1 (GatewayTransporte, CU-INT-01)
  *
  * Cuando esos existan, el unico archivo que cambia sigue siendo este.
  */
 @Global()
 @Module({
-  imports: [TypeOrmModule.forFeature([EventoPendiente]), EdaTransportModule],
+  imports: [TypeOrmModule.forFeature([EventoPendiente])],
   providers: [
     ContextoTransaccional,
     InMemoryEventPublisher,
+    GatewayTransporte,
+    EstadoRecepcionBus,
     OutboxEventPublisher,
     DespachadorOutbox,
     { provide: OUTBOX_REPOSITORY, useClass: OutboxTypeormRepository },
     {
       provide: TRANSPORTE_EVENTOS,
-      inject: [ConfigService, InMemoryEventPublisher, EdaEventPublisher],
+      inject: [ConfigService, InMemoryEventPublisher, GatewayTransporte],
       useFactory: (
         config: ConfigService,
         inMemory: InMemoryEventPublisher,
-        eda: EdaEventPublisher,
+        gateway: GatewayTransporte,
       ) => {
         const driver = config.get<string>('EVENT_BUS_DRIVER', 'inmemory');
 
         if (driver === 'inmemory') {
           return inMemory;
         }
-        if (driver === 'platform') return eda;
+
+        if (driver === 'platform') {
+          return gateway;
+        }
 
         throw new Error(
           `EVENT_BUS_DRIVER="${driver}" todavia no esta implementado. ` +
@@ -66,6 +71,8 @@ import { EdaEventPublisher } from './eda/eda-event.publisher';
     DespachadorOutbox,
     ContextoTransaccional,
     OUTBOX_REPOSITORY,
+    GatewayTransporte,
+    EstadoRecepcionBus,
   ],
 })
 export class EventsModule {}

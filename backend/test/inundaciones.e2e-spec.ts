@@ -1,3 +1,7 @@
+import {
+  OBSTRUCCION_REPOSITORY,
+  ObstruccionRepository,
+} from '../src/modules/integracion/domain/integracion.repository';
 import * as request from 'supertest';
 import { randomUUID } from 'crypto';
 import { ContingenciasService } from '../src/modules/contingencias/application/contingencias.service';
@@ -416,5 +420,96 @@ describe('Suspension y recuperacion por inundacion (e2e)', () => {
       .get('/api/v1/contingencias')
       .set(auth(ctx.token(Rol.OPERADOR)))
       .expect(200);
+  });
+  it('el fin climatico no libera una emergencia activa y los dos usan la misma integracion', async () => {
+    const { zona, camion } = await escenario();
+    const inundacion = await iniciar(zona.id);
+    const enviar = (eventType: string, data: Record<string, unknown>) =>
+      http
+        .post(`/api/v1/webhooks/citypass?token=${process.env.GATEWAY_WEBHOOK_TOKEN}`)
+        .send({ metadata: { eventId: randomUUID(), eventType }, data })
+        .expect(204);
+    await enviar('com.citypass.emergencias.EmergenciaCreada', {
+      emergenciaId: 'EM-CLIMA',
+      afectaCirculacion: true,
+      ubicacion: posicion,
+    });
+    await finalizar(inundacion.id);
+    await recuperar(inundacion.id);
+    const z = (await http.get(`/api/v1/zonas/${zona.id}`).set(auth(admin)).expect(200)).body;
+    expect(z.bloqueada).toBe(true);
+    expect(z.bloqueoManual).toBe(false);
+    expect(z.restriccionesInundacion).toEqual([]);
+    await http
+      .post('/api/v1/rutas/generar')
+      .set(auth(admin))
+      .send({ camionId: camion.id })
+      .expect(409);
+    await enviar('com.citypass.emergencias.EmergenciaCerrada', { emergenciaId: 'EM-CLIMA' });
+    await http
+      .post('/api/v1/rutas/generar')
+      .set(auth(admin))
+      .send({ camionId: camion.id })
+      .expect(201);
+  });
+
+  it('la recuperacion incluye un contenedor no critico y respeta obstrucciones de Reclamos', async () => {
+    const { zona, camion, contenedor } = await escenario();
+    const normal = (
+      await http
+        .post('/api/v1/contenedores')
+        .set(auth(admin))
+        .send({
+          zonaId: zona.id,
+          tipoResiduo: TipoResiduo.COMUN,
+          capacidadLitros: 1100,
+          ...posicion,
+        })
+        .expect(201)
+    ).body;
+    const sensor = (
+      await http
+        .post(`/api/v1/contenedores/${normal.id}/sensor`)
+        .set(auth(admin))
+        .send({})
+        .expect(201)
+    ).body;
+    await http
+      .post('/api/v1/lecturas')
+      .set('X-Sensor-Key', sensor.apiKey)
+      .send({ nivelLlenadoPct: 30, temperaturaC: 20, bateriaPct: 90 })
+      .expect(202);
+    const inundacion = await iniciar(zona.id);
+    await finalizar(inundacion.id);
+    await recuperar(inundacion.id);
+    const obstrucciones = ctx.app.get<ObstruccionRepository>(OBSTRUCCION_REPOSITORY);
+    await obstrucciones.guardarObstrucciones([
+      {
+        reclamoId: 'RC-CLIMA',
+        contenedorId: contenedor.id,
+        distanciaMetros: 5,
+        venceEn: new Date(Date.now() + 3600000),
+      },
+    ]);
+    const ruta = (
+      await http
+        .post('/api/v1/rutas/generar')
+        .set(auth(admin))
+        .send({ camionId: camion.id })
+        .expect(201)
+    ).body;
+    expect(ruta.paradas.map((p: { contenedorId: string }) => p.contenedorId)).toEqual([normal.id]);
+    await http.patch(`/api/v1/rutas/${ruta.id}/descartar`).set(auth(admin)).expect(200);
+    await obstrucciones.resolverReclamo('RC-CLIMA', new Date());
+    const liberada = (
+      await http
+        .post('/api/v1/rutas/generar')
+        .set(auth(admin))
+        .send({ camionId: camion.id })
+        .expect(201)
+    ).body;
+    expect(liberada.paradas.map((p: { contenedorId: string }) => p.contenedorId).sort()).toEqual(
+      [contenedor.id, normal.id].sort(),
+    );
   });
 });

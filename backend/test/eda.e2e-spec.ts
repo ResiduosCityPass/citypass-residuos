@@ -7,8 +7,9 @@ import { join } from 'path';
 import { Type, Schema } from 'avsc';
 import { ConfigService } from '@nestjs/config';
 import { crearAppDePrueba, AppDePrueba } from './helpers/app-de-prueba';
-import { EdaTokenService } from '../src/shared/events/eda/eda-token.service';
-import { CONTRATOS_EDA, registroEda } from '../src/shared/events/eda/eda-contracts';
+import { GatewayTransporte } from '../src/shared/events/gateway/gateway.transporte';
+import { IntegracionService } from '../src/modules/integracion/application/integracion.service';
+import { CONTRATOS_EDA, registroEda } from '../src/shared/events/gateway/contratos-climaticos';
 import { RecepcionEdaService } from '../src/modules/contingencias/application/recepcion-eda.service';
 import { DespachadorOutbox } from '../src/shared/events/outbox/despachador-outbox';
 import {
@@ -27,7 +28,7 @@ describe('Recepcion EDA y outbox HTTP con schemas Avro (e2e)', () => {
   let gateway: Server;
   let received: Array<{ path: string; data: Record<string, unknown> }>;
   let fail = false;
-  const keys = ['EVENT_BUS_DRIVER', 'EDA_GATEWAY_URL', 'EDA_CLIENT_SECRET', 'EDA_CONSUMER_ENABLED'];
+  const keys = ['EVENT_BUS_DRIVER', 'GATEWAY_URL', 'GATEWAY_CLIENT_SECRET', 'KAFKA_BROKERS'];
   const previous = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
   const start = (alertaId: string) => ({
     alertaId,
@@ -39,7 +40,7 @@ describe('Recepcion EDA y outbox HTTP con schemas Avro (e2e)', () => {
     vigenciaHasta: 1793333220000,
     actorSub: 'espacios-actor',
   });
-  const envelope = (tipo: string, data: unknown) => ({
+  const envelope = (tipo: string, data: Record<string, unknown>) => ({
     data,
     metadata: {
       eventId: randomUUID(),
@@ -50,8 +51,8 @@ describe('Recepcion EDA y outbox HTTP con schemas Avro (e2e)', () => {
       source: 'espacios-service',
     },
   });
-  const receive = (tipo: string, data: unknown) =>
-    ctx.app.get(RecepcionEdaService).procesar(tipo, tipo, 28, envelope(tipo, data));
+  const receive = (tipo: string, data: Record<string, unknown>) =>
+    ctx.app.get(IntegracionService).procesar(envelope(tipo, data), { topic: tipo, schemaId: 28 });
   const api = () => request(ctx.app.getHttpServer());
   const auth = () => ({ Authorization: `Bearer ${ctx.token()}` });
   const setup = async () => {
@@ -96,21 +97,21 @@ describe('Recepcion EDA y outbox HTTP con schemas Avro (e2e)', () => {
     });
     await new Promise<void>((resolve) => gateway.listen(0, '127.0.0.1', resolve));
     process.env.EVENT_BUS_DRIVER = 'platform';
-    process.env.EDA_CLIENT_SECRET = 'test-only';
-    process.env.EDA_CONSUMER_ENABLED = 'false';
-    process.env.EDA_GATEWAY_URL = `http://127.0.0.1:${(gateway.address() as AddressInfo).port}/api/v1`;
+    process.env.GATEWAY_CLIENT_SECRET = 'test-only';
+    process.env.KAFKA_BROKERS = '';
+    process.env.GATEWAY_URL = `http://127.0.0.1:${(gateway.address() as AddressInfo).port}`;
     ctx = await crearAppDePrueba((builder) => {
       builder.overrideProvider(ConfigService).useValue(new ConfigService({ ...process.env }));
-      builder
-        .overrideProvider(EdaTokenService)
-        .useValue({ obtener: async () => 'test-service-token' });
+      const transporte = new GatewayTransporte(new ConfigService({ ...process.env }));
+      jest.spyOn(transporte, 'obtenerToken').mockResolvedValue('test-service-token');
+      builder.overrideProvider(GatewayTransporte).useValue(transporte);
     });
   });
   beforeEach(async () => {
     received = [];
     fail = false;
     await ctx.limpiar();
-    ctx.app.get(ConfigService).set('EDA_CLIMA_SIMULACRO_ENABLED', 'false');
+    ctx.app.get(ConfigService).set('CLIMA_SIMULACRO_EDA_HABILITADO', 'false');
   });
   afterAll(async () => {
     await ctx?.cerrar();
@@ -153,7 +154,7 @@ describe('Recepcion EDA y outbox HTTP con schemas Avro (e2e)', () => {
     expect(await ctx.dataSource.query('SELECT * FROM entrega_eda')).toHaveLength(2);
   });
   it('procesa los dos tipos propios por el inbox y publica las cuatro respuestas con identidad de simulacro', async () => {
-    ctx.app.get(ConfigService).set('EDA_CLIMA_SIMULACRO_ENABLED', 'true');
+    ctx.app.get(ConfigService).set('CLIMA_SIMULACRO_EDA_HABILITADO', 'true');
     const payload = crearInicioSimulacro();
     const inbound = envelope(SIMULACRO_CONFIRMADO, payload);
     inbound.metadata.source = 'grupo6';

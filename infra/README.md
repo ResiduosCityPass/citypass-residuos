@@ -105,8 +105,8 @@ Para crear el entorno en Render:
 
 1. Crear un Blueprint desde el repositorio.
 2. Usar `render.yaml` desde la rama `main`.
-3. Completar `JWT_SECRET` y `EDA_CLIENT_SECRET` cuando Render lo pida. Para un Blueprint
-   existente, cargar manualmente la nueva variable `EDA_CLIENT_SECRET` antes de sincronizar.
+3. Completar `JWT_SECRET` y `GATEWAY_CLIENT_SECRET` cuando Render lo pida. Para un Blueprint
+   existente, cargar manualmente la nueva variable `GATEWAY_CLIENT_SECRET` antes de sincronizar.
 4. El Blueprint activa Login federado y EDA real. El delegado entra por el IdP; no se
    generan tokens humanos locales. `JWT_SECRET` se reserva al chofer interno.
 

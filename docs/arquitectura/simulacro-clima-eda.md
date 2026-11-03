@@ -12,7 +12,7 @@ Conservan el payload climático y entran por el mismo procesamiento de recepció
 deduplicación, revisión, suspensión y recuperación. El camino previsto es
 **CLI → gateway EDA → Avro/Kafka → inbox → revisión del operador → contingencia → outbox → EDA**.
 
-Los tipos están apagados por defecto. `EDA_CLIMA_SIMULACRO_ENABLED=true` los agrega a
+Los tipos están apagados por defecto. `CLIMA_SIMULACRO_EDA_HABILITADO=true` los agrega a
 las suscripciones del consumidor solo en desarrollo/test. Producción rechaza habilitarlos.
 Las suscripciones reales de Espacios Públicos siguen funcionando. Cada simulacro tiene
 un ID nuevo con prefijo `SIMULACRO-RES-`, actor `simulacro-residuos` y exige como emisor
@@ -42,11 +42,10 @@ El perfil backend `.env.integration.local`, ignorado por Git, contiene:
 ```dotenv
 NODE_ENV=development
 EVENT_BUS_DRIVER=platform
-EDA_CONSUMER_ENABLED=true
-EDA_CLIMA_SIMULACRO_ENABLED=true
-EDA_NAMESPACE=com.citypass.residuos
-EDA_KAFKA_SSL=true
-EDA_KAFKA_GROUP_ID=com.citypass.residuos.residuos-simulacro-local-v1
+CLIMA_SIMULACRO_EDA_HABILITADO=true
+GATEWAY_NAMESPACE=com.citypass.residuos
+KAFKA_SSL=true
+KAFKA_GROUP_ID=com.citypass.residuos.residuos-simulacro-local-v1
 CLIMA_SIMULADOR_HABILITADO=false
 ```
 

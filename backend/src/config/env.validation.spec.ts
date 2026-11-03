@@ -77,39 +77,44 @@ describe('validarEntorno', () => {
   });
   it('exige credenciales propias, namespace y TLS para habilitar EDA', () => {
     expect(() => validarEntorno({ ...entornoValido, EVENT_BUS_DRIVER: 'platform' })).toThrow(
-      'EDA_CLIENT_SECRET',
+      'GATEWAY_CLIENT_ID',
     );
     const base = {
       ...entornoValido,
       EVENT_BUS_DRIVER: 'platform',
-      EDA_CLIENT_SECRET: 'test',
-      EDA_CONSUMER_ENABLED: 'true',
+      GATEWAY_CLIENT_SECRET: 'test',
+      GATEWAY_CLIENT_ID: 'grupo6',
+      GATEWAY_URL: 'https://gateway.example',
+      GATEWAY_TOKEN_URL: 'https://auth.example/oauth/token',
+      KAFKA_BROKERS: 'bus:9092',
     };
-    expect(validarEntorno(base).EDA_KAFKA_SSL).toBe('true');
-    expect(() => validarEntorno({ ...base, EDA_NAMESPACE: 'com.citypass.turismo' })).toThrow(
-      'EDA_NAMESPACE',
+    expect(validarEntorno(base).KAFKA_SSL).toBe('true');
+    expect(() => validarEntorno({ ...base, GATEWAY_NAMESPACE: 'com.citypass.turismo' })).toThrow(
+      'GATEWAY_NAMESPACE',
     );
-    expect(() => validarEntorno({ ...base, EDA_KAFKA_GROUP_ID: 'otro-grupo' })).toThrow('GROUP_ID');
-    expect(() => validarEntorno({ ...base, EDA_KAFKA_BROKERS: '' })).toThrow('BROKERS');
-    expect(() =>
-      validarEntorno({ ...base, NODE_ENV: 'production', EDA_KAFKA_SSL: 'false' }),
-    ).toThrow('TLS');
-    expect(() => validarEntorno({ ...base, EDA_AUTH_URL: 'http://otro-idp' })).toThrow('HTTPS');
-    expect(
-      validarEntorno({ ...base, EDA_GATEWAY_URL: 'http://localhost:8080/api/v1' }).EDA_GATEWAY_URL,
-    ).toContain('localhost');
+    expect(() => validarEntorno({ ...base, KAFKA_GROUP_ID: 'otro-grupo' })).toThrow('GROUP_ID');
+    expect(validarEntorno({ ...base, KAFKA_BROKERS: '' }).KAFKA_BROKERS).toBe('');
+    expect(() => validarEntorno({ ...base, NODE_ENV: 'production', KAFKA_SSL: 'false' })).toThrow(
+      'TLS',
+    );
+    expect(() => validarEntorno({ ...base, GATEWAY_TOKEN_URL: 'http://otro-idp' })).toThrow(
+      'HTTPS',
+    );
+    expect(validarEntorno({ ...base, GATEWAY_URL: 'http://localhost:8080' }).GATEWAY_URL).toContain(
+      'localhost',
+    );
   });
   it('no permite habilitar los tipos de simulacro EDA en produccion', () => {
-    expect(validarEntorno(entornoValido).EDA_CLIMA_SIMULACRO_ENABLED).toBe('false');
+    expect(validarEntorno(entornoValido).CLIMA_SIMULACRO_EDA_HABILITADO).toBe('false');
     expect(() =>
       validarEntorno({
         ...entornoValido,
         NODE_ENV: 'production',
-        EDA_CLIMA_SIMULACRO_ENABLED: 'true',
+        CLIMA_SIMULACRO_EDA_HABILITADO: 'true',
       }),
     ).toThrow('simulacros');
     expect(() =>
-      validarEntorno({ ...entornoValido, EDA_CLIMA_SIMULACRO_ENABLED: 'quizas' }),
-    ).toThrow('EDA_CLIMA_SIMULACRO_ENABLED');
+      validarEntorno({ ...entornoValido, CLIMA_SIMULACRO_EDA_HABILITADO: 'quizas' }),
+    ).toThrow('CLIMA_SIMULACRO_EDA_HABILITADO');
   });
 });

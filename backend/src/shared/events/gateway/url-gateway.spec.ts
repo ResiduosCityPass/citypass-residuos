@@ -1,4 +1,4 @@
-import { sinBarrasFinales } from './eda-url';
+import { sinBarrasFinales } from './url-gateway';
 
 describe('Normalizacion de URL EDA', () => {
   it.each([

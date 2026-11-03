@@ -273,7 +273,7 @@ export class ContingenciasService {
       throw new ConflictException({
         code: 'ZONA_BLOQUEADA',
         message:
-          'La zona conserva un bloqueo manual. El operador debe revisarlo antes de recolectar.',
+          'La zona conserva un bloqueo operativo. El operador debe revisar su motivo antes de recolectar.',
       });
     }
   }

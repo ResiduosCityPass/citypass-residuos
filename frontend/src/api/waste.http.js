@@ -38,6 +38,13 @@ import { api, apiPublic } from './client.js';
  */
 export const fetchMapContainers = (filters) => api.get('/mapa/contenedores', filters);
 
+/**
+ * Squad 3 · Actividades masivas de Espacios en curso o recien terminadas.
+ * Cada una trae: actividadId, titulo, capacidad, lat, lng, radioMetros,
+ * inicio, fin (ISO) y contenedores (cuantos hay en la zona).
+ */
+export const fetchMassEvents = () => api.get('/actividades-masivas');
+
 /* --- CU-01 · Contenedores ----------------------------------------------- */
 
 /** Listado completo. Mismos filtros que el mapa: zonaId, tipoResiduo, estado. */
@@ -89,6 +96,12 @@ export const deleteZone = (id) => api.delete(`/zonas/${id}`);
  * fila contra el listado de contenedores para mostrar "CT-0007".
  */
 export const fetchAlerts = (filters) => api.get('/alertas', filters);
+
+/** Intervenciones programadas por emergencias con causa RESIDUOS. */
+export const fetchInterventions = () => api.get('/intervenciones');
+
+/** El operador marca que la cuadrilla ya intervino. 409 INTERVENCION_YA_COMPLETADA si ya estaba. */
+export const completeIntervention = (id) => api.patch(`/intervenciones/${id}/completar`);
 
 /** Pasa la alerta a EN_ATENCION. Sin cuerpo. Falla con ALERTA_NO_ABIERTA si ya no esta ABIERTA. */
 export const acknowledgeAlert = (id) => api.patch(`/alertas/${id}/atender`);
