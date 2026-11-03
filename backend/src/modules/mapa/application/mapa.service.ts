@@ -7,6 +7,7 @@ import {
   ContenedorRepository,
   FiltroContenedores,
 } from '../../contenedores/domain/contenedor.repository';
+import { ContingenciasService } from '../../contingencias/application/contingencias.service';
 
 /** Un marcador del mapa (CU-07). */
 export interface MarcadorMapa {
@@ -21,6 +22,7 @@ export interface MarcadorMapa {
   zonaNombre: string | null;
   umbralCriticoPct: number | null;
   incendioActivo: boolean;
+  recoleccionSuspendida: boolean;
 }
 
 /**
@@ -37,8 +39,8 @@ export interface MarcadorMapa {
  *   de referencia sobre la barra de llenado, que es lo que le da sentido al
  *   numero. "94% sobre un umbral de 70" se entiende; "94%" solo, no.
  *
- * Son dos consultas en total, sin importar cuantos contenedores haya: una para
- * los contenedores y otra para todos los incendios abiertos.
+ * Se resuelven contenedores, incendios y restricciones en consultas por lote,
+ * sin una consulta adicional por cada marcador.
  */
 @Injectable()
 export class MapaService {
@@ -46,13 +48,15 @@ export class MapaService {
     @Inject(CONTENEDOR_REPOSITORY)
     private readonly contenedores: ContenedorRepository,
     private readonly alertas: AlertasService,
+    private readonly contingencias: ContingenciasService,
   ) {}
 
   async marcadores(filtro: FiltroContenedores): Promise<MarcadorMapa[]> {
-    const [contenedores, incendios] = await Promise.all([
+    const [contenedores, incendios, restricciones] = await Promise.all([
       this.contenedores.listarConZona({ ...filtro, soloActivos: true }),
       // Atender un incendio no lo apaga: el halo sigue mientras no se resuelva.
       this.alertas.listar({ tipo: TipoAlerta.INCENDIO, estado: ESTADOS_SIN_RESOLVER }),
+      this.contingencias.restricciones(),
     ]);
 
     const conIncendio = new Set(incendios.map((a) => a.contenedorId));
@@ -69,6 +73,7 @@ export class MapaService {
       zonaNombre: c.zona?.nombre ?? null,
       umbralCriticoPct: c.zona?.umbralCriticoPct ?? null,
       incendioActivo: conIncendio.has(c.id),
+      recoleccionSuspendida: restricciones.some((r) => r.zonaId === c.zonaId),
     }));
   }
 }

@@ -2,11 +2,14 @@ import { Column, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn } 
 import { EstadoParada } from '../../../shared/domain/enums';
 import { Contenedor } from '../../contenedores/domain/contenedor.entity';
 import { Ruta } from './ruta.entity';
+import type { RestriccionInundacion } from '../../contingencias/domain/contingencia.repository';
 
 /** Una visita a un contenedor dentro de una ruta (CU-08, CU-10). */
 @Entity('parada')
 @Index(['rutaId', 'orden'])
 export class Parada {
+  restriccionesInundacion?: RestriccionInundacion[];
+  bloqueoManual?: boolean;
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 

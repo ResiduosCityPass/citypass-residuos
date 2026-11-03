@@ -36,10 +36,26 @@ services:
         value: "true"
       - key: JWT_SECRET
         sync: false
+      - key: AUTH_MODE
+        value: federated
       - key: JWT_ISSUER
         value: https://idp.citypass.local
+      - key: JWT_ISSUER_CHOFERES
+        value: citypass-residuos-choferes
       - key: JWT_AUDIENCE
         value: citypass-residuos-api
+      - key: JWT_JWKS_URL
+        value: https://api.citypass-login.pp.ua/.well-known/jwks.json
+      - key: JWT_MODULE
+        value: residuos
+      - key: JWT_ADMIN_GROUPS
+        value: administrador,residuos-administradores
+      - key: JWT_OPERATOR_GROUPS
+        value: operador,delegados,residuos-operadores
+      - key: JWT_DRIVER_GROUPS
+        value: chofer
+      # HS256 corresponde solo a las credenciales internas del chofer.
+      # Los tokens humanos del IdP se verifican con RS256/JWKS.
       - key: JWT_ALGORITHM
         value: HS256
       - key: JWT_EXPIRES_IN
@@ -50,7 +66,30 @@ services:
           type: web
           envVarKey: RENDER_EXTERNAL_URL
       - key: EVENT_BUS_DRIVER
-        value: inmemory
+        value: platform
+      - key: CLIMA_SIMULADOR_HABILITADO
+        value: "false"
+      - key: CLIMA_SIMULACRO_EDA_HABILITADO
+        value: "false"
+      - key: GATEWAY_URL
+        value: https://test.citypass.mrfranco.net.ar
+      - key: GATEWAY_TOKEN_URL
+        value: https://api.citypass-login.pp.ua/oauth/token
+      - key: GATEWAY_CLIENT_ID
+        value: grupo6
+      - key: GATEWAY_CLIENT_SECRET
+        sync: false
+      - key: GATEWAY_NAMESPACE
+        value: com.citypass.residuos
+      - key: KAFKA_BROKERS
+        value: test.citypass.mrfranco.net.ar:9092
+      - key: KAFKA_SSL
+        value: "true"
+      - key: KAFKA_GROUP_ID
+        value: com.citypass.residuos.api
+      # Alternativa de entrega HTTP del mismo bus.
+      - key: GATEWAY_WEBHOOK_TOKEN
+        sync: false
 
   - type: web
     name: citypass-residuos-frontend
@@ -69,10 +108,18 @@ services:
           envVarKey: RENDER_EXTERNAL_URL
       - key: VITE_API_PREFIX
         value: api/v1
+      - key: VITE_AUTH_MODE
+        value: federated
+      - key: VITE_IDP_URL
+        value: https://api.citypass-login.pp.ua
+      - key: VITE_IDP_CLIENT_ID
+        value: citypass-residuos-web
       - key: VITE_USE_MOCKS
         value: "false"
       - key: VITE_SIMULAR_GPS
         value: "false"
+      - key: VITE_BI_DASHBOARD_URL
+        sync: false
     routes:
       - type: rewrite
         source: /*

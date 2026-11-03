@@ -27,6 +27,20 @@ export const EventTypes = {
   RUTA_GENERADA: 'residuos.ruta.generada',
   RUTA_ASIGNADA: 'residuos.ruta.asignada',
   PARADA_OMITIDA: 'residuos.parada.omitida',
+  SERVICIO_AFECTADO: 'residuos.servicio.afectado',
+  RECUPERACION_PENDIENTE: 'residuos.recuperacion.pendiente',
+  RECUPERACION_HABILITADA: 'residuos.recuperacion.habilitada',
+  SERVICIO_RESTABLECIDO: 'residuos.servicio.restablecido',
+  /** CU-INT-01: refuerzo de recoleccion cerca de un evento cultural. */
+  REFUERZO_PROGRAMADO: 'residuos.refuerzo.programado',
+  /** CU-INT-02: una ruta viva perdio paradas porque un auto tapa sus contenedores. */
+  RUTA_RECALCULADA: 'residuos.ruta.recalculada',
+  /** CU-INT-02: la respuesta a Reclamos, si el auto denunciado tapa algun contenedor. */
+  RECLAMO_EVALUADO: 'residuos.reclamo.evaluado',
+  INTERVENCION_PROGRAMADA: 'residuos.intervencion.programada',
+  INTERVENCION_COMPLETADA: 'residuos.intervencion.completada',
+  /** CU-INT-01: una emergencia corto el camino y una parada de una ruta en marcha quedo afectada. */
+  INTERVENCION_ACTUALIZADA: 'residuos.intervencion.actualizada',
 } as const;
 
 export type EventType = (typeof EventTypes)[keyof typeof EventTypes];

@@ -1,3 +1,4 @@
+import { sinContingencias } from '../../../../test/helpers/doble-contingencias';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Zona } from '../domain/zona.entity';
 import { ZonaRepository } from '../domain/zona.repository';
@@ -27,7 +28,7 @@ describe('ZonasService', () => {
       contarContenedores: jest.fn(),
       eliminar: jest.fn(),
     };
-    service = new ZonasService(repo);
+    service = new ZonasService(repo, sinContingencias());
   });
 
   describe('crear', () => {
@@ -95,6 +96,14 @@ describe('ZonasService', () => {
   });
 
   describe('eliminar', () => {
+    it('conserva una zona con historial de inundaciones aunque ya no tenga contenedores', async () => {
+      repo.buscarPorId.mockResolvedValue(zonaDe());
+      const clima = sinContingencias();
+      jest.spyOn(clima, 'zonaTieneHistorial').mockResolvedValue(true);
+      service = new ZonasService(repo, clima);
+      await expect(service.eliminar('z-1')).rejects.toThrow(ConflictException);
+      expect(repo.eliminar).not.toHaveBeenCalled();
+    });
     it('elimina la zona cuando no tiene contenedores', async () => {
       repo.buscarPorId.mockResolvedValue(zonaDe());
       repo.contarContenedores.mockResolvedValue(0);
@@ -113,14 +122,51 @@ describe('ZonasService', () => {
     });
   });
 
-  describe('cambiarBloqueo', () => {
-    it('bloquea la zona para excluirla del ruteo', async () => {
+  describe('cambiarBloqueo (operador)', () => {
+    beforeEach(() => repo.guardar.mockImplementation(async (z) => z));
+
+    it('bloquea la zona para excluirla del ruteo y anota que fue a mano', async () => {
       repo.buscarPorId.mockResolvedValue(zonaDe());
-      repo.guardar.mockImplementation(async (z) => z);
 
       const resultado = await service.cambiarBloqueo('z-1', true);
 
-      expect(resultado.bloqueada).toBe(true);
+      expect(resultado).toMatchObject({ bloqueada: true, bloqueoManual: true });
+    });
+
+    it('desbloquear a mano libera la zona aunque la tuviera bloqueada una emergencia', async () => {
+      repo.buscarPorId.mockResolvedValue(zonaDe({ bloqueada: true, bloqueoManual: false }));
+
+      const resultado = await service.cambiarBloqueo('z-1', false);
+
+      expect(resultado).toMatchObject({ bloqueada: false, bloqueoManual: false });
+    });
+  });
+
+  describe('cambiarBloqueoPorIncidente (emergencia)', () => {
+    beforeEach(() => repo.guardar.mockImplementation(async (z) => z));
+
+    it('bloquea la zona sin anotarla como manual', async () => {
+      repo.buscarPorId.mockResolvedValue(zonaDe({ bloqueoManual: false }));
+
+      const resultado = await service.cambiarBloqueoPorIncidente('z-1', true);
+
+      expect(resultado).toMatchObject({ bloqueada: true, bloqueoManual: false });
+    });
+
+    it('al levantarse desbloquea la zona', async () => {
+      repo.buscarPorId.mockResolvedValue(zonaDe({ bloqueada: true, bloqueoManual: false }));
+
+      const resultado = await service.cambiarBloqueoPorIncidente('z-1', false);
+
+      expect(resultado.bloqueada).toBe(false);
+    });
+
+    it('al levantarse no toca el bloqueo de un operador', async () => {
+      repo.buscarPorId.mockResolvedValue(zonaDe({ bloqueada: true, bloqueoManual: true }));
+
+      const resultado = await service.cambiarBloqueoPorIncidente('z-1', false);
+
+      expect(resultado).toMatchObject({ bloqueada: true, bloqueoManual: true });
     });
   });
 });

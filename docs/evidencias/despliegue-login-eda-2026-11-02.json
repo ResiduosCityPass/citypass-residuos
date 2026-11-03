@@ -1,0 +1,111 @@
+{
+  "fecha": "2026-11-02T21:47:36.553Z",
+  "publicadoEnRender": false,
+  "backendUnitarios": 569,
+  "backendE2E": 118,
+  "coberturaLineasUnitariaBackend": 90.39,
+  "lint": "OK",
+  "tipado": "OK",
+  "builds": "OK",
+  "blueprintValidacionAplicacion": "OK",
+  "imagenes": [
+    "sha256:24bbc254516fe41a498bfc6e595053749255e942989eeae093e9fbf29148aa7b",
+    "sha256:ce1a2195412ad39efbb7b01046942f26b78886e49228a51d344ba3546dd3bf1c"
+  ],
+  "smoke": {
+    "verificadoEn": "2026-11-02T21:44:54.637Z",
+    "nodeEnv": "production",
+    "authMode": "federated",
+    "driver": "platform",
+    "chofer": "OK",
+    "ruta": "ASIGNADA",
+    "zonaUuidV4": true,
+    "credencialPermisos": "0600",
+    "health": "OK",
+    "loginReal": "OK",
+    "rol": "OPERADOR",
+    "kafka": {
+      "estado": "ERROR",
+      "ultimoError": "Connection error: Client network socket disconnected before secure TLS connection was established",
+      "topicos": [],
+      "simulacroHabilitado": false
+    },
+    "logoutReal": 204
+  },
+  "demoCompilada": {
+    "creada": true,
+    "repetida": false,
+    "rutaConservada": true,
+    "credencialPermisos": "0600",
+    "propietarioHostConservado": true
+  },
+  "escenarioLocal": {
+    "escenario": "LISTO01",
+    "creado": false,
+    "zonas": [
+      {
+        "id": "16efdf7c-6899-4a1a-9edb-ac0cd4bcb504",
+        "nombre": "DEMO-LISTO01 Centro",
+        "bloqueada": false
+      },
+      {
+        "id": "2af5485d-7520-4bf4-8629-14b17b2a6657",
+        "nombre": "DEMO-LISTO01 Norte",
+        "bloqueada": false
+      }
+    ],
+    "contenedores": [
+      {
+        "id": "d29bae86-1693-5a55-9194-3d044167a2a6",
+        "codigo": "DEMO-LISTO01-01",
+        "zonaId": "16efdf7c-6899-4a1a-9edb-ac0cd4bcb504",
+        "estado": "CRITICO",
+        "nivelLlenadoPct": 90,
+        "lat": -34.6037,
+        "lng": -58.3816
+      },
+      {
+        "id": "f8c41ec4-0cba-5820-a0b6-cd04b1404ed5",
+        "codigo": "DEMO-LISTO01-02",
+        "zonaId": "16efdf7c-6899-4a1a-9edb-ac0cd4bcb504",
+        "estado": "NORMAL",
+        "nivelLlenadoPct": 30,
+        "lat": -34.604,
+        "lng": -58.382
+      },
+      {
+        "id": "01c99d67-c371-50ad-bb8e-dcd58e6b7a48",
+        "codigo": "DEMO-LISTO01-03",
+        "zonaId": "2af5485d-7520-4bf4-8629-14b17b2a6657",
+        "estado": "CRITICO",
+        "nivelLlenadoPct": 85,
+        "lat": -34.5631,
+        "lng": -58.4584
+      }
+    ],
+    "camion": {
+      "id": "b242682d-eb58-52fc-a413-9bec439379be",
+      "patente": "DEMO-LISTO01",
+      "estado": "EN_RUTA"
+    },
+    "chofer": {
+      "id": "753e5e83-d7b3-5b07-9a17-20d2726b902c",
+      "nombre": "SIMULACRO LISTO01",
+      "legajo": "DEMO-LISTO01",
+      "activo": true
+    },
+    "ruta": {
+      "id": "700067d1-08c7-50e4-abec-3ccc3fe11a72",
+      "estado": "ASIGNADA",
+      "paradaId": "a63b1956-00b5-5e07-8904-94c446fa9a29",
+      "estadoParada": "PENDIENTE"
+    }
+  },
+  "diagnosticoKafka": {
+    "host": "Fallo antes de completar TLS al broker oficial :9092; OAuth y catalogo OK",
+    "docker": "Fallo antes de completar TLS al mismo broker",
+    "historialesTercerosLeidos": false,
+    "eventosNegocioPublicados": false
+  },
+  "cierreSigterm": 143
+}

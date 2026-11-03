@@ -29,3 +29,53 @@ export function distanciaMetros(a: Punto, b: Punto): number {
 }
 
 export const distanciaKm = (a: Punto, b: Punto): number => distanciaMetros(a, b) / 1000;
+
+/**
+ * Los candidatos a `radioMetros` o menos del centro, con su distancia, en el
+ * orden en que vinieron.
+ *
+ * ponytail: los eventos del bus recorren todos los contenedores activos en
+ * memoria. Alcanza para cientos; con miles, pasar a la consulta por radio de
+ * `ContenedorCercanoRepository` (CU-11).
+ */
+export function dentroDelRadio<T extends Punto>(
+  centro: Punto,
+  candidatos: T[],
+  radioMetros: number,
+): { item: T; distancia: number }[] {
+  return candidatos
+    .map((item) => ({ item, distancia: distanciaMetros(centro, item) }))
+    .filter(({ distancia }) => distancia <= radioMetros);
+}
+
+/**
+ * La ubicacion de un evento del bus. Cada squad la manda a su manera: acepta
+ * `latitud`/`longitud` o `lat`/`lng`, sueltos o dentro de `ubicacion`, y
+ * numeros en texto. null si no hay un par valido.
+ */
+export function ubicacionDe(data: Record<string, unknown>): Punto | null {
+  const anidada =
+    typeof data.ubicacion === 'object' && data.ubicacion !== null
+      ? (data.ubicacion as Record<string, unknown>)
+      : null;
+
+  return parDeCoordenadas(data) ?? (anidada ? parDeCoordenadas(anidada) : null);
+}
+
+function parDeCoordenadas(origen: Record<string, unknown>): Punto | null {
+  const lat = numero(origen.latitud ?? origen.lat);
+  const lng = numero(origen.longitud ?? origen.lng);
+
+  if (lat === null || lng === null || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+    return null;
+  }
+
+  return { lat, lng };
+}
+
+/** Acepta numeros y numeros en texto: "-34.6037" es una coordenada valida. */
+function numero(valor: unknown): number | null {
+  const n = typeof valor === 'string' && valor.trim() !== '' ? Number(valor) : valor;
+
+  return typeof n === 'number' && Number.isFinite(n) ? n : null;
+}

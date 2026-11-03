@@ -4,6 +4,7 @@ export interface CandidatoRuteo extends Punto {
   contenedorId: string;
   /** Litros que ocupa hoy este contenedor, segun su nivel de llenado. */
   litrosOcupados: number;
+  prioridadRecuperacion?: boolean;
 }
 
 export interface PlanDeRuta {
@@ -16,8 +17,8 @@ export interface PlanDeRuta {
 /**
  * CU-08 · Heuristica de ruteo.
  *
- * Sale del deposito y en cada paso toma el contenedor mas cercano que todavia
- * entre en el camion. Cuando ninguno entra, vuelve al deposito.
+ * Prioriza pendientes de recuperacion que entren en el camion; dentro de cada
+ * grupo elige por cercania. Cuando ninguno entra, vuelve al deposito.
  *
  * **Es vecino mas cercano, no optimizacion exacta.** El problema completo es un
  * Vehicle Routing Problem con capacidad, que es NP-hard. El recorte esta
@@ -46,8 +47,11 @@ export function planificarRuta(
       break;
     }
 
-    const masCercano = alcanzables.reduce((mejor, c) =>
-      distanciaKm(posicion, c) < distanciaKm(posicion, mejor) ? c : mejor,
+    const recuperacion = alcanzables.filter((c) => c.prioridadRecuperacion);
+    const prioritarios = recuperacion.length ? recuperacion : alcanzables;
+    const masCercano = prioritarios.reduce(
+      (mejor, c) => (distanciaKm(posicion, c) < distanciaKm(posicion, mejor) ? c : mejor),
+      prioritarios[0],
     );
 
     distancia += distanciaKm(posicion, masCercano);
@@ -68,6 +72,43 @@ export function planificarRuta(
     paradas,
     distanciaKm: Number(distancia.toFixed(1)),
     litros: Math.round(litros),
+  };
+}
+
+export interface Reordenamiento {
+  /** Contenedores pendientes en el nuevo orden de visita. */
+  contenedorIds: string[];
+  /** Recorrido completo: deposito, visitadas, pendientes y vuelta. */
+  distanciaKm: number;
+}
+
+/**
+ * CU-INT-02 · Reordena lo que le queda a una ruta despues de sacarle paradas.
+ *
+ * Sale desde la ultima parada visitada, que es donde esta el camion, o desde el
+ * deposito si todavia no visito ninguna. Usa la misma heuristica que generar:
+ * sacar paradas solo libera capacidad, asi que no hace falta volver a mirarla.
+ */
+export function reordenarPendientes(
+  deposito: Punto,
+  visitadas: Punto[],
+  pendientes: (Punto & { contenedorId: string })[],
+): Reordenamiento {
+  const origen = visitadas[visitadas.length - 1] ?? deposito;
+  const plan = planificarRuta(
+    origen,
+    pendientes.map((p) => ({ ...p, litrosOcupados: 0 })),
+    Infinity,
+  );
+
+  const recorrido = [deposito, ...visitadas, ...plan.paradas, deposito];
+  const distancia = recorrido
+    .slice(1)
+    .reduce((km, punto, i) => km + distanciaKm(recorrido[i], punto), 0);
+
+  return {
+    contenedorIds: plan.paradas.map((p) => p.contenedorId),
+    distanciaKm: Number(distancia.toFixed(1)),
   };
 }
 

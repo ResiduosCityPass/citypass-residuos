@@ -14,7 +14,7 @@ import {
   EstadoRuta,
   TipoAlerta,
 } from '../../../shared/domain/enums';
-import { distanciaMetros } from '../../../shared/domain/geo';
+import { Punto, distanciaMetros } from '../../../shared/domain/geo';
 import { EVENT_PUBLISHER, EventPublisher } from '../../../shared/events/event-publisher';
 import { ContextoTransaccional } from '../../../shared/persistence/contexto-transaccional';
 import { AlertasService } from '../../alertas/application/alertas.service';
@@ -28,8 +28,11 @@ import { Parada } from '../domain/parada.entity';
 import { PARADA_REPOSITORY, ParadaRepository } from '../domain/parada.repository';
 import { Ruta } from '../domain/ruta.entity';
 import { RUTA_REPOSITORY, RutaRepository } from '../domain/ruta.repository';
+import { reordenarPendientes } from '../domain/reglas/planificador';
 import { ConfirmarParadaDto } from './dto/confirmar-parada.dto';
 import { OmitirParadaDto } from './dto/omitir-parada.dto';
+import { ContingenciasService } from '../../contingencias/application/contingencias.service';
+import { depositoConfigurado } from './rutas.service';
 
 export const RADIO_CONFIRMACION_DEFAULT_METROS = 100;
 
@@ -62,6 +65,13 @@ export interface ResultadoOmision {
   rutaEstado: EstadoRuta;
 }
 
+/** Por que el camino quedo cortado: es lo que Analitica lee en IntervencionActualizada. */
+export interface CausaAfectacion {
+  causaId: string | null;
+  causaTipo: string | null;
+  correlationId: string;
+}
+
 /**
  * CU-10 · Confirmar vaciado.
  *
@@ -73,6 +83,7 @@ export interface ResultadoOmision {
 @Injectable()
 export class ParadasService {
   private readonly radioMetros: number;
+  private readonly deposito: Punto;
 
   constructor(
     @Inject(PARADA_REPOSITORY)
@@ -88,10 +99,12 @@ export class ParadasService {
     private readonly flota: FlotaService,
     private readonly transaccion: ContextoTransaccional,
     config: ConfigService,
+    private readonly contingencias: ContingenciasService,
   ) {
     this.radioMetros = Number(
       config.get('RADIO_CONFIRMACION_VACIADO_METROS', RADIO_CONFIRMACION_DEFAULT_METROS),
     );
+    this.deposito = depositoConfigurado(config);
   }
 
   async confirmar(
@@ -107,6 +120,7 @@ export class ParadasService {
     sub: string,
     posicion: ConfirmarParadaDto,
   ): Promise<ResultadoConfirmacion> {
+    await this.contingencias.bloquearOperacion();
     const { parada, ruta } = await this.buscarParadaPendiente(paradaId, sub);
 
     const contenedor = await this.contenedores.buscarPorId(parada.contenedorId);
@@ -117,6 +131,8 @@ export class ParadasService {
         code: 'CONTENEDOR_NO_ENCONTRADO',
       });
     }
+
+    await this.contingencias.exigirZonaHabilitada(contenedor.zonaId);
 
     const metros = Math.round(distanciaMetros(posicion, contenedor));
 
@@ -144,10 +160,11 @@ export class ParadasService {
     }
     await this.contenedores.guardar(contenedor);
 
-    const alertasCerradas = await this.alertas.resolverAbiertasPorTipo(
+    const alertasCerradasIds = await this.alertas.resolverAbiertasPorTipoConIds(
       contenedor.id,
       TipoAlerta.SATURACION,
     );
+    const alertasCerradas = alertasCerradasIds.length;
 
     const estadoRuta = await this.avanzarRuta(parada.rutaId);
 
@@ -156,6 +173,8 @@ export class ParadasService {
         EventTypes.CONTENEDOR_VACIADO,
         {
           contenedorId: contenedor.codigo,
+          paradaId: parada.id,
+          alertaIds: alertasCerradasIds,
           rutaId: parada.rutaId,
           camionId: ruta.camion?.patente ?? ruta.camionId,
           choferId: ruta.chofer?.legajo ?? sub,
@@ -165,6 +184,8 @@ export class ParadasService {
         { occurredAt: confirmadaEn },
       ),
     );
+
+    await this.contingencias.registrarVaciado(contenedor.id, confirmadaEn, sub);
 
     return {
       paradaId: parada.id,
@@ -201,8 +222,174 @@ export class ParadasService {
     sub: string,
     dto: OmitirParadaDto,
   ): Promise<ResultadoOmision> {
+    await this.contingencias.bloquearOperacion();
     const { parada, ruta } = await this.buscarParadaPendiente(paradaId, sub);
 
+    return this.cerrarComoOmitida(parada, ruta, dto.motivo, sub);
+  }
+
+  /**
+   * CU-INT-02 · El sistema omite una parada sin que el chofer haga nada: un
+   * reclamo avisa que un auto tapa el contenedor.
+   *
+   * Mismos efectos que la omision del chofer. Se suma a la transaccion en curso
+   * si la hay, porque quien la llama tambien guarda la obstruccion y las dos
+   * cosas tienen que quedar juntas; abrir otra aca la haria independiente.
+   */
+  async omitirPorSistema(paradaId: string, motivo: string): Promise<ResultadoOmision> {
+    const omitir = async () => {
+      const parada = await this.buscarParada(paradaId);
+      const ruta = await this.rutas.buscarPorId(parada.rutaId);
+
+      if (!ruta) {
+        throw new NotFoundException({
+          message: `No existe la ruta ${parada.rutaId}`,
+          code: 'RUTA_NO_ENCONTRADA',
+        });
+      }
+
+      validarAbierta(parada);
+      // El sistema no arranca la ruta: si el chofer no salio, sigue ASIGNADA.
+      return this.cerrarComoOmitida(parada, ruta, motivo, ruta.choferId ?? 'sistema', false);
+    };
+
+    return this.transaccion.managerActual() ? omitir() : this.transaccion.ejecutar(omitir);
+  }
+
+  /**
+   * CU-INT-02 · Saca de las rutas vivas a contenedores a los que el camion ya no
+   * puede llegar, y reordena lo que les queda.
+   *
+   * - PROPUESTA: la parada se borra; nadie salio todavia, no hay nada que
+   *   registrar. Si no le queda ninguna, la propuesta se cancela.
+   * - ASIGNADA / EN_CURSO: la parada queda OMITIDA, igual que si el chofer no
+   *   hubiera podido vaciar. Si era la ultima, la ruta se cierra y libera el camion.
+   *
+   * El contenedor no se toca: sigue lleno y con su alerta abierta. Devuelve las
+   * rutas que cambiaron.
+   *
+   * Con `afectacion` (una emergencia corto el camino, CU-INT-01), cada parada
+   * omitida ademas publica que la cuadrilla quedo afectada. Las de una PROPUESTA
+   * no: el camion todavia no salio, asi que no se afecto a nadie.
+   */
+  async quitarContenedores(
+    contenedorIds: string[],
+    motivo: string,
+    reclamoId?: string,
+    afectacion?: CausaAfectacion,
+  ): Promise<string[]> {
+    const quitar = async () => {
+      const rutaIds = await this.rutas.rutasVivasConPendientes(contenedorIds);
+      const tapados = new Set(contenedorIds);
+
+      for (const rutaId of rutaIds) {
+        await this.recalcular(rutaId, tapados, motivo, reclamoId ?? null, afectacion);
+      }
+
+      return rutaIds;
+    };
+
+    return this.transaccion.managerActual() ? quitar() : this.transaccion.ejecutar(quitar);
+  }
+
+  private async recalcular(
+    rutaId: string,
+    tapados: Set<string>,
+    motivo: string,
+    reclamoId: string | null,
+    afectacion?: CausaAfectacion,
+  ): Promise<void> {
+    const antes = await this.rutas.buscarPorId(rutaId);
+    const quitadas = (antes?.paradas ?? []).filter(
+      (p) => p.estado === EstadoParada.PENDIENTE && tapados.has(p.contenedorId),
+    );
+
+    if (antes?.estado === EstadoRuta.PROPUESTA) {
+      await this.paradas.borrar(quitadas.map((p) => p.id));
+    } else {
+      for (const parada of quitadas) {
+        await this.omitirPorSistema(parada.id, motivo);
+
+        if (afectacion) {
+          await this.eventos.publish(
+            buildEvent(
+              EventTypes.INTERVENCION_ACTUALIZADA,
+              {
+                // Para Analitica, cada parada es una intervencion (Valen, 30/10).
+                intervencionId: parada.id,
+                camionId: antes?.camion?.patente ?? antes?.camionId,
+                estadoAnterior: 'PROGRAMADA',
+                estadoNuevo: 'AFECTADA',
+                causaId: afectacion.causaId,
+                causaTipo: afectacion.causaTipo,
+                updatedAt: new Date().toISOString(),
+              },
+              { correlationId: afectacion.correlationId },
+            ),
+          );
+        }
+      }
+    }
+
+    // Se relee: omitir pudo cerrar la ruta, y borrar le saco paradas.
+    const ruta = await this.rutas.buscarPorId(rutaId);
+    if (!ruta) {
+      return;
+    }
+
+    const paradas = ruta.paradas ?? [];
+    const pendientes = paradas.filter((p) => p.estado === EstadoParada.PENDIENTE);
+    // Las omitidas no cuentan como visitadas: no se sabe si el camion llego (las
+    // omitio el chofer) o si nunca fue (las omitio el sistema).
+    const visitadas = paradas.filter((p) => p.estado === EstadoParada.CONFIRMADA);
+
+    const nuevo = reordenarPendientes(
+      this.deposito,
+      visitadas.map((p) => p.contenedor!),
+      pendientes.map((p) => ({ contenedorId: p.contenedorId, ...ubicacion(p) })),
+    );
+
+    // Las pendientes siguen despues de todas las cerradas, omitidas incluidas:
+    // si no, una pendiente quedaba con el mismo numero que una omitida.
+    const cerradas = paradas.filter((p) => p.estado !== EstadoParada.PENDIENTE);
+    const ultimoOrden = Math.max(0, ...cerradas.map((p) => p.orden));
+    for (const parada of pendientes) {
+      parada.orden = ultimoOrden + nuevo.contenedorIds.indexOf(parada.contenedorId) + 1;
+      await this.paradas.guardar(parada);
+    }
+
+    if (ruta.estado === EstadoRuta.PROPUESTA && pendientes.length === 0) {
+      ruta.estado = EstadoRuta.CANCELADA;
+    }
+    ruta.distanciaEstimadaKm = nuevo.distanciaKm;
+    await this.rutas.guardar(ruta);
+
+    await this.eventos.publish(
+      buildEvent(EventTypes.RUTA_RECALCULADA, {
+        rutaId: ruta.id,
+        camionId: ruta.camion?.patente ?? ruta.camionId,
+        estado: ruta.estado,
+        motivo,
+        reclamoId,
+        paradasQuitadas: quitadas.map((p) => p.contenedor?.codigo ?? p.contenedorId),
+        paradasPendientes: pendientes.length,
+        distanciaEstimadaKm: nuevo.distanciaKm,
+        recalculadaEn: new Date().toISOString(),
+      }),
+    );
+  }
+
+  /**
+   * Lo comun a las dos omisiones: el contenedor queda como estaba, la parada
+   * pasa a OMITIDA, la ruta avanza y se publica el evento.
+   */
+  private async cerrarComoOmitida(
+    parada: Parada,
+    ruta: Ruta,
+    motivo: string,
+    choferPorDefecto: string,
+    arrancaLaRuta = true,
+  ): Promise<ResultadoOmision> {
     const contenedor = await this.contenedores.buscarPorId(parada.contenedorId);
 
     if (!contenedor) {
@@ -212,14 +399,18 @@ export class ParadasService {
       });
     }
 
+    // Reclamos/Emergencias pueden retirar una parada de una zona bloqueada.
+    // La omision del sistema no cuenta como vaciado de la recuperacion.
+    if (arrancaLaRuta) await this.contingencias.exigirZonaHabilitada(contenedor.zonaId);
+
     const omitidaEn = new Date();
 
     parada.estado = EstadoParada.OMITIDA;
     parada.omitidaEn = omitidaEn;
-    parada.motivo = dto.motivo;
+    parada.motivo = motivo;
     await this.paradas.guardar(parada);
 
-    const estadoRuta = await this.avanzarRuta(parada.rutaId);
+    const estadoRuta = await this.avanzarRuta(parada.rutaId, arrancaLaRuta);
 
     await this.eventos.publish(
       buildEvent(
@@ -229,8 +420,8 @@ export class ParadasService {
           rutaId: parada.rutaId,
           contenedorId: contenedor.codigo,
           camionId: ruta.camion?.patente ?? ruta.camionId,
-          choferId: ruta.chofer?.legajo ?? sub,
-          motivo: dto.motivo,
+          choferId: ruta.chofer?.legajo ?? choferPorDefecto,
+          motivo,
           nivelLlenadoPct: contenedor.nivelLlenadoPct,
           omitidaEn: omitidaEn.toISOString(),
         },
@@ -242,7 +433,7 @@ export class ParadasService {
       paradaId: parada.id,
       estado: parada.estado,
       omitidaEn,
-      motivo: dto.motivo,
+      motivo,
       contenedorId: contenedor.id,
       estadoContenedor: contenedor.estado,
       nivelLlenadoPct: contenedor.nivelLlenadoPct,
@@ -264,14 +455,7 @@ export class ParadasService {
     sub: string,
   ): Promise<{ parada: Parada; ruta: Ruta }> {
     const chofer = await this.choferes.buscarActivoPorUsuarioSub(sub);
-    const parada = await this.paradas.buscarPorId(paradaId);
-
-    if (!parada) {
-      throw new NotFoundException({
-        message: `No existe la parada ${paradaId}`,
-        code: 'PARADA_NO_ENCONTRADA',
-      });
-    }
+    const parada = await this.buscarParada(paradaId);
 
     const ruta = await this.rutas.buscarPorId(parada.rutaId);
 
@@ -285,21 +469,22 @@ export class ParadasService {
       });
     }
 
-    if (parada.estado === EstadoParada.CONFIRMADA) {
-      throw new ConflictException({
-        message: `La parada ${parada.orden} ya fue confirmada`,
-        code: 'PARADA_YA_CONFIRMADA',
-      });
-    }
-
-    if (parada.estado === EstadoParada.OMITIDA) {
-      throw new ConflictException({
-        message: `La parada ${parada.orden} ya fue omitida: ${parada.motivo}`,
-        code: 'PARADA_YA_OMITIDA',
-      });
-    }
+    validarAbierta(parada);
 
     return { parada, ruta };
+  }
+
+  private async buscarParada(paradaId: string): Promise<Parada> {
+    const parada = await this.paradas.buscarPorId(paradaId);
+
+    if (!parada) {
+      throw new NotFoundException({
+        message: `No existe la parada ${paradaId}`,
+        code: 'PARADA_NO_ENCONTRADA',
+      });
+    }
+
+    return parada;
   }
 
   /**
@@ -307,7 +492,7 @@ export class ParadasService {
    * camion. Sin esto, un camion quedaria EN_RUTA para siempre y no se podria
    * volver a usar: es la trampa que CU-03 evita del otro lado.
    */
-  private async avanzarRuta(rutaId: string): Promise<EstadoRuta> {
+  private async avanzarRuta(rutaId: string, arranca = true): Promise<EstadoRuta> {
     const ruta = await this.rutas.buscarPorId(rutaId);
 
     if (!ruta) {
@@ -321,7 +506,7 @@ export class ParadasService {
     const quedanPendientes = paradas.some((p) => p.estado === EstadoParada.PENDIENTE);
 
     if (quedanPendientes) {
-      if (ruta.estado === EstadoRuta.ASIGNADA) {
+      if (arranca && ruta.estado === EstadoRuta.ASIGNADA) {
         ruta.estado = EstadoRuta.EN_CURSO;
         await this.rutas.guardar(ruta);
       }
@@ -339,4 +524,25 @@ export class ParadasService {
 
     return ruta.estado;
   }
+}
+
+/** Una parada cerrada no se reabre, ni confirmada ni omitida. */
+function validarAbierta(parada: Parada): void {
+  if (parada.estado === EstadoParada.CONFIRMADA) {
+    throw new ConflictException({
+      message: `La parada ${parada.orden} ya fue confirmada`,
+      code: 'PARADA_YA_CONFIRMADA',
+    });
+  }
+
+  if (parada.estado === EstadoParada.OMITIDA) {
+    throw new ConflictException({
+      message: `La parada ${parada.orden} ya fue omitida: ${parada.motivo}`,
+      code: 'PARADA_YA_OMITIDA',
+    });
+  }
+}
+
+function ubicacion(parada: Parada): Punto {
+  return { lat: parada.contenedor!.lat, lng: parada.contenedor!.lng };
 }

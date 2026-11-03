@@ -1,0 +1,173 @@
+{
+  "fecha": "2026-11-02",
+  "zonaHoraria": "America/Argentina/Buenos_Aires",
+  "alertaId": "SIMULACRO-RES-29cf2fb7-ad89-4b6d-931d-74317911c069",
+  "contingenciaId": "d42ba0a2-9461-467f-bcf0-d26913b0ee88",
+  "modalidad": "Backend y frontend locales; gateway y Kafka reales; eventos de simulacro propios de Residuos; GPS simulado",
+  "estadoFinal": "RECUPERADA",
+  "pendientes": 0,
+  "contenedores": [
+    {
+      "codigo": "QA-EDA-01",
+      "zona": "Centro",
+      "llenadoInicial": 90,
+      "llenadoFinal": 0
+    },
+    {
+      "codigo": "QA-EDA-02",
+      "zona": "Centro",
+      "llenadoInicial": 30,
+      "llenadoFinal": 0
+    },
+    {
+      "codigo": "QA-EDA-03",
+      "zona": "Norte",
+      "llenadoInicial": 85,
+      "llenadoFinal": 85
+    }
+  ],
+  "rutas": [
+    {
+      "id": "45248afc-83cb-44c4-8a8e-1daf9cba2bca",
+      "estado": "COMPLETADA"
+    },
+    {
+      "id": "6003e1cd-2f1c-42df-abbe-82f5fbb55659",
+      "estado": "COMPLETADA"
+    }
+  ],
+  "vaciados": [
+    {
+      "codigo": "QA-EDA-01",
+      "vaciadoEn": "2026-11-02T17:10:18.970Z"
+    },
+    {
+      "codigo": "QA-EDA-02",
+      "vaciadoEn": "2026-11-02T17:11:43.838Z"
+    }
+  ],
+  "bloqueos": [
+    {
+      "rutaId": "45248afc-83cb-44c4-8a8e-1daf9cba2bca",
+      "paradaId": "93140fe0-fcab-428e-add9-e01004b58567",
+      "status": 409,
+      "respuesta": {
+        "statusCode": 409,
+        "error": "CONFLICT",
+        "message": "La recoleccion esta suspendida por inundacion o pendiente de habilitacion.",
+        "code": "PARADA_SUSPENDIDA_INUNDACION",
+        "timestamp": "2026-11-02T17:07:56.471Z",
+        "path": "/api/v1/paradas/93140fe0-fcab-428e-add9-e01004b58567/confirmar"
+      }
+    },
+    {
+      "status": 409,
+      "respuesta": {
+        "statusCode": 409,
+        "error": "CONFLICT",
+        "message": "La recoleccion esta suspendida por inundacion o pendiente de habilitacion.",
+        "code": "PARADA_SUSPENDIDA_INUNDACION",
+        "timestamp": "2026-11-02T17:09:45.214Z",
+        "path": "/api/v1/paradas/93140fe0-fcab-428e-add9-e01004b58567/confirmar"
+      }
+    }
+  ],
+  "publicaciones": [
+    {
+      "tipo": "com.citypass.residuos.SimulacroClimaticoConfirmado",
+      "eventIdEda": "3fa6745d-b702-455f-b0bb-f54891170dfb",
+      "eventIdDominio": null,
+      "alertaId": "SIMULACRO-RES-29cf2fb7-ad89-4b6d-931d-74317911c069",
+      "correlationId": null,
+      "estado": null,
+      "schemaId": 39,
+      "source": "grupo6",
+      "recibidaEn": "2026-11-02T17:05:29.892Z"
+    },
+    {
+      "tipo": "com.citypass.residuos.ServicioAfectado",
+      "eventIdEda": "d00326fc-74f9-4022-bfcf-1cc62eb35c60",
+      "eventIdDominio": "db3e99f3-57b4-4eaa-939d-9260f4255071",
+      "alertaId": "SIMULACRO-RES-29cf2fb7-ad89-4b6d-931d-74317911c069",
+      "correlationId": "SIMULACRO-RES-29cf2fb7-ad89-4b6d-931d-74317911c069",
+      "estado": "ACTIVA",
+      "schemaId": 29,
+      "source": "grupo6",
+      "recibidaEn": "2026-11-02T17:06:30.168Z"
+    },
+    {
+      "tipo": "com.citypass.residuos.SimulacroClimaticoFinalizado",
+      "eventIdEda": "02745cd6-a88f-4167-889f-3a7d0ff15fd0",
+      "eventIdDominio": null,
+      "alertaId": "SIMULACRO-RES-29cf2fb7-ad89-4b6d-931d-74317911c069",
+      "correlationId": null,
+      "estado": null,
+      "schemaId": 40,
+      "source": "grupo6",
+      "recibidaEn": "2026-11-02T17:08:23.325Z"
+    },
+    {
+      "tipo": "com.citypass.residuos.RecuperacionPendiente",
+      "eventIdEda": "119d6d2e-925d-40b8-a510-63a22c4a8463",
+      "eventIdDominio": "18e55500-ac5f-43c8-b830-486d675f3f2b",
+      "alertaId": "SIMULACRO-RES-29cf2fb7-ad89-4b6d-931d-74317911c069",
+      "correlationId": "SIMULACRO-RES-29cf2fb7-ad89-4b6d-931d-74317911c069",
+      "estado": "PENDIENTE_RECUPERACION",
+      "schemaId": 30,
+      "source": "grupo6",
+      "recibidaEn": "2026-11-02T17:08:25.795Z"
+    },
+    {
+      "tipo": "com.citypass.residuos.RecuperacionHabilitada",
+      "eventIdEda": "1c8645fd-f55a-4283-ae8b-e1d6634b64c3",
+      "eventIdDominio": "d233131e-f369-4c83-8dd4-84bb45685fc2",
+      "alertaId": "SIMULACRO-RES-29cf2fb7-ad89-4b6d-931d-74317911c069",
+      "correlationId": "SIMULACRO-RES-29cf2fb7-ad89-4b6d-931d-74317911c069",
+      "estado": "EN_RECUPERACION",
+      "schemaId": 31,
+      "source": "grupo6",
+      "recibidaEn": "2026-11-02T17:09:55.211Z"
+    },
+    {
+      "tipo": "com.citypass.residuos.ServicioRestablecido",
+      "eventIdEda": "30e3a4ac-3769-4b1f-8dc9-4b5888ef3b79",
+      "eventIdDominio": "d3dd9f10-69ad-4678-9e01-1e6e6b139063",
+      "alertaId": "SIMULACRO-RES-29cf2fb7-ad89-4b6d-931d-74317911c069",
+      "correlationId": "SIMULACRO-RES-29cf2fb7-ad89-4b6d-931d-74317911c069",
+      "estado": "RECUPERADA",
+      "schemaId": 32,
+      "source": "grupo6",
+      "recibidaEn": "2026-11-02T17:11:45.234Z"
+    }
+  ],
+  "salidaLocal": [
+    {
+      "eventId": "db3e99f3-57b4-4eaa-939d-9260f4255071",
+      "eventType": "residuos.servicio.afectado",
+      "estado": "PUBLICADO",
+      "intentos": 0,
+      "publicadoEn": "2026-11-02T17:06:30.194Z"
+    },
+    {
+      "eventId": "18e55500-ac5f-43c8-b830-486d675f3f2b",
+      "eventType": "residuos.recuperacion.pendiente",
+      "estado": "PUBLICADO",
+      "intentos": 0,
+      "publicadoEn": "2026-11-02T17:08:25.823Z"
+    },
+    {
+      "eventId": "d233131e-f369-4c83-8dd4-84bb45685fc2",
+      "eventType": "residuos.recuperacion.habilitada",
+      "estado": "PUBLICADO",
+      "intentos": 0,
+      "publicadoEn": "2026-11-02T17:09:55.242Z"
+    },
+    {
+      "eventId": "d3dd9f10-69ad-4678-9e01-1e6e6b139063",
+      "eventType": "residuos.servicio.restablecido",
+      "estado": "PUBLICADO",
+      "intentos": 0,
+      "publicadoEn": "2026-11-02T17:11:45.260Z"
+    }
+  ]
+}

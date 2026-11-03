@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import ContainersMap from '../components/ContainersMap.jsx';
 import ContainerPanel from '../components/ContainerPanel.jsx';
 import Button from '../components/ui/Button.jsx';
 import Notice from '../components/ui/Notice.jsx';
 import { useLiveMap, POLLING_INTERVAL_MS } from '../hooks/useLiveMap.js';
-import { fetchZones, USING_MOCKS } from '../api/waste.js';
+import { fetchMassEvents, fetchZones, USING_MOCKS } from '../api/waste.js';
+import { endLabel } from '../domain/massEvents.js';
 import { readToken } from '../api/client.js';
 import { generalMessage } from '../domain/errors.js';
 import {
@@ -45,6 +47,15 @@ export default function MapPage({ tokenVersion }) {
     fetchZones().then(setZones).catch(() => setZones([]));
   }, [tokenVersion]);
 
+  // Squad 3 · Zonas de actividades masivas. Se piden de nuevo con cada refresco
+  // del mapa: asi aparece una actividad nueva y se actualiza la cuenta regresiva.
+  // Si falla, el mapa de contenedores sigue andando sin las zonas.
+  const [massEvents, setMassEvents] = useState([]);
+  useEffect(() => {
+    if (!USING_MOCKS && !readToken()) return;
+    fetchMassEvents().then(setMassEvents).catch(() => setMassEvents([]));
+  }, [tokenVersion, updatedAt]);
+
   // Las tarjetas siempre cuentan sobre todo lo que hay en la zona y el tipo
   // elegidos. Apretar una filtra el mapa, no los numeros: el resumen tiene que
   // seguir diciendo cuantos hay de cada estado para que se pueda volver.
@@ -79,6 +90,10 @@ export default function MapPage({ tokenVersion }) {
 
   return (
     <div className="screen screen-map">
+      {containers.some((c) => c.recoleccionSuspendida) && <Notice type="warning" title="Recolección suspendida por inundación">
+        {containers.filter((c) => c.recoleccionSuspendida).length} contenedor(es) afectados en esta vista.
+        El borde azul punteado indica suspensión; el color interior conserva el estado de llenado. <Link to="/contingencias">Ver inundaciones</Link>
+      </Notice>}
       {/* Tarjetas de resumen: el conteo por estado se lee de un vistazo, sin
           tener que contar marcadores sobre el mapa. Las cinco son botones que
           filtran el mapa; antes la de incendios se veia igual que las otras
@@ -161,11 +176,25 @@ export default function MapPage({ tokenVersion }) {
         </Notice>
       )}
 
+      {massEvents.map((event) => (
+        <Notice
+          key={event.actividadId}
+          type="info"
+          title={`Actividad masiva: ${event.titulo ?? 'sin título'}`}
+        >
+          {event.capacidad.toLocaleString('es-AR')} personas · {endLabel(event.fin)} ·{' '}
+          {event.contenedores === 1
+            ? '1 contenedor en la zona'
+            : `${event.contenedores} contenedores en la zona`}
+        </Notice>
+      ))}
+
       <div className="map-and-panel">
         <ContainersMap
           containers={visible}
           selectedId={selectedId}
           onSelect={setSelectedId}
+          massEvents={massEvents}
         />
         {selectedId && (
           <ContainerPanel

@@ -21,6 +21,7 @@ const zone = (extras = {}) => ({
   umbralCriticoPct: 70,
   umbralTemperaturaC: 60,
   bloqueada: false,
+  bloqueoManual: false,
   ...extras,
 });
 
@@ -31,6 +32,21 @@ describe('CU-02 zonas y umbrales', () => {
     vi.clearAllMocks();
     fetchZones.mockResolvedValue([zone()]);
     fetchContainers.mockResolvedValue([]);
+  });
+
+  it('distingue bloqueo por emergencia y bloqueo manual', async () => {
+    fetchZones.mockResolvedValue([zone({ bloqueada: true }), zone({ id: 'z2', nombre: 'Norte', bloqueada: true, bloqueoManual: true })]);
+    render(<ZonesPage />);
+    expect(await screen.findByText('Bloqueo por emergencia')).toBeInTheDocument();
+    expect(screen.getByText('Bloqueo manual')).toBeInTheDocument();
+  });
+  it('quitar el bloqueo manual informa que la restriccion de inundacion sigue vigente', async () => {
+    fetchZones.mockResolvedValue([zone({ bloqueada: true, bloqueoManual: true, restriccionesInundacion: [{ contingenciaId: 'f1', descripcion: 'Tormenta Centro' }] })]);
+    setZoneBlocked.mockResolvedValue(zone());
+    const user = userEvent.setup(); render(<ZonesPage />);
+    await user.click(await screen.findByRole('button', { name: 'Desbloquear' }));
+    expect(await screen.findByText(/La restricción por inundación sigue vigente/)).toBeInTheDocument();
+    expect(screen.getByText('Inundación: Tormenta Centro')).toBeInTheDocument();
   });
 
   it('muestra los dos umbrales de cada zona', async () => {

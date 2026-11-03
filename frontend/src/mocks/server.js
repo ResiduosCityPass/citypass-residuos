@@ -1,5 +1,12 @@
 import { ApiError } from '../api/client.js';
-import { ZONES, CONTAINERS, SENSORS, ALERTS, TRUCKS, DRIVERS, ROUTES, STOPS } from './data.js';
+
+// La simulacion climatica modifica negocio real y requiere la API.
+export const fetchFloods = async () => ({ simuladorHabilitado: false, contingencias: [] });
+const requiresFloodApi = async () => { throw new ApiError({ code: 'CONTINGENCIAS_REQUIEREN_API', status: 409, message: 'Conectá el backend para simular inundaciones.' }); };
+export const simulateFloodStart = requiresFloodApi;
+export const simulateFloodEnd = requiresFloodApi;
+export const enableFloodRecovery = requiresFloodApi;
+import { ZONES, CONTAINERS, SENSORS, ALERTS, TRUCKS, DRIVERS, ROUTES, STOPS, INTERVENTIONS } from './data.js';
 import { DEPOT, distanceKm, distanceMeters } from '../domain/geo.js';
 
 /**
@@ -30,6 +37,7 @@ const store = {
   drivers: DRIVERS.map((d) => ({ ...d })),
   routes: ROUTES.map((r) => ({ ...r })),
   stops: STOPS.map((s) => ({ ...s })),
+  interventions: INTERVENTIONS.map((i) => ({ ...i })),
 };
 
 /** Latencia falsa: sin ella los esqueletos de carga nunca se ven y no se pueden disenar. */
@@ -101,6 +109,33 @@ export const fetchMapContainers = (filters = {}) =>
           (a) => a.contenedorId === id && a.tipo === 'INCENDIO' && a.estado !== 'RESUELTA',
         ),
       })),
+  );
+
+/* --- Squad 3 · Actividades masivas -------------------------------------- */
+
+/** Mismo radio que usa el backend (INTEGRACION_RADIO_METROS). */
+const MASS_EVENT_RADIUS_M = 300;
+
+/** Un festival en el Obelisco que termina en dos horas, como para la demo. */
+const MASS_EVENTS = [
+  {
+    actividadId: '3f1c2a9e-0000-4000-8000-000000000001',
+    titulo: 'Festival de Primavera',
+    capacidad: 5000,
+    lat: -34.6037,
+    lng: -58.3816,
+    inicio: new Date(Date.now() - 3 * 3_600_000).toISOString(),
+    fin: new Date(Date.now() + 2 * 3_600_000).toISOString(),
+  },
+];
+
+export const fetchMassEvents = () =>
+  respond(
+    MASS_EVENTS.map((event) => ({
+      ...event,
+      radioMetros: MASS_EVENT_RADIUS_M,
+      contenedores: active().filter((c) => distanceMeters(event, c) <= MASS_EVENT_RADIUS_M).length,
+    })),
   );
 
 /* --- CU-01 · Contenedores ----------------------------------------------- */
@@ -1100,4 +1135,25 @@ export function fetchNearbyContainers(filters = {}) {
         distanciaMetros: meters,
       })),
   );
+}
+// El contrato externo se prueba contra el backend; los mocks no simulan el bus.
+export const fetchClimateAlerts = async () => ({ alertas: [], simuladorHabilitado: false });
+export const simulateClimateEvent = async () => { throw new Error('Usá el backend para probar el contrato climático.'); };
+export const resolveClimateAlert = async () => { throw new Error('Usá el backend para revisar alertas climáticas.'); };
+
+/* CU-01 de Emergencias (A7) · Completar una intervencion. */
+export function completeIntervention(id) {
+  const intervention = store.interventions.find((i) => i.id === id);
+  if (!intervention) return fail('INTERVENCION_NO_ENCONTRADA', 404, `No existe la intervencion ${id}`);
+  if (intervention.estado === 'COMPLETADA') {
+    return fail('INTERVENCION_YA_COMPLETADA', 409, 'La intervencion ya esta completada');
+  }
+  intervention.estado = 'COMPLETADA';
+  intervention.completadaEn = new Date().toISOString();
+  return respond(intervention);
+}
+
+/* CU-01 de Emergencias (A7) · Intervenciones, las mas recientes primero. */
+export function fetchInterventions() {
+  return respond([...store.interventions].sort((a, b) => b.programadaEn.localeCompare(a.programadaEn)));
 }

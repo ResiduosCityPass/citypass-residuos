@@ -1,3 +1,4 @@
+import { sinContingencias } from '../../../../test/helpers/doble-contingencias';
 import {
   EstadoAlerta,
   EstadoContenedor,
@@ -46,7 +47,11 @@ describe('MapaService (CU-07)', () => {
     };
     alertas = { listar: jest.fn().mockResolvedValue([]) };
 
-    service = new MapaService(contenedores, alertas as unknown as AlertasService);
+    service = new MapaService(
+      contenedores,
+      alertas as unknown as AlertasService,
+      sinContingencias(),
+    );
   });
 
   it('devuelve solo los campos necesarios para pintar un marcador', async () => {
@@ -64,6 +69,7 @@ describe('MapaService (CU-07)', () => {
       zonaNombre: 'Centro',
       umbralCriticoPct: 70,
       incendioActivo: false,
+      recoleccionSuspendida: false,
     });
   });
 

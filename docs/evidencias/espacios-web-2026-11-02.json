@@ -1,0 +1,199 @@
+{
+  "prueba": "SIMULACRO-QA-WEB-20261102",
+  "alertaId": "9cb579b4-297f-4b3d-bbd6-6e8e04d501d9",
+  "resultado": "SIN_ENTREGA_OBSERVADA_EN_EDA",
+  "origen": "web de Espacios Publicos",
+  "estadoFinalMostradoEnWeb": "FINALIZADA",
+  "detalleOficialAntesDelCierre": {
+    "verificadoEn": "2026-11-02T19:02:13.850Z",
+    "id": "9cb579b4-297f-4b3d-bbd6-6e8e04d501d9",
+    "status": "CONFIRMED",
+    "publicationChannel": null,
+    "confirmedAt": "2026-11-02T18:56:37.100Z",
+    "finalizedAt": null
+  },
+  "payloadsMostradosEnWeb": {
+    "confirmacion": {
+      "alertaId": "9cb579b4-297f-4b3d-bbd6-6e8e04d501d9",
+      "nivelCriticidad": "ALTA",
+      "fenomeno": "LLUVIA_INTENSA",
+      "ubicaciones": [
+        {
+          "latitud": -34.603666,
+          "longitud": -58.380515
+        }
+      ],
+      "vigenciaDesde": 1793645640000,
+      "vigenciaHasta": 1793667240000,
+      "temperaturaMinC": null,
+      "temperaturaMaxC": null,
+      "actorSub": "U000009"
+    },
+    "finalizacion": {
+      "alertaId": "9cb579b4-297f-4b3d-bbd6-6e8e04d501d9",
+      "finalizadaEn": 1793646216355,
+      "actorSub": "U000009"
+    }
+  },
+  "comprobaciones": [
+    {
+      "verificadoEn": "2026-11-02T19:02:46.842Z",
+      "alertaId": "9cb579b4-297f-4b3d-bbd6-6e8e04d501d9",
+      "offsets": [
+        {
+          "fqn": "com.citypass.espacios.CriticidadClimaticaConfirmada",
+          "namespace": "com.citypass.espacios",
+          "name": "CriticidadClimaticaConfirmada",
+          "topic": "com.citypass.espacios.CriticidadClimaticaConfirmada",
+          "version": 1,
+          "schemaId": 28,
+          "versions": [
+            {
+              "version": 1,
+              "topic": "com.citypass.espacios.CriticidadClimaticaConfirmada",
+              "schemaId": 28
+            }
+          ],
+          "particiones": [
+            {
+              "partition": 0,
+              "offset": "1",
+              "high": "1",
+              "low": "0"
+            }
+          ]
+        },
+        {
+          "fqn": "com.citypass.espacios.CriticidadClimaticaFinalizada",
+          "namespace": "com.citypass.espacios",
+          "name": "CriticidadClimaticaFinalizada",
+          "topic": "com.citypass.espacios.CriticidadClimaticaFinalizada",
+          "version": 1,
+          "schemaId": 27,
+          "versions": [
+            {
+              "version": 1,
+              "topic": "com.citypass.espacios.CriticidadClimaticaFinalizada",
+              "schemaId": 27
+            }
+          ],
+          "particiones": [
+            {
+              "partition": 0,
+              "offset": "1",
+              "high": "1",
+              "low": "0"
+            }
+          ]
+        }
+      ],
+      "alerta": [],
+      "contingencia": [],
+      "contenedores": [
+        {
+          "codigo": "QA-EDA-03",
+          "estado": "CRITICO",
+          "nivelLlenadoPct": "85.00"
+        },
+        {
+          "codigo": "QA-WEB-01",
+          "estado": "CRITICO",
+          "nivelLlenadoPct": "90.00"
+        },
+        {
+          "codigo": "QA-WEB-02",
+          "estado": "NORMAL",
+          "nivelLlenadoPct": "30.00"
+        }
+      ],
+      "ruta": [
+        {
+          "id": "21ca5029-587e-49e2-881f-ef0a7c62bb52",
+          "estado": "ASIGNADA"
+        }
+      ],
+      "outbox": []
+    },
+    {
+      "verificadoEn": "2026-11-02T19:04:15.533Z",
+      "alertaId": "9cb579b4-297f-4b3d-bbd6-6e8e04d501d9",
+      "offsets": [
+        {
+          "fqn": "com.citypass.espacios.CriticidadClimaticaConfirmada",
+          "namespace": "com.citypass.espacios",
+          "name": "CriticidadClimaticaConfirmada",
+          "topic": "com.citypass.espacios.CriticidadClimaticaConfirmada",
+          "version": 1,
+          "schemaId": 28,
+          "versions": [
+            {
+              "version": 1,
+              "topic": "com.citypass.espacios.CriticidadClimaticaConfirmada",
+              "schemaId": 28
+            }
+          ],
+          "particiones": [
+            {
+              "partition": 0,
+              "offset": "1",
+              "high": "1",
+              "low": "0"
+            }
+          ]
+        },
+        {
+          "fqn": "com.citypass.espacios.CriticidadClimaticaFinalizada",
+          "namespace": "com.citypass.espacios",
+          "name": "CriticidadClimaticaFinalizada",
+          "topic": "com.citypass.espacios.CriticidadClimaticaFinalizada",
+          "version": 1,
+          "schemaId": 27,
+          "versions": [
+            {
+              "version": 1,
+              "topic": "com.citypass.espacios.CriticidadClimaticaFinalizada",
+              "schemaId": 27
+            }
+          ],
+          "particiones": [
+            {
+              "partition": 0,
+              "offset": "1",
+              "high": "1",
+              "low": "0"
+            }
+          ]
+        }
+      ],
+      "alerta": [],
+      "contingencia": [],
+      "contenedores": [
+        {
+          "codigo": "QA-EDA-03",
+          "estado": "CRITICO",
+          "nivelLlenadoPct": "85.00"
+        },
+        {
+          "codigo": "QA-WEB-01",
+          "estado": "CRITICO",
+          "nivelLlenadoPct": "90.00"
+        },
+        {
+          "codigo": "QA-WEB-02",
+          "estado": "NORMAL",
+          "nivelLlenadoPct": "30.00"
+        }
+      ],
+      "ruta": [
+        {
+          "id": "21ca5029-587e-49e2-881f-ef0a7c62bb52",
+          "estado": "ASIGNADA"
+        }
+      ],
+      "outbox": []
+    }
+  ],
+  "alcanceDiagnostico": "Solo contadores de dos topicos climaticos y datos locales del simulacro; sin lectura de mensajes historicos de terceros.",
+  "simuladorHttpLocalUsado": false,
+  "pruebaPreviaDeResiduosConservada": true
+}

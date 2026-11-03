@@ -19,6 +19,7 @@ function corsOrigin(config: ConfigService) {
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.enableShutdownHooks();
   const config = app.get(ConfigService);
 
   const prefix = config.get<string>('API_PREFIX', 'api/v1');

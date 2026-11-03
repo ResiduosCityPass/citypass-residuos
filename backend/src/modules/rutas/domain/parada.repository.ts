@@ -6,6 +6,7 @@ export interface ParadaRepository {
   /** Con la ruta y el contenedor cargados. */
   buscarPorId(id: string): Promise<Parada | null>;
   listarDeRuta(rutaId: string): Promise<Parada[]>;
+  borrar(ids: string[]): Promise<void>;
 }
 
 export const PARADA_REPOSITORY = Symbol('PARADA_REPOSITORY');

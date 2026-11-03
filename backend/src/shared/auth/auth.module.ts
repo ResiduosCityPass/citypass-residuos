@@ -5,6 +5,8 @@ import { JwtModule, JwtModuleOptions } from '@nestjs/jwt';
 import { AUDIENCIA_TOKEN_DEFAULT, EMISOR_TOKEN_DEFAULT } from '../../config/env.validation';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { RolesGuard } from './roles.guard';
+import { JwksService } from './jwks.service';
+import { SesionController } from './sesion.controller';
 
 /**
  * Configuracion del firmado de tokens.
@@ -29,7 +31,9 @@ export function opcionesJwt(config: ConfigService): JwtModuleOptions {
       // siempre, y el guard rechaza a proposito cualquier `aud` que no lo sea.
       // Firmar un string haria que el backend rechace sus propios tokens.
       audience: [config.get<string>('JWT_AUDIENCE', AUDIENCIA_TOKEN_DEFAULT)],
-      algorithm: config.get<string>('JWT_ALGORITHM', 'HS256'),
+      // Las credenciales internas del chofer siguen siendo nuestras, aunque
+      // el IdP firme los tokens humanos con RS256.
+      algorithm: 'HS256',
     } as JwtModuleOptions['signOptions'],
   };
 }
@@ -51,9 +55,11 @@ export function opcionesJwt(config: ConfigService): JwtModuleOptions {
     }),
   ],
   providers: [
+    JwksService,
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
   ],
+  controllers: [SesionController],
   exports: [JwtModule],
 })
 export class AuthModule {}

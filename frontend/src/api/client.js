@@ -7,6 +7,7 @@
  *     y nunca por el texto de `message` (que esta en castellano y puede cambiar).
  */
 import { matchesPath } from '../domain/paths.js';
+import { accessToken, federatedEnabled, clearSession, renewAccessToken } from '../auth/session.js';
 
 function trimRightSlash(value) {
   return String(value ?? '').replace(/\/+$/, '');
@@ -73,7 +74,8 @@ const writeManual = (token) => {
   }
 };
 
-export const readToken = () => readManual() || localStorage.getItem(TOKEN_KEY) || '';
+export const readDriverToken = () => readManual() || localStorage.getItem(TOKEN_KEY) || '';
+export const readToken = () => federatedEnabled() ? accessToken() : readDriverToken();
 export const tokenSource = () => (readManual() ? 'manual' : localStorage.getItem(TOKEN_SOURCE_KEY));
 
 /**
@@ -157,6 +159,7 @@ export function seedDevToken(pathname = '') {
   // Por segmento, no por texto: `/choferes` (el ABM del operador) empieza con
   // `/chofer` y quedaba con el token de CHOFER, o sea 403 en toda la pantalla.
   const esChofer = matchesPath(pathname, '/chofer');
+  if (federatedEnabled()) return false;
 
   if (esChofer && readToken() && tokenSource() === 'manual') return false;
 
@@ -231,7 +234,9 @@ function toText(message) {
 async function request(path, options = {}) {
   // `anonymous` no es parte de RequestInit: se saca antes de llegar a fetch.
   const { anonymous = false, ...init } = options;
-  const token = anonymous ? '' : readToken();
+  const driver = path === '/rutas/mias' || path.startsWith('/paradas/');
+  const federated = federatedEnabled() && !anonymous && !driver;
+  const token = anonymous ? '' : driver ? readDriverToken() : readToken();
 
   let response;
   try {
@@ -252,6 +257,18 @@ async function request(path, options = {}) {
       status: 0,
       message: 'No se pudo contactar la API. Verifica que el backend este corriendo en el puerto 3000.',
     });
+  }
+
+  if (response.status === 401 && federated && token) {
+    const fresh = await renewAccessToken(token);
+    if (fresh) {
+      try {
+        response = await fetch(`${BASE_URL}${path}`, {
+          ...init, headers: { 'Content-Type': 'application/json', ...init.headers, Authorization: `Bearer ${fresh}` },
+        });
+      } catch { throw new ApiError({ code: 'SIN_CONEXION', status: 0, message: 'No se pudo contactar la API.' }); }
+    }
+    if (response.status === 401) clearSession();
   }
 
   if (response.status === 204) return null;

@@ -212,6 +212,34 @@ body.no-scroll { overflow: hidden; }
    obliga a elegir entre ver el mapa o ver los filtros. */
 .screen-map { height: calc(100vh - var(--topbar-height) - var(--space-5) * 2); }
 
+/* Con min-height y no height: el aviso de error suma alto y en un celular el
+   dashboard no tiene por que quedar aplastado contra la barra. */
+.screen-metrics { min-height: calc(100vh - var(--topbar-height) - var(--space-5) * 2); }
+
+.metrics-frame {
+  position: relative;
+  flex: 1;
+  min-height: 420px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.metrics-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+
+.metrics-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  background: var(--surface);
+  color: var(--text-muted);
+}
+
 .back-link { font-size: var(--font-size-sm); text-decoration: none; }
 .back-link:hover { text-decoration: underline; }
 

@@ -1,6 +1,6 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { Test } from '@nestjs/testing';
+import { Test, TestingModuleBuilder } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../../src/app.module';
 import { HttpExceptionFilter } from '../../src/shared/filters/http-exception.filter';
@@ -25,8 +25,12 @@ export interface AppDePrueba {
  * exactamente las mismas respuestas que un cliente real: si la validacion o el
  * formato de error cambian, estos tests lo notan.
  */
-export async function crearAppDePrueba(): Promise<AppDePrueba> {
-  const modulo = await Test.createTestingModule({ imports: [AppModule] }).compile();
+export async function crearAppDePrueba(
+  configurar?: (builder: TestingModuleBuilder) => void,
+): Promise<AppDePrueba> {
+  const builder = Test.createTestingModule({ imports: [AppModule] });
+  configurar?.(builder);
+  const modulo = await builder.compile();
 
   const app = modulo.createNestApplication();
   app.setGlobalPrefix('api/v1');
@@ -34,7 +38,9 @@ export async function crearAppDePrueba(): Promise<AppDePrueba> {
     new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
   );
   app.useGlobalFilters(new HttpExceptionFilter());
-  await app.init();
+  // Un solo puerto efimero por suite. Abrir/cerrar el server por request en
+  // supertest produce sockets interrumpidos con keep-alive y entregas paralelas.
+  await app.listen(0, '127.0.0.1');
 
   const dataSource = app.get(DataSource);
   const jwt = app.get(JwtService);
@@ -48,7 +54,7 @@ export async function crearAppDePrueba(): Promise<AppDePrueba> {
       // El orden importa menos con CASCADE, pero se listan igual de la hoja a
       // la raiz para que el dia que se saque el CASCADE esto siga andando.
       await dataSource.query(
-        'TRUNCATE TABLE "evento_pendiente", "alerta", "lectura", "sensor", "contenedor", "camion", "chofer", "zona" RESTART IDENTITY CASCADE',
+        `TRUNCATE TABLE ${dataSource.entityMetadatas.map((meta) => '"' + meta.tableName.replaceAll('"', '""') + '"').join(', ')} RESTART IDENTITY CASCADE`,
       );
     },
     cerrar: async () => {

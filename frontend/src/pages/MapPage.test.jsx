@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import MapPage from './MapPage.jsx';
-import { fetchMapContainers, fetchZones } from '../api/waste.js';
+import { fetchMapContainers, fetchMassEvents, fetchZones } from '../api/waste.js';
 import { saveToken, clearToken } from '../api/client.js';
 
 vi.mock('../api/waste.js', () => ({
@@ -10,6 +10,7 @@ vi.mock('../api/waste.js', () => ({
   fetchMapContainers: vi.fn(),
   fetchZones: vi.fn(),
   fetchContainer: vi.fn(),
+  fetchMassEvents: vi.fn(),
 }));
 
 // Leaflet necesita un contenedor con tamano real, que jsdom no tiene. La pantalla
@@ -49,6 +50,42 @@ describe('pantalla del mapa', () => {
     vi.clearAllMocks();
     clearToken();
     fetchZones.mockResolvedValue([{ id: 'z-1', nombre: 'Centro', umbralCriticoPct: 70 }]);
+    fetchMassEvents.mockResolvedValue([]);
+  });
+
+  it('avisa de una actividad masiva con su hora de fin y los contenedores de la zona', async () => {
+    saveToken('un.jwt.valido');
+    fetchMapContainers.mockResolvedValue([container()]);
+    fetchMassEvents.mockResolvedValue([
+      {
+        actividadId: 'act-1',
+        titulo: 'Festival de Primavera',
+        capacidad: 5000,
+        lat: -34.6037,
+        lng: -58.3816,
+        radioMetros: 300,
+        inicio: new Date(Date.now() - 3_600_000).toISOString(),
+        fin: new Date(Date.now() + 2 * 3_600_000 + 30_000).toISOString(),
+        contenedores: 4,
+      },
+    ]);
+
+    render(<MapPage />);
+
+    expect(await screen.findByText('Actividad masiva: Festival de Primavera')).toBeInTheDocument();
+    expect(screen.getByText(/5\.000 personas · Termina a las .* \(en 2 h\) · 4 contenedores en la zona/))
+      .toBeInTheDocument();
+  });
+
+  it('si fallan las actividades masivas, el mapa sigue andando', async () => {
+    saveToken('un.jwt.valido');
+    fetchMapContainers.mockResolvedValue([container()]);
+    fetchMassEvents.mockRejectedValue(new Error('caido'));
+
+    render(<MapPage />);
+
+    expect(await screen.findByText('1 marcadores')).toBeInTheDocument();
+    expect(screen.queryByText(/Actividad masiva/)).not.toBeInTheDocument();
   });
 
   it('resume cuantos contenedores hay en cada estado', async () => {

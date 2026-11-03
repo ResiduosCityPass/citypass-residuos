@@ -15,7 +15,7 @@ import { DataSource } from 'typeorm';
  * `synchronize` esta en false y no se toca: el CLI tiene que comparar contra el
  * esquema real, no modificarlo por su cuenta.
  */
-cargarEnv();
+cargarEnv({ path: process.env.ENV_FILE ?? '.env', quiet: true });
 
 const connectionOptions = process.env.DATABASE_URL
   ? { url: process.env.DATABASE_URL }

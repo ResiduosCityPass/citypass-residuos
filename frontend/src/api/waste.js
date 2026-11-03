@@ -22,6 +22,9 @@ const source = USING_MOCKS ? mock : http;
 /* CU-07 · Mapa */
 export const fetchMapContainers = (...args) => source.fetchMapContainers(...args);
 
+/* Squad 3 · Actividades masivas */
+export const fetchMassEvents = (...args) => source.fetchMassEvents(...args);
+
 /* CU-01 · Contenedores */
 export const fetchContainers = (...args) => source.fetchContainers(...args);
 export const fetchContainer = (...args) => source.fetchContainer(...args);
@@ -66,6 +69,10 @@ export const fetchAlerts = (...args) => source.fetchAlerts(...args);
 export const acknowledgeAlert = (...args) => source.acknowledgeAlert(...args);
 export const resolveAlert = (...args) => source.resolveAlert(...args);
 
+/* CU-01 de Emergencias (A7) · Intervenciones */
+export const fetchInterventions = (...args) => source.fetchInterventions(...args);
+export const completeIntervention = (...args) => source.completeIntervention(...args);
+
 /* CU-10 · Confirmar vaciado */
 export const fetchMyRoute = (...args) => source.fetchMyRoute(...args);
 export const confirmStop = (...args) => source.confirmStop(...args);
@@ -73,3 +80,11 @@ export const skipStop = (...args) => source.skipStop(...args);
 
 /* CU-11 · Consulta ciudadana */
 export const fetchNearbyContainers = (...args) => source.fetchNearbyContainers(...args);
+
+export const fetchFloods = (...args) => source.fetchFloods(...args);
+export const simulateFloodStart = (...args) => source.simulateFloodStart(...args);
+export const simulateFloodEnd = (...args) => source.simulateFloodEnd(...args);
+export const enableFloodRecovery = (...args) => source.enableFloodRecovery(...args);
+export const fetchClimateAlerts = (...args) => source.fetchClimateAlerts(...args);
+export const simulateClimateEvent = (...args) => source.simulateClimateEvent(...args);
+export const resolveClimateAlert = (...args) => source.resolveClimateAlert(...args);

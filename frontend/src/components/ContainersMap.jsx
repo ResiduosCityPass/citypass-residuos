@@ -1,16 +1,40 @@
 import { Fragment } from 'react';
-import { MapContainer, CircleMarker, Tooltip } from 'react-leaflet';
+import { MapContainer, Circle, CircleMarker, Tooltip } from 'react-leaflet';
 import BaseTiles from './map/BaseTiles.jsx';
 import 'leaflet/dist/leaflet.css';
 import { colorForState, STATE_LABEL, neverReported } from '../domain/states.js';
+import { MASS_EVENT_COLOR, endLabel } from '../domain/massEvents.js';
 
 /** Obelisco: el seed del simulador crea los contenedores alrededor de este punto. */
 const CABA_CENTER = [-34.6037, -58.3816];
 
-export default function ContainersMap({ containers, selectedId, onSelect }) {
+export default function ContainersMap({ containers, selectedId, onSelect, massEvents = [] }) {
   return (
     <MapContainer center={CABA_CENTER} zoom={15} className="map" scrollWheelZoom>
       <BaseTiles />
+
+      {/* Zonas de actividades masivas (squad 3). Van antes que los contenedores
+          para quedar debajo: el circulo no puede tapar el click en un marcador. */}
+      {massEvents.map((event) => (
+        <Circle
+          key={event.actividadId}
+          center={[event.lat, event.lng]}
+          radius={event.radioMetros}
+          pathOptions={{
+            color: MASS_EVENT_COLOR,
+            weight: 2,
+            dashArray: '6 6',
+            fillColor: MASS_EVENT_COLOR,
+            fillOpacity: 0.08,
+          }}
+        >
+          <Tooltip direction="top">
+            <strong>{event.titulo ?? 'Actividad masiva'}</strong>
+            <br />
+            {event.capacidad.toLocaleString('es-AR')} personas · {endLabel(event.fin)}
+          </Tooltip>
+        </Circle>
+      ))}
 
       {containers.map((container) => {
         // `incendioActivo` lo trae el propio payload del mapa: no depende del
@@ -20,6 +44,11 @@ export default function ContainersMap({ containers, selectedId, onSelect }) {
 
         return (
           <Fragment key={container.id}>
+            {container.recoleccionSuspendida && <CircleMarker
+              center={[container.lat, container.lng]} radius={23}
+              pathOptions={{ color: '#2563A6', weight: 3, dashArray: '4 4', fillOpacity: 0 }}
+              interactive={false}
+            />}
             {/* Halo de incendio: va APARTE del color de estado, porque un contenedor
                 puede estar verde y estar prendido fuego al mismo tiempo. */}
             {hasFire && (
@@ -48,6 +77,7 @@ export default function ContainersMap({ containers, selectedId, onSelect }) {
                 {container.zonaNombre && <span className="tooltip-zone"> · {container.zonaNombre}</span>}
                 <br />
                 {STATE_LABEL[container.estado]} · {container.nivelLlenadoPct}%
+                {container.recoleccionSuspendida && <><br /><strong>Recolección suspendida por inundación</strong></>}
                 {/* "94% sobre un umbral de 70" se entiende mucho mejor que un 94%
                     solo. El umbral viene en el payload del mapa, asi que no hay
                     que pedir la zona aparte para mostrarlo. */}

@@ -1,5 +1,5 @@
 import { plainToInstance } from 'class-transformer';
-import { IsEnum, IsInt, IsOptional, IsString, Max, Min, validateSync } from 'class-validator';
+import { IsEnum, IsIn, IsInt, IsOptional, IsString, Max, Min, validateSync } from 'class-validator';
 
 /**
  * Emisor con el que se firman y se leen los tokens.
@@ -101,9 +101,70 @@ class VariablesEntorno {
   @IsOptional()
   JWT_ALGORITHM: string = 'HS256';
 
+  @IsIn(['local', 'federated'])
+  @IsOptional()
+  AUTH_MODE: string = 'local';
+
+  @IsString()
+  @IsOptional()
+  JWT_JWKS_URL?: string;
+
+  @IsString() @IsOptional() JWT_MODULE: string = 'residuos';
+  @IsIn(['true', 'false']) @IsOptional() CLIMA_SIMULACRO_EDA_HABILITADO: string = 'false';
+
+  @IsString()
+  @IsOptional()
+  JWT_ADMIN_GROUPS: string = 'administrador,residuos-administradores';
+
+  @IsString()
+  @IsOptional()
+  JWT_OPERATOR_GROUPS: string = 'operador,delegados,residuos-operadores';
+
+  @IsString()
+  @IsOptional()
+  JWT_DRIVER_GROUPS: string = 'chofer';
+
   @IsString()
   @IsOptional()
   EVENT_BUS_DRIVER: string = 'inmemory';
+
+  @IsIn(['true', 'false'])
+  @IsOptional()
+  CLIMA_SIMULADOR_HABILITADO: string = 'true';
+  // --- Bus de CityPass+ (CU-INT-01). Solo se usan con EVENT_BUS_DRIVER=platform.
+  @IsString()
+  @IsOptional()
+  GATEWAY_URL?: string;
+
+  @IsString()
+  @IsOptional()
+  GATEWAY_TOKEN_URL?: string;
+
+  @IsString()
+  @IsOptional()
+  GATEWAY_CLIENT_ID?: string;
+
+  @IsString()
+  @IsOptional()
+  GATEWAY_CLIENT_SECRET?: string;
+
+  @IsString() @IsOptional() GATEWAY_NAMESPACE: string = 'com.citypass.residuos';
+  @IsString() @IsOptional() KAFKA_GROUP_ID: string = 'com.citypass.residuos.api';
+
+  /** Brokers de Kafka separados por coma. Vacio: no se consume por Kafka, solo por webhook. */
+  @IsString()
+  @IsOptional()
+  KAFKA_BROKERS?: string;
+
+  /** `false` solo para el bus local (SASL_PLAINTEXT). En produccion es SASL_SSL. */
+  @IsIn(['true', 'false'])
+  @IsOptional()
+  KAFKA_SSL: string = 'true';
+
+  /** Secreto de la URL del webhook (?token=...). Vacio: el webhook rechaza todo. */
+  @IsString()
+  @IsOptional()
+  GATEWAY_WEBHOOK_TOKEN?: string;
 
   @IsString()
   @IsOptional()
@@ -143,5 +204,70 @@ export function validarEntorno(config: Record<string, unknown>) {
     );
   }
 
+  if (
+    instancia.NODE_ENV === Entorno.Production &&
+    instancia.CLIMA_SIMULACRO_EDA_HABILITADO === 'true'
+  )
+    throw new Error('Los simulacros climaticos por EDA no se habilitan en produccion');
+
+  if (instancia.AUTH_MODE === 'federated') {
+    for (const key of ['JWT_ISSUER', 'JWT_AUDIENCE', 'JWT_JWKS_URL']) {
+      if (typeof config[key] !== 'string' || !(config[key] as string).trim()) {
+        throw new Error(`${key} debe confirmarse y configurarse en modo federated`);
+      }
+    }
+    const url = new URL(instancia.JWT_JWKS_URL!);
+    if (url.protocol !== 'https:' || url.username || url.password) {
+      throw new Error('JWT_JWKS_URL debe ser HTTPS sin credenciales');
+    }
+  }
+  const grupos = [
+    instancia.JWT_ADMIN_GROUPS,
+    instancia.JWT_OPERATOR_GROUPS,
+    instancia.JWT_DRIVER_GROUPS,
+  ].flatMap((v) =>
+    v
+      .split(',')
+      .map((g) => g.trim())
+      .filter(Boolean),
+  );
+  if (new Set(grupos).size !== grupos.length) {
+    throw new Error('Un grupo JWT no puede asignar mas de un rol');
+  }
+  if (instancia.EVENT_BUS_DRIVER === 'platform' || Boolean(instancia.KAFKA_BROKERS?.trim())) {
+    for (const key of [
+      'GATEWAY_CLIENT_ID',
+      'GATEWAY_CLIENT_SECRET',
+      'GATEWAY_NAMESPACE',
+      'GATEWAY_URL',
+      'GATEWAY_TOKEN_URL',
+    ] as const) {
+      if (!instancia[key]?.trim()) throw new Error(`${key} es obligatorio para EDA`);
+    }
+    if (new URL(instancia.GATEWAY_URL!).pathname.replace(/\/$/, '') !== '')
+      throw new Error('GATEWAY_URL debe ser la raiz del gateway, sin /api/v1');
+    if (instancia.GATEWAY_NAMESPACE !== 'com.citypass.residuos')
+      throw new Error('GATEWAY_NAMESPACE debe ser com.citypass.residuos');
+    for (const key of ['GATEWAY_URL', 'GATEWAY_TOKEN_URL'] as const) {
+      const url = new URL(instancia[key]!);
+      const local =
+        instancia.NODE_ENV !== Entorno.Production &&
+        ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+      if (
+        (url.protocol !== 'https:' && !(local && url.protocol === 'http:')) ||
+        url.username ||
+        url.password ||
+        url.search ||
+        url.hash
+      )
+        throw new Error(`${key} requiere HTTPS (HTTP solo en localhost de desarrollo/test)`);
+    }
+    if (instancia.KAFKA_BROKERS?.trim()) {
+      if (!instancia.KAFKA_GROUP_ID.startsWith(`${instancia.GATEWAY_NAMESPACE}.`))
+        throw new Error('KAFKA_GROUP_ID debe pertenecer al namespace de Residuos');
+      if (instancia.NODE_ENV === Entorno.Production && instancia.KAFKA_SSL !== 'true')
+        throw new Error('Kafka de produccion requiere TLS');
+    }
+  }
   return instancia;
 }

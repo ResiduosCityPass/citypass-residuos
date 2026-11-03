@@ -4,6 +4,7 @@ import { Zona } from '../domain/zona.entity';
 import { ZONA_REPOSITORY, ZonaRepository } from '../domain/zona.repository';
 import { ActualizarZonaDto } from './dto/actualizar-zona.dto';
 import { CrearZonaDto } from './dto/crear-zona.dto';
+import { ContingenciasService } from '../../contingencias/application/contingencias.service';
 
 /**
  * Casos de uso de Zona (CU-02).
@@ -16,6 +17,7 @@ export class ZonasService {
   constructor(
     @Inject(ZONA_REPOSITORY)
     private readonly zonas: ZonaRepository,
+    private readonly contingencias: ContingenciasService,
   ) {}
 
   async crear(dto: CrearZonaDto): Promise<Zona> {
@@ -28,11 +30,11 @@ export class ZonasService {
       });
     }
 
-    return this.zonas.crear({ ...dto, bloqueada: false });
+    return this.zonas.crear({ ...dto, bloqueada: false, bloqueoManual: false });
   }
 
-  listar(): Promise<Zona[]> {
-    return this.zonas.listar();
+  async listar(): Promise<Zona[]> {
+    return this.contingencias.decorarZonas(await this.zonas.listar());
   }
 
   async obtener(id: string): Promise<Zona> {
@@ -45,7 +47,7 @@ export class ZonasService {
       });
     }
 
-    return zona;
+    return (await this.contingencias.decorarZonas([zona]))[0];
   }
 
   async actualizar(id: string, dto: ActualizarZonaDto): Promise<Zona> {
@@ -68,19 +70,40 @@ export class ZonasService {
   }
 
   /**
-   * Marca o desmarca la zona como bloqueada. Lo dispara el consumo de
-   * `emergencias.incidente.creado` a partir del Sprint 4; por ahora se expone
-   * para poder probarlo a mano.
+   * Bloqueo manual de un operador (PATCH /zonas/:id/bloqueo). Queda anotado en
+   * `bloqueoManual` para que el fin de una emergencia no lo levante.
+   *
+   * Desbloquear a mano libera la zona aunque una emergencia la tenga bloqueada:
+   * manda el operador, que puede saber que la calle ya esta habilitada.
    */
   async cambiarBloqueo(id: string, bloqueada: boolean): Promise<Zona> {
     const zona = await this.obtener(id);
+    zona.bloqueoManual = bloqueada;
     zona.bloqueada = bloqueada;
+
+    return this.zonas.guardar(zona);
+  }
+
+  /**
+   * Bloqueo por una emergencia que corta la circulacion (CU-INT-01). Al
+   * levantarlo, la zona sigue bloqueada si un operador la bloqueo a mano.
+   */
+  async cambiarBloqueoPorIncidente(id: string, bloqueada: boolean): Promise<Zona> {
+    const zona = await this.obtener(id);
+    zona.bloqueada = bloqueada || zona.bloqueoManual;
 
     return this.zonas.guardar(zona);
   }
 
   async eliminar(id: string): Promise<void> {
     await this.obtener(id);
+
+    if (await this.contingencias.zonaTieneHistorial(id)) {
+      throw new ConflictException({
+        code: 'ZONA_CON_CONTINGENCIAS',
+        message: 'La zona tiene historial de inundaciones y debe conservarse.',
+      });
+    }
 
     const contenedores = await this.zonas.contarContenedores(id);
 

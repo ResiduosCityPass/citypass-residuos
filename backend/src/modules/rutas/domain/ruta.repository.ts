@@ -39,8 +39,12 @@ export interface RutaRepository {
   listar(filtro: FiltroRutas): Promise<Ruta[]>;
   /** Ruta activa del chofer: ASIGNADA o EN_CURSO. */
   buscarActivaDeChofer(choferId: string): Promise<Ruta | null>;
-  /** Contenedores comprometidos en alguna ruta viva. */
+  /** Contenedores con una parada pendiente en alguna ruta viva. */
   contenedoresEnRutasVivas(): Promise<string[]>;
+  /** Rutas vivas que todavia tienen pendiente alguno de estos contenedores. */
+  rutasVivasConPendientes(contenedorIds: string[]): Promise<string[]>;
+  /** Ultima vez que el chofer confirmo el vaciado de cada contenedor. Sin vaciados, no aparece. */
+  ultimosVaciados(contenedorIds: string[]): Promise<Map<string, Date>>;
   /** Avance de varias rutas en una sola consulta agrupada, sin N+1. */
   avanceDeParadas(rutaIds: string[]): Promise<Map<string, AvanceParadas>>;
 }
