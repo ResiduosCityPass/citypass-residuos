@@ -5,6 +5,7 @@ import { Kafka, logLevel } from 'kafkajs';
 import { GatewayTransporte } from '../shared/events/gateway/gateway.transporte';
 import { CONTRATOS_EDA, registroEda } from '../shared/events/gateway/contratos-climaticos';
 import { canonicalJson } from '../shared/events/gateway/canonical-json';
+import { EventoAuditable, verificarRespuestasEda } from '../shared/demo/respuestas-eda';
 
 async function main() {
   cargarEnv({ path: process.env.ENV_FILE ?? '.env', quiet: true });
@@ -32,6 +33,33 @@ async function main() {
   if (config.get<string>('GATEWAY_NAMESPACE') !== namespace)
     throw new Error('El namespace debe ser com.citypass.residuos');
   const gateway = new GatewayTransporte(config);
+  if (command === 'auditar') {
+    const parametro = (nombre: string) => {
+      const index = process.argv.indexOf(nombre);
+      const value = index < 0 ? undefined : process.argv[index + 1];
+      if (!value || value.startsWith('--')) throw new Error(`Falta ${nombre}`);
+      return value;
+    };
+    const esperado = {
+      alertaId: parametro('--alerta'),
+      inundacionId: parametro('--inundacion'),
+      zonaId: parametro('--zona'),
+      clientId: config.getOrThrow<string>('GATEWAY_CLIENT_ID'),
+    };
+    const recientes = await gateway.request<{ events: EventoAuditable[] }>('/events?limit=50');
+    console.log(
+      JSON.stringify(
+        {
+          verificado: true,
+          ...esperado,
+          respuestas: verificarRespuestasEda(recientes.events, esperado),
+        },
+        null,
+        2,
+      ),
+    );
+    return;
+  }
   const types = await gateway.listarTipos();
   console.log('Token de servicio obtenido; catalogo EDA accesible.');
   if (command === 'verificar') {
