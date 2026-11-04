@@ -15,6 +15,12 @@ describe('Cliente de ensayo HTTP', () => {
     'https://example.com/api/v1/',
   ])('acepta %s sin barras finales', (url) => expect(urlDemo(url)).toBe(url.slice(0, -1)));
 
+  it('normaliza una secuencia larga de barras finales sin retroceso de regex', () => {
+    expect(urlDemo('https://example.com/api/v1' + '/'.repeat(10000))).toBe(
+      'https://example.com/api/v1',
+    );
+  });
+
   it('no envía el token humano al endpoint de lecturas de sensor', async () => {
     const enviar = jest.fn().mockResolvedValue(new Response('{}', { status: 202 }));
     const api = new ClienteDemoHttp('https://example.com/api/v1', 'token-humano', enviar);

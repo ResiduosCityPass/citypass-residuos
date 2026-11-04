@@ -1,8 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import { execFile } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import {
+  mkdtempSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { AppDePrueba, crearAppDePrueba } from './helpers/app-de-prueba';
 import { ClienteDemoHttp } from '../src/shared/demo/cliente-demo-http';
@@ -125,31 +134,33 @@ describe('Ensayo operativo HTTP sobre PostgreSQL migrado (sin bus externo)', () 
   it('el CLI guarda archivos privados, no imprime tokens y no pisa un escenario anterior', async () => {
     const temporal = mkdtempSync(join(tmpdir(), 'residuos-http-test-'));
     const tokenFile = join(temporal, 'admin.jwt');
-    const salida = join(temporal, 'escenario');
+    const salida = join(temporal, '.demo', 'http', 'CLI01');
     const url = (await ctx.app.getUrl()) + '/api/v1';
     writeFileSync(tokenFile, ctx.token(), { mode: 0o600 });
-    const ejecutar = () =>
+    const preparar = [
+      'preparar',
+      '--escenario',
+      'CLI01',
+      '--patente',
+      'QA124ZZ',
+      '--api',
+      url,
+      '--apply',
+    ];
+    const ejecutar = (argumentos = preparar) =>
       promisify(execFile)(
         process.execPath,
         [
           '-r',
-          'ts-node/register',
-          'src/scripts/demo-http.ts',
-          'preparar',
-          '--escenario',
-          'CLI01',
-          '--patente',
-          'QA124ZZ',
-          '--api',
-          url,
-          '--directorio',
-          salida,
-          '--apply',
+          require.resolve('ts-node/register'),
+          resolve('src/scripts/demo-http.ts'),
+          ...argumentos,
         ],
         {
-          cwd: process.cwd(),
+          cwd: temporal,
           env: {
             ...process.env,
+            TS_NODE_PROJECT: resolve('tsconfig.json'),
             DEMO_TOKEN_FILE: tokenFile,
             ENV_FILE: join(temporal, 'sin-configuracion.local'),
           },
@@ -175,6 +186,20 @@ describe('Ensayo operativo HTTP sobre PostgreSQL migrado (sin bus externo)', () 
         '/rutas/mias',
       );
       expect(propia.id).toBe(manifiesto.escenario.rutaId);
+      const verificar = ['verificar', '--escenario', 'CLI01', '--api', url, '--etapa', 'preparada'];
+      await expect(ejecutar(verificar)).resolves.toMatchObject({ stderr: '' });
+      await expect(
+        ejecutar(['verificar', '--escenario', '../CLI01', '--api', url, '--etapa', 'preparada']),
+      ).rejects.toThrow('1 a 10 letras');
+      const archivo = join(salida, 'escenario.json');
+      renameSync(archivo, archivo + '.respaldo');
+      symlinkSync(tokenFile, archivo);
+      await expect(ejecutar(verificar)).rejects.toThrow('ELOOP');
+      unlinkSync(archivo);
+      renameSync(archivo + '.respaldo', archivo);
+      renameSync(salida, salida + '.respaldo');
+      symlinkSync(salida + '.respaldo', salida, 'dir');
+      await expect(ejecutar(verificar)).rejects.toThrow('sin enlaces simbólicos');
     } finally {
       rmSync(temporal, { recursive: true, force: true });
     }

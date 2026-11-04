@@ -1,6 +1,16 @@
 import 'reflect-metadata';
 import { config as cargarEnv } from 'dotenv';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  constants,
+  closeSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  realpathSync,
+  writeFileSync,
+} from 'node:fs';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { ClienteDemoHttp, urlDemo } from '../shared/demo/cliente-demo-http';
@@ -21,7 +31,6 @@ async function main() {
       patente: { type: 'string' },
       api: { type: 'string' },
       apply: { type: 'boolean', default: false },
-      directorio: { type: 'string' },
       etapa: { type: 'string' },
       alerta: { type: 'string' },
     },
@@ -32,11 +41,14 @@ async function main() {
       'Uso: demo:http plan|preparar|verificar. Ver docs/arquitectura/prueba-operativa-http.md.',
     );
   if (!values.api) throw new Error('Indicá --api con la URL completa, incluido /api/v1.');
+  const nombre = values.escenario?.trim().toUpperCase();
+  if (!nombre || !/^[A-Z][A-Z0-9]{0,9}$/.test(nombre))
+    throw new Error('Indicá --escenario con 1 a 10 letras/números, empezando con una letra.');
   const apiUrl = urlDemo(values.api);
   let plan: ReturnType<typeof planDemoHttp> | undefined;
   if (modo !== 'verificar') {
-    if (!values.escenario || !values.patente) throw new Error('Faltan --escenario y --patente.');
-    plan = planDemoHttp(values.escenario, values.patente);
+    if (!values.patente) throw new Error('Falta --patente.');
+    plan = planDemoHttp(nombre, values.patente);
     if (modo === 'plan' || !values.apply) {
       console.log(
         JSON.stringify(
@@ -55,17 +67,34 @@ async function main() {
     }
   } else {
     if (values.apply) throw new Error('verificar es solo lectura; no usa --apply.');
-    if (!values.directorio || !ETAPAS_DEMO.includes(values.etapa as EtapaDemo))
-      throw new Error(`Indicá --directorio y --etapa (${ETAPAS_DEMO.join(', ')}).`);
+    if (!ETAPAS_DEMO.includes(values.etapa as EtapaDemo))
+      throw new Error(`Indicá --etapa (${ETAPAS_DEMO.join(', ')}).`);
     if (values.etapa !== 'preparada' && !values.alerta)
       throw new Error('Falta --alerta con el ID de Espacios.');
   }
-  const directorio = resolve(values.directorio ?? `.demo/http/${plan!.escenario}`);
+  // El argumento identifica un escenario; nunca es una ruta de archivos arbitraria.
+  const raiz = realpathSync(process.cwd());
+  const directorio = resolve(raiz, '.demo', 'http', nombre);
+  for (const carpeta of [resolve(raiz, '.demo'), resolve(raiz, '.demo/http'), directorio]) {
+    if (
+      existsSync(carpeta) &&
+      (lstatSync(carpeta).isSymbolicLink() || !lstatSync(carpeta).isDirectory())
+    )
+      throw new Error(
+        'Las carpetas de escenarios deben ser directorios locales, sin enlaces simbólicos.',
+      );
+  }
   let manifest: { apiUrl: string; escenario: EscenarioHttp } | undefined;
   if (modo === 'verificar') {
-    manifest = JSON.parse(
-      readFileSync(resolve(directorio, 'escenario.json'), 'utf8'),
-    ) as typeof manifest;
+    const descriptor = openSync(
+      resolve(directorio, 'escenario.json'),
+      constants.O_RDONLY | constants.O_NOFOLLOW,
+    );
+    try {
+      manifest = JSON.parse(readFileSync(descriptor, 'utf8')) as typeof manifest;
+    } finally {
+      closeSync(descriptor);
+    }
     if (manifest?.apiUrl !== apiUrl) throw new Error('La API no coincide con la del manifiesto.');
   }
   cargarEnv({ path: process.env.ENV_FILE ?? '.env.demo.http.local', quiet: true });

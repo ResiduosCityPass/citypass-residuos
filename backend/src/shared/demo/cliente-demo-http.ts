@@ -13,7 +13,10 @@ export function urlDemo(valor: string): string {
     throw new Error(
       'Usá una URL HTTPS sin credenciales, query ni fragmento (HTTP solo en localhost).',
     );
-  return url.toString().replace(/\/+$/, '');
+  const normalizada = url.toString();
+  let fin = normalizada.length;
+  while (fin > 0 && normalizada[fin - 1] === '/') fin--;
+  return normalizada.slice(0, fin);
 }
 
 export class ClienteDemoHttp implements ApiDemo {

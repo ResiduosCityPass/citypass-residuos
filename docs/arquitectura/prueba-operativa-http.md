@@ -58,7 +58,7 @@ no se cumple. No confirma una etapa porque la pantalla diga que terminó: compar
 llenados, restricciones, estados de paradas, las dos rutas y evidencia de vaciado.
 
 ```bash
-npm run demo:http -- verificar --directorio .demo/http/WEB01 \
+npm run demo:http -- verificar --escenario WEB01 \
   --api https://citypass-residuos-api.onrender.com/api/v1 --etapa preparada
 ```
 
@@ -91,6 +91,9 @@ npm run demo:http -- verificar --directorio .demo/http/WEB01 \
 En todas las etapas se usa el mismo comando de verificación, cambiando `--etapa`
 y agregando `--alerta` con el ID real, sin los caracteres de marcador `ID`.
 Los IDs de contingencia y zona se muestran en el resultado de la verificación.
+Los archivos se resuelven únicamente dentro de `.demo/http/<escenario>`; el nombre
+del escenario admite letras y números y no se aceptan rutas arbitrarias ni
+directorios o manifiestos enlazados simbólicamente.
 
 La web de producción mantiene deshabilitada la simulación GPS. Para un ensayo
 con datos sintéticos puede enviarse `PATCH /paradas/:id/confirmar` con el token
@@ -130,8 +133,8 @@ las cuatro respuestas en el outbox. Los unit tests cubren permisos, colisiones,
 destinos HTTP y errores de correlación, incluyendo falsos positivos por omisión
 o cambios en el contenedor de control.
 
-Validación del 3 de noviembre de 2026: 799 tests unitarios y 27 E2E de las cuatro
-suites de demo/inundaciones pasaron, además de lint y compilación. La cobertura
+Validación final del 3 de noviembre de 2026: 810 tests unitarios y los 146 E2E del
+backend pasaron, además de lint y compilación. La cobertura
 combinada de unitarios y E2E alcanza el 100 % en líneas, funciones y ramas de los
 tres helpers nuevos de preparación, cliente HTTP y auditoría EDA; los entrypoints
 CLI conservan la exclusión de cobertura existente del proyecto. El E2E también
@@ -139,6 +142,6 @@ ejecuta el CLI, verifica permisos de archivos y comprueba que una repetición no
 sobrescriba ni invalide la credencial del chofer.
 
 La auditoría de solo lectura también pasó contra las cuatro respuestas del caso
-desplegado `bba18974-ee18-444f-80b7-8ddc0408f9d6`. Ese caso previo no tenía trabajo
-de recolección pendiente; no reemplaza el ensayo desplegado con los niveles
-90/30/85 %, que sigue pendiente de una cuenta administradora.
+desplegado `bba18974-ee18-444f-80b7-8ddc0408f9d6`, sin trabajo de recolección pendiente,
+y del [ensayo operativo completo en Render](prueba-operativa-render-2026-11-03.md)
+`0a9cf43f-dd69-4977-8bf9-5deccd171f07`, con niveles iniciales 90/30/85 % y ambos vaciados confirmados.

@@ -244,12 +244,12 @@ export async function verificarDemoHttp(
   assert.equal(
     c.contenedores
       .map((p) => p.contenedorId)
-      .sort()
+      .sort((a, b) => a.localeCompare(b))
       .join(','),
     e.contenedores
       .slice(0, 2)
       .map((p) => p.id)
-      .sort()
+      .sort((a, b) => a.localeCompare(b))
       .join(','),
     'Debe incluir también el contenedor no crítico, sin incluir al control.',
   );

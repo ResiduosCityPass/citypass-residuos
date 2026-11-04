@@ -67,9 +67,11 @@ JWT_OPERATOR_GROUPS=operador,delegados
 JWT_DRIVER_GROUPS=chofer
 ```
 
-No se crearon grupos ni se modificaron membresías del directorio remoto. Los permisos de
-administración (por ejemplo crear camiones) siguen requiriendo administrador y devuelven 403
-al delegado. Las credenciales internas del chofer siguen con HS256 y su emisor propio;
+Los grupos y membresías se administran en Login con el delegado; no se crean desde
+los endpoints de Residuos. Para el ensayo desplegado del 03/11 se creó `qa-admin-res`
+con el único grupo `residuos-administradores`, sin modificar los grupos del delegado.
+Los permisos de administración (por ejemplo crear camiones) siguen requiriendo administrador
+y devuelven 403 al delegado. Las credenciales internas del chofer siguen con HS256 y su emisor propio;
 no se mezclan con la sesión del personal.
 
 ## Sesión del frontend

@@ -57,6 +57,9 @@ Espacios quedó finalizada y la contingencia de Residuos recuperada.
 
 ## Pendiente para la prueba operativa completa
 
+**Resuelto en un segundo ensayo:** ver [prueba operativa completa en Render](prueba-operativa-render-2026-11-03.md).
+Lo que sigue describe el pendiente al cerrar la primera ejecución, sin vaciados.
+
 Preparar un escenario aislado con contenedores al 90 % y 30 %, un control en otra
 zona, un camión, un chofer y una ruta asignada. Verificar suspensión de paradas,
 exclusión del ruteo, recuperación prioritaria y cierre mediante vaciados.
