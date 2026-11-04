@@ -114,6 +114,41 @@ describe('Login federado: firma real y limites de confianza', () => {
       verify(sign({ module: 'reclamos', groups: ['administrador'] })).run(),
     ).rejects.toThrow('Token invalido');
   });
+
+  it.each([
+    ['delegados', 'residuos-administradores'],
+    ['residuos-administradores', 'delegados'],
+    ['chofer', 'delegados', 'residuos-administradores'],
+  ])('un token RS256 con varios grupos prioriza administrador: %j', (...groups) => {
+    guard = new JwtAuthGuard(
+      new Reflector(),
+      jwt,
+      new ConfigService({
+        AUTH_MODE: 'federated',
+        JWT_ISSUER: 'https://idp.example',
+      }),
+      { clave: jest.fn().mockResolvedValue(publicKey) } as unknown as JwksService,
+    );
+    const check = verify(sign({ groups }));
+    return check.run().then(() => expect(check.req.usuario?.rol).toBe('ADMINISTRADOR'));
+  });
+
+  it('aplica la misma prioridad con nombres de grupos personalizados', async () => {
+    guard = new JwtAuthGuard(
+      new Reflector(),
+      jwt,
+      new ConfigService({
+        AUTH_MODE: 'federated',
+        JWT_ISSUER: 'https://idp.example',
+        JWT_ADMIN_GROUPS: 'supervisores',
+        JWT_OPERATOR_GROUPS: 'guardias',
+      }),
+      { clave: jest.fn().mockResolvedValue(publicKey) } as unknown as JwksService,
+    );
+    const check = verify(sign({ groups: ['guardias', 'supervisores'] }));
+    await check.run();
+    expect(check.req.usuario?.rol).toBe('ADMINISTRADOR');
+  });
   it.each([
     [{}, { issuer: 'otro-emisor' }],
     [{}, { audience: ['otra-api'] }],

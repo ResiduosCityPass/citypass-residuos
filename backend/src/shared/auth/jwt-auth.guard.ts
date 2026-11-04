@@ -133,7 +133,7 @@ export class JwtAuthGuard implements CanActivate {
           .map((g): [string, Rol] => [g, rol]),
       ),
     );
-    return (payload.groups ?? []).map((g) => mapping.get(g)).find(Boolean);
+    return resolverRol(payload.groups ?? [], mapping);
   }
 
   /**

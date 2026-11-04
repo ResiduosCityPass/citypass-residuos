@@ -25,10 +25,12 @@
     "migration:run:prod": "typeorm -d dist/config/data-source.js migration:run",
     "eda:plan": "ts-node src/scripts/eda.ts plan",
     "eda:verificar": "ts-node src/scripts/eda.ts verificar",
+    "eda:auditar": "ts-node src/scripts/eda.ts auditar",
     "eda:registrar": "ts-node src/scripts/eda.ts registrar",
     "eda:simulacro": "ts-node src/scripts/eda-simulacro.ts",
     "demo:preparar": "ts-node src/scripts/preparar-demo.ts",
     "demo:preparar:prod": "node dist/scripts/preparar-demo.js",
+    "demo:http": "ts-node src/scripts/demo-http.ts",
     "deploy:verificar": "node ../infra/verificar-integracion.cjs"
   },
   "dependencies": {

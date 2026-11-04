@@ -26,17 +26,14 @@ const GRUPO_A_ROL: Record<string, Rol> = {
 /**
  * Resuelve el rol interno a partir de los grupos del token.
  *
- * El contrato modela pertenencia a *varios* grupos; nuestra matriz de ADR-005 asume un
- * rol *unico* por persona. Hasta que un caso de uso real pida lo contrario, se toma el
- * primer grupo reconocido en el orden en que vino el array. Un grupo desconocido nunca
- * otorga nada (contrato §5) ni hace fallar la resolucion: simplemente se ignora.
+ * El rol único se resuelve por prioridad ADMINISTRADOR > OPERADOR > CHOFER,
+ * independientemente del orden de los grupos LDAP. Los grupos desconocidos no
+ * otorgan permisos. El guard federado comparte esta regla con su mapa configurable.
  */
-export function resolverRol(groups: string[]): Rol | undefined {
-  for (const grupo of groups) {
-    const rol = GRUPO_A_ROL[grupo];
-    if (rol) {
-      return rol;
-    }
-  }
-  return undefined;
+export function resolverRol(
+  groups: string[],
+  mapeo: ReadonlyMap<string, Rol> = new Map(Object.entries(GRUPO_A_ROL)),
+): Rol | undefined {
+  const presentes = new Set(groups.map((grupo) => mapeo.get(grupo)));
+  return [Rol.ADMINISTRADOR, Rol.OPERADOR, Rol.CHOFER].find((rol) => presentes.has(rol));
 }
