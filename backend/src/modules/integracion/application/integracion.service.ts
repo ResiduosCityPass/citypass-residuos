@@ -79,7 +79,8 @@ function estadoDe(data: Record<string, unknown>): string {
  *   EmergenciaActualizada      -> al terminar la emergencia se desbloquean
  *   EmergenciaEstadoActualizado-> igual: es como la publica Emergencias de verdad
  *   EmergenciaCerrada          -> igual, y si trae causa RESIDUOS, intervencion
- *   ActividadCreada            -> zona del evento y escuadrilla (squad 3, ActividadesMasivasService)
+ *   ActividadCreada            -> zona del evento y escuadrilla (squads 3 y 6, ActividadesMasivasService)
+ *   ActividadCancelada         -> se borran la escuadrilla y la zona (squad 6)
  *   Reclamos (CU-INT-02)       -> ver ReclamosService
  *
  * Todo corre en una transaccion: si algo falla tampoco queda registrado el
@@ -197,6 +198,12 @@ export class IntegracionService {
         }
         case `${ESPACIOS}ActividadCreada`:
           await this.actividades.registrar(data);
+          return 'procesado';
+        // Cancelacion de una reserva (squad 6). Nombre sin confirmar con Espacios:
+        // ReservaCancelada es como figura en CASO-RESERVA-ESPACIOS de EDA.
+        case `${ESPACIOS}ActividadCancelada`:
+        case `${ESPACIOS}ReservaCancelada`:
+          await this.actividades.cancelar(data);
           return 'procesado';
         default:
           if (await this.reclamos?.procesar(eventType, data)) {

@@ -31,17 +31,22 @@ interface ActividadLeida {
 
 /**
  * Squad 3 · Recoleccion despues de un evento masivo.
+ * Squad 6 · Reserva de espacio publico + limpieza a la salida.
  *
- * Espacios publica `ActividadCreada` y, si la actividad es masiva, Residuos:
- *   - la guarda con sus contenedores cercanos, para mostrar la zona en el mapa;
- *   - agenda la escuadrilla: desde la hora de fin y durante
- *     `INTEGRACION_HORAS_ZONA_EVENTO`, esos contenedores entran a la ruta que
- *     genera CU-08 aunque no esten criticos. Reusa el refuerzo de CU-INT-01;
- *   - publica `RefuerzoProgramado`, del que Analitica saca la metrica del caso.
+ * Espacios publica `ActividadCreada` y Residuos, segun la capacidad:
+ *   - desde `INTEGRACION_CUPO_MINIMO_REFUERZO` (100) agenda la escuadrilla: desde
+ *     la hora de fin y durante `INTEGRACION_HORAS_ZONA_EVENTO`, los contenedores
+ *     cercanos entran a la ruta que genera CU-08 aunque no esten criticos. Reusa
+ *     el refuerzo de CU-INT-01 y publica `RefuerzoProgramado` para Analitica.
+ *     Cubre la reserva de una plaza para un evento comunitario chico;
+ *   - desde `INTEGRACION_CAPACIDAD_MASIVA` (1000) ademas la guarda con sus
+ *     contenedores, para mostrar la zona en el mapa.
+ *
+ * Si la reserva se cancela (`ActividadCreada` con estado `CANCELADA`, o un
+ * evento de cancelacion aparte), se borran el refuerzo y la zona del mapa.
  *
  * Lee los campos del contrato del squad (E1 en plan-squad-3.md), que es como
- * Espacios lo publica en el bus. Tiene su propio corte de capacidad, aparte del
- * cupo del refuerzo de CU-INT-01.
+ * Espacios lo publica en el bus.
  *
  * Un evento mal formado se ignora y queda en el log, sin responder 400: un 400
  * hace que el bus lo reintente para siempre.
@@ -51,6 +56,7 @@ export class ActividadesMasivasService {
   private readonly logger = new Logger(ActividadesMasivasService.name);
 
   private readonly radioMetros: number;
+  private readonly cupoMinimoRefuerzo: number;
   private readonly capacidadMasiva: number;
   private readonly horasZonaEvento: number;
 
@@ -64,6 +70,7 @@ export class ActividadesMasivasService {
     config: ConfigService,
   ) {
     this.radioMetros = Number(config.get('INTEGRACION_RADIO_METROS', 300));
+    this.cupoMinimoRefuerzo = Number(config.get('INTEGRACION_CUPO_MINIMO_REFUERZO', 100));
     this.capacidadMasiva = Number(config.get('INTEGRACION_CAPACIDAD_MASIVA', 1000));
     this.horasZonaEvento = Number(config.get('INTEGRACION_HORAS_ZONA_EVENTO', 6));
   }
@@ -75,7 +82,11 @@ export class ActividadesMasivasService {
       this.logger.warn(`ActividadCreada ignorada, mal formada: ${JSON.stringify(data)}`);
       return;
     }
-    if (actividad.cancelada || actividad.capacidad < this.capacidadMasiva) {
+    if (actividad.cancelada) {
+      await this.borrar(actividad.actividadId);
+      return;
+    }
+    if (actividad.capacidad < this.cupoMinimoRefuerzo) {
       return;
     }
 
@@ -84,21 +95,22 @@ export class ActividadesMasivasService {
       ({ item }) => item.id,
     );
 
-    await this.integracion.guardarActividad({
-      actividadId: actividad.actividadId,
-      titulo: actividad.titulo,
-      capacidad: actividad.capacidad,
-      lat: actividad.punto.lat,
-      lng: actividad.punto.lng,
-      inicio: actividad.inicio,
-      fin: actividad.fin,
-      contenedorIds,
-    });
+    // La zona en el mapa queda solo para los eventos masivos.
+    if (actividad.capacidad >= this.capacidadMasiva) {
+      await this.integracion.guardarActividad({
+        actividadId: actividad.actividadId,
+        titulo: actividad.titulo,
+        capacidad: actividad.capacidad,
+        lat: actividad.punto.lat,
+        lng: actividad.punto.lng,
+        inicio: actividad.inicio,
+        fin: actividad.fin,
+        contenedorIds,
+      });
+    }
 
     if (contenedorIds.length > 0) {
-      // Prefijo propio: el id de Espacios podria coincidir con el de un
-      // EventoComunitarioPublicado y pisaria el refuerzo de CU-INT-01.
-      const eventoId = `act-${actividad.actividadId}`;
+      const eventoId = idRefuerzo(actividad.actividadId);
 
       await this.integracion.guardarRefuerzo({
         eventoId,
@@ -118,6 +130,29 @@ export class ActividadesMasivasService {
         }),
       );
     }
+  }
+
+  /**
+   * Cancelacion de la reserva por un evento aparte. El nombre todavia no esta
+   * confirmado con Espacios (ver IntegracionService): se acepta el id como
+   * `actividadId` o, como en CASO-RESERVA-ESPACIOS de EDA, como `reservaId`.
+   * Borrar algo que no existe no hace nada, asi que un repetido no molesta.
+   */
+  async cancelar(data: Record<string, unknown>): Promise<void> {
+    const id = [data.actividadId, data.reservaId].find(esIdValido);
+
+    if (!id) {
+      this.logger.warn(`Cancelacion de actividad ignorada, sin id: ${JSON.stringify(data)}`);
+      return;
+    }
+
+    await this.borrar(id);
+  }
+
+  /** Saca los contenedores del ruteo y la zona del mapa. */
+  private async borrar(actividadId: string): Promise<void> {
+    await this.integracion.borrarRefuerzo(idRefuerzo(actividadId));
+    await this.integracion.borrarActividad(actividadId);
   }
 
   /**
@@ -143,6 +178,18 @@ export class ActividadesMasivasService {
   }
 }
 
+/**
+ * Prefijo propio: el id de Espacios podria coincidir con el de un
+ * EventoComunitarioPublicado y pisaria el refuerzo de CU-INT-01.
+ */
+function idRefuerzo(actividadId: string): string {
+  return `act-${actividadId}`;
+}
+
+function esIdValido(valor: unknown): valor is string {
+  return typeof valor === 'string' && valor.length > 0 && valor.length <= LARGO_MAXIMO_ID;
+}
+
 /** null si falta el id, la ubicacion o una fecha valida, o si la capacidad no es un entero. */
 function leerActividad(data: Record<string, unknown>): ActividadLeida | null {
   const { actividadId, titulo, estado } = data;
@@ -152,9 +199,7 @@ function leerActividad(data: Record<string, unknown>): ActividadLeida | null {
   const fin = leerFecha(data.fechaHoraFinalizacion);
 
   if (
-    typeof actividadId !== 'string' ||
-    actividadId.length === 0 ||
-    actividadId.length > LARGO_MAXIMO_ID ||
+    !esIdValido(actividadId) ||
     !Number.isInteger(capacidad) ||
     capacidad > CAPACIDAD_MAXIMA ||
     !punto ||

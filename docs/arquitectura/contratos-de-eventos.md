@@ -408,8 +408,8 @@ gateway `{ metadata: { eventId, eventType }, data }`. Se descartan repetidos por
 |---|---|---|
 | `actividadId` | UUID | Id de la actividad |
 | `titulo` | string | Se muestra en el mapa |
-| `capacidad` | entero | Corte de evento masivo |
-| `estado` | string | Siempre `PROGRAMADA`. Si algún día llega `CANCELADA`, se ignora |
+| `capacidad` | entero | Cortes de refuerzo (100) y de evento masivo (1.000) |
+| `estado` | string | Hoy siempre `PROGRAMADA`. Si llega `CANCELADA`, se borran el refuerzo y la zona |
 | `fechaHoraInicio`, `fechaHoraFinalizacion` | milisegundos (epoch, UTC) | La zona se muestra hasta 6 h después del fin; la escuadrilla arranca en el fin |
 | `ubicacion` | `{ lat, lng }`, WGS84 | Centro de la zona |
 
@@ -419,14 +419,17 @@ el log.
 
 **Qué hacemos al recibirlo** (`ActividadesMasivasService`):
 
-1. Si la capacidad es menor a 1.000 personas (`INTEGRACION_CAPACIDAD_MASIVA`) o el estado es
-   `CANCELADA`, no hace nada.
-2. Busca los contenedores activos a 300 m o menos (`INTEGRACION_RADIO_METROS`) y guarda la
-   actividad en `actividad_masiva`.
-3. **Zona en el mapa:** `GET /actividades-masivas` devuelve las actividades que no terminaron o
+1. Si el estado es `CANCELADA`, borra el refuerzo y la zona (ver "Cancelación", abajo) y termina.
+2. Si la capacidad es menor a 100 personas (`INTEGRACION_CUPO_MINIMO_REFUERZO`), no hace nada.
+   Desde 100 cubre el caso del squad 6: un ciudadano reserva una plaza para un evento comunitario
+   y Residuos refuerza la limpieza a la salida.
+3. Busca los contenedores activos a 300 m o menos (`INTEGRACION_RADIO_METROS`). Solo si la
+   capacidad es de 1.000 personas o más (`INTEGRACION_CAPACIDAD_MASIVA`) guarda la actividad en
+   `actividad_masiva`.
+   **Zona en el mapa:** `GET /actividades-masivas` devuelve las actividades que no terminaron o
    que terminaron hace menos de 6 h (`INTEGRACION_HORAS_ZONA_EVENTO`). El mapa de CU-07 las dibuja
-   como un círculo, con un aviso con la hora de fin.
-4. **Escuadrilla:** si hay contenedores cerca, crea un refuerzo `act-<actividadId>` que va
+   como un círculo, con un aviso con la hora de fin. Un evento comunitario chico no aparece.
+4. **Escuadrilla:** desde 100 personas, si hay contenedores cerca, crea un refuerzo `act-<actividadId>` que va
    desde `fechaHoraFinalizacion` hasta 6 h después. En esa ventana, esos contenedores entran a la ruta que
    genera CU-08 aunque no estén críticos, salvo que ya se hayan vaciado desde que arrancó el
    refuerzo. El operador genera y asigna la ruta, y el chofer la cierra con CU-10.
@@ -436,7 +439,24 @@ aviso en el log y se responde `204`. No se responde `400`, porque el bus lo rein
 siempre.
 
 5. **Métrica:** al agendar la escuadrilla publica `residuos.refuerzo.programado`, para Analítica.
-   Es lo único que publicamos en respuesta.
+   Es lo único que publicamos en respuesta. Desde el squad 6 también sale para los eventos de 100 a
+   999 personas, con el mismo prefijo `act-`.
+
+**Cancelación (squad 6):** si se cancela la reserva, se borran el refuerzo `act-<actividadId>`
+(los contenedores dejan de entrar al ruteo) y la zona del mapa. Borrar algo que no existe no hace
+nada, así que un repetido no molesta. Se acepta de dos formas, porque Espacios todavía no confirmó
+cuál usa:
+
+- `ActividadCreada` con `estado: CANCELADA`.
+- Un evento aparte: `com.citypass.espacios.ActividadCancelada`, o
+  `com.citypass.espacios.ReservaCancelada` como figura en el `CASO-RESERVA-ESPACIOS.md` de EDA. El
+  id se lee de `actividadId` o, si no está, de `reservaId`. Sin id, se ignora y queda en el log.
+
+**Limitación conocida:** si la cancelación llega por un tópico aparte, el bus no garantiza que
+llegue después de la `ActividadCreada`. Si llegara antes, la actividad se agendaría igual. Para
+cubrirlo haría falta guardar las reservas canceladas (la "regla del cementerio" del documento de
+EDA). Con `ActividadCreada` + `estado: CANCELADA` no pasa, porque va por el mismo tópico y la misma
+`correlationId`.
 
 ## Política de errores y reintentos
 

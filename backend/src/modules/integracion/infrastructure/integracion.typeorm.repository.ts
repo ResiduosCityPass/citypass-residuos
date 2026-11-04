@@ -64,6 +64,10 @@ export class IntegracionTypeormRepository
     return repo.save(repo.create(actividad));
   }
 
+  async borrarActividad(actividadId: string): Promise<void> {
+    await this.manager().getRepository(ActividadMasiva).delete({ actividadId });
+  }
+
   actividadesQueTerminanDespuesDe(desde: Date): Promise<ActividadMasiva[]> {
     return this.manager()
       .getRepository(ActividadMasiva)

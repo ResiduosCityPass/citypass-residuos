@@ -54,7 +54,7 @@ describe('IntegracionService (CU-INT-01)', () => {
   let intervenciones: { programarSiCorresponde: jest.Mock };
   let bloqueos: BloqueoPorIncidente[];
   let zonasGuardadas: Map<string, Zona>;
-  let actividades: jest.Mocked<Pick<ActividadesMasivasService, 'registrar'>>;
+  let actividades: jest.Mocked<Pick<ActividadesMasivasService, 'registrar' | 'cancelar'>>;
 
   const bloqueada = (zonaId: string) => zonasGuardadas.get(zonaId)?.bloqueada;
 
@@ -75,9 +75,10 @@ describe('IntegracionService (CU-INT-01)', () => {
         ),
       bloqueosActivos: jest.fn().mockImplementation(async () => bloqueos.filter((b) => b.activo)),
       guardarActividad: jest.fn(),
+      borrarActividad: jest.fn(),
       actividadesQueTerminanDespuesDe: jest.fn(),
     };
-    actividades = { registrar: jest.fn() };
+    actividades = { registrar: jest.fn(), cancelar: jest.fn() };
     contenedores = { listar: jest.fn().mockResolvedValue([CERCA, LEJOS]) };
     // ZonasService real sobre un repositorio en memoria, con estado como la base:
     // lo que bloquea una emergencia lo ve la siguiente, y el bloqueo de un
@@ -164,6 +165,20 @@ describe('IntegracionService (CU-INT-01)', () => {
 
     expect(actividades.registrar).toHaveBeenCalledWith(data);
   });
+
+  it.each(['ActividadCancelada', 'ReservaCancelada'])(
+    'una %s la cancela ActividadesMasivasService (squad 6)',
+    async (tipo) => {
+      const data = { actividadId: 'act-1' };
+
+      await expect(service.procesar(sobre(`com.citypass.espacios.${tipo}`, data))).resolves.toBe(
+        'procesado',
+      );
+
+      expect(actividades.cancelar).toHaveBeenCalledWith(data);
+      expect(actividades.registrar).not.toHaveBeenCalled();
+    },
+  );
 
   describe('emergencias', () => {
     const incendio = sobre('com.citypass.emergencias.EmergenciaCreada', {
