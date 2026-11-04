@@ -5,6 +5,12 @@ la web de Espacios Públicos ni un token de administrador: es una herramienta de
 operación ejecutada con acceso a PostgreSQL, fuera de los endpoints de la aplicación.
 No modifica usuarios LDAP, roles ni grupos.
 
+Para Render Free sin acceso externo a PostgreSQL se puede preparar el mismo tipo
+de escenario con una cuenta administradora usando las APIs públicas. Ver
+[ensayo operativo por HTTP](prueba-operativa-http.md). Esa alternativa valida la
+patente Mercosur, registra sensores nuevos y publica los eventos normales de
+lecturas y rutas; el bootstrap de base descrito aquí no publica eventos.
+
 ## Preparar en local
 
 Desde `backend`, con dependencias instaladas y `.env.integration.local` configurado:

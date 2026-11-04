@@ -24,4 +24,29 @@ describe('resolverRol', () => {
   it('sin grupos no hay rol', () => {
     expect(resolverRol([])).toBeUndefined();
   });
+
+  it.each([
+    ['residuos-operadores', 'residuos-administradores', 'chofer'],
+    ['chofer', 'residuos-administradores', 'residuos-operadores'],
+    ['residuos-administradores', 'residuos-operadores', 'chofer'],
+  ])('prioriza administrador independientemente del orden: %s, %s, %s', (...grupos) => {
+    expect(resolverRol(grupos)).toBe(Rol.ADMINISTRADOR);
+  });
+
+  it.each([
+    ['chofer', 'operador'],
+    ['operador', 'chofer'],
+  ])('prioriza operador sobre chofer: %s, %s', (...grupos) => {
+    expect(resolverRol(grupos)).toBe(Rol.OPERADOR);
+  });
+
+  it('respeta exclusivamente los nombres del mapa configurado', () => {
+    const mapeo = new Map([
+      ['supervisores', Rol.ADMINISTRADOR],
+      ['guardias', Rol.OPERADOR],
+    ]);
+    expect(resolverRol(['guardias', 'supervisores'], mapeo)).toBe(Rol.ADMINISTRADOR);
+    expect(resolverRol(['administrador', 'residuos-administradores'], mapeo)).toBeUndefined();
+    expect(resolverRol(['__proto__', 'constructor'])).toBeUndefined();
+  });
 });
