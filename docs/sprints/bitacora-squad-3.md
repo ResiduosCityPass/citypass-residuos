@@ -528,3 +528,23 @@ Comparé el `.avsc` con lo que publica el traductor al gateway: tienen los mismo
 - Correr `npm run plaza` en Render, con un token de administrador.
 - La prueba con el bus real: el evento de Rodrigo, las credenciales y el release a `main`.
 - **Para confirmar con Rodrigo:** él habla de terminar a los 10 minutos y nuestro guion usa 2. Hay que ver si Espacios deja 2.
+
+## Mié 04/11 · Release a `main` y el PR de Tomás
+
+- **El #69 entró a `develop`**, aprobado por Rami. También entraron el #76 (nuevo diseño del Login, de Rami) y el **#77, el release a `main`**. `main` quedó igual que `develop`: Render ya puede desplegar todo el caso.
+- **Tomás abrió el #74** (squad 6, reserva de espacio con limpieza a la salida). Va sobre el mismo servicio de actividades masivas: desde 100 personas agenda la escuadrilla y publica `RefuerzoProgramado`, y si se cancela la reserva borra el refuerzo y la zona. CI en verde.
+- **Rami encontró dos errores en el #74** y se los pidió a Tomás, con tests:
+  1. Si la cancelación llega antes que `ActividadCreada`, la limpieza se vuelve a programar.
+  2. Si llegan los dos avisos de la misma actividad, al cancelar queda un refuerzo activo.
+
+**Novedades de Espacios:**
+- `ActividadCreada` suma `categoria`, opcional y al final. No cambia nada para nosotros.
+- **Evento nuevo:** `com.citypass.espacios.ActividadModificada`. Sale cuando se cancela una actividad, con `estadoAnterior`/`estadoNuevo`, el motivo, la causa (opcional) y el mismo `correlationId` (`act-<id>`).
+- Reemplaza a `ActividadCancelada` y `ReservaCancelada`, que eran nombres provisorios. El #74 tiene que escuchar `ActividadModificada` con `estadoNuevo = CANCELADA` y suscribirse a ese tipo en el gateway.
+
+**Duda abierta:** con el #74, `RefuerzoProgramado` también sale para eventos de 100 a 999 personas, con el mismo prefijo `act-` y sin la capacidad. Analítica no podría separar las actividades masivas. Hay que confirmarlo con Francisco Csik.
+
+**Falta:**
+- Correr `npm run plaza` en Render.
+- Confirmar si `RefuerzoProgramado` está registrado en la consola de EDA.
+- Revisar el #74 cuando Tomás suba las correcciones.
