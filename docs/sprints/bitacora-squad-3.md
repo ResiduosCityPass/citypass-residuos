@@ -493,3 +493,38 @@ Comparé el `.avsc` con lo que publica el traductor al gateway: tienen los mismo
 
 - Generé el valor de `GATEWAY_WEBHOOK_TOKEN` para Render. No está en el repo y se pasa solo por privado.
 - **Rami** lo carga en Render. **Fran** lo necesita para sus suscripciones. Tiene que ser el mismo valor para los dos.
+- **Cambio:** quedó el valor que carga Rami en Render, no el que generé. Fran ya lo tiene.
+
+## Sáb 31/10 · Fran abrió el #68 (consumir por Kafka)
+
+- **El #63 y el #67 entraron a `develop`**, con el CI en verde. Sigue sin haber release a `main`.
+- **Sección 4 del documento de Fran:** no me toca el front del chofer ni del operador para su caso. La pantalla ya muestra la parada omitida y el motivo. Fran lo saca del documento.
+
+**Qué hace el #68:** lee los tópicos de Reclamos, Emergencias y Espacios y le pasa cada evento al mismo `procesar` del webhook. Solo arranca con `KAFKA_BROKERS`, así que no cambia nada hasta que se cargue esa variable. El webhook queda.
+
+**Lo que revisé para mi caso:**
+- `ActividadCreada` entra, porque está dentro de los tópicos de Espacios.
+- El consumidor sigue la guía del bus: autenticación, grupo con el prefijo de nuestro namespace y confirmación recién cuando termina de procesar.
+- Mandé 8 veces a la vez el mismo evento por el webhook, en local. Quedó 1 actividad, 1 refuerzo y 1 `RefuerzoProgramado`. Probé la entrada por el webhook, no por Kafka, pero las dos usan el mismo `procesar`.
+
+**Sin probar:** la conexión con el broker real. Falta que Exequiel confirme el broker y que lleguen las credenciales.
+
+## Lun 02/11 · Rodrigo implementó `ActividadCreada` y probé su JSON
+
+- **El #68 entró a `develop`** el 01/11, con el CI en verde. Sigue sin haber release a `main`: el último es el #50, del 16/10. Tomás todavía no tiene PR.
+- **Rodrigo:** E1 está implementado, con el contrato aprobado. Su PR espera un review en su grupo. Cuando entre, registra el tipo en el gateway y avisa.
+- **Los dos eventos quedan:** Espacios publica `EventoComunitarioPublicado` para la ruta urbana de Nico y `ActividadCreada` para nuestro caso.
+- **La plaza de la demo:** Plaza Houssay (-34.5994, -58.3988), con capacidad para 6.000 personas.
+
+**Lo que probé en local, por el webhook:**
+- El JSON de Rodrigo entra tal cual. El mismo `eventId` repetido no agrega otra actividad.
+- **Problema que encontré:** el contenedor más cercano a la plaza estaba a 786 m. Sin contenedores a menos de 300 m no hay refuerzo ni `RefuerzoProgramado`.
+- **Solución:** `npm run plaza` en `simulator/` crea 3 contenedores en la plaza, uno de cada tipo. Con ellos sale el refuerzo.
+- Mandé los dos eventos de la misma actividad. Quedan 2 refuerzos, pero el contenedor entra una sola vez a la ruta: la ruta del camión de reciclables salió con CT-0018 al 0 %.
+
+**Ensayo en pantalla, en local y con el plan B:** salió entero en Plaza Houssay. Se vio la zona con 3 contenedores, CT-0018 entró a la ruta al 0 % y Juana Perez cerró la ruta, con GPS simulado. Si se genera la ruta antes de la hora de fin, da "no hay contenedores": lo sumé al guion.
+
+**Falta:**
+- Correr `npm run plaza` en Render, con un token de administrador.
+- La prueba con el bus real: el evento de Rodrigo, las credenciales y el release a `main`.
+- **Para confirmar con Rodrigo:** él habla de terminar a los 10 minutos y nuestro guion usa 2. Hay que ver si Espacios deja 2.
