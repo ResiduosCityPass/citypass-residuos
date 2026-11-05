@@ -280,6 +280,10 @@ cuando llega una `EmergenciaCreada` con `afectaCirculacion: true` y un contenedo
 tiene una parada pendiente en una ruta `ASIGNADA` o `EN_CURSO`. Esa parada queda `OMITIDA` y la ruta
 se recalcula. En una ruta `PROPUESTA` la parada se borra sin publicar nada: el camión no salió.
 
+**Mientras Emergencias mande `afectaCirculacion` en `null`** (acordado con Kevin el 05/11), una
+emergencia con `causaTipo = INCIDENTE_VIAL` cuenta como corte de circulación. Un `false` explícito
+se respeta siempre, y con otra causa en `null` no se bloquea nada.
+
 ```json
 {
   "intervencionId": "9c4e2a1b-6d8f-4b3a-a7e5-1f0d3c8b6e21",
