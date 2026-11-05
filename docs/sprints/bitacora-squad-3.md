@@ -554,3 +554,19 @@ Comparé el `.avsc` con lo que publica el traductor al gateway: tienen los mismo
 - **El caso de Tomás (6):** lo mismo, con `causaTipo = RESERVA`.
 - **Choque:** hoy `IntervencionProgramada` sale solo en el caso de Emergencias, sin `causaTipo` ni `camionId` y con `emergenciaId` obligatorio. Además, en nuestro caso el camión recién se conoce cuando el operador genera la ruta, después de que termina el evento.
 - **Siguiente paso:** pedirle a Francisco los campos exactos que espera y acordar en qué momento sale el evento. Después se adapta el esquema, que comparten varios casos del grupo 4.
+
+## Jue 05/11 · `IntervencionProgramada` para la métrica de Analítica
+
+- **Francisco Csik:** le sirve que el evento salga cuando el operador genera o asigna la ruta, porque el dashboard no es en tiempo real. Los campos los pasa mañana. Dice que en su md no existe `RefuerzoProgramado`.
+- **Reclamos (caso 3):** marcan sus reclamos con `causaTipo = EVENTO_PUBLICO` y `causaId` = el `actividadId` de `ActividadCreada`. Es la misma causa que usamos nosotros.
+
+**Abrí el #80**, que publica `IntervencionProgramada` con `causaTipo = EVENTO_PUBLICO`:
+- Sale al **asignar** una ruta que pasa por contenedores de una actividad masiva, una por actividad. Al asignar, el camión ya quedó comprometido; una propuesta se puede descartar.
+- Trae `causaId` (el `actividadId`), `camionId` (la patente) y `correlationId` `act-<id>`.
+- El esquema suma `causaId`, `causaTipo` y `camionId`, opcionales, y `emergenciaId` pasa a ser opcional. El caso de Emergencias no cambia.
+- **Probado en local:** una actividad en Plaza Houssay y la ruta del XY987ZW con CT-0018. Al asignarla salió la intervención con `EVENTO_PUBLICO` y la patente. Lint, build y 814 unitarios en verde.
+
+**Falta:**
+- Confirmar los campos cuando Francisco los pase.
+- Registrar `IntervencionProgramada` en la consola de EDA.
+- Avisarle a Tomás: su caso tiene que salir con `causaTipo = RESERVA`. Hoy sus refuerzos usan el mismo prefijo `act-` y saldrían como `EVENTO_PUBLICO`.
