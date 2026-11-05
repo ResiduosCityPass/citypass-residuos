@@ -313,6 +313,10 @@ se recalcula. En una ruta `PROPUESTA` la parada se borra sin publicar nada: el c
 emergencia con `causaTipo = INCIDENTE_VIAL` cuenta como corte de circulación. Un `false` explícito
 se respeta siempre, y con otra causa en `null` no se bloquea nada.
 
+**Una emergencia con `causaTipo = RECLAMO` nunca bloquea**, aunque traiga `afectaCirculacion: true`
+(acordado con Fran el 05/11). Es el mismo auto que ya resuelve CU-INT-02 sacando los contenedores a
+15 m; bloquear la zona y las paradas a 300 m sería reaccionar dos veces.
+
 ```json
 {
   "intervencionId": "9c4e2a1b-6d8f-4b3a-a7e5-1f0d3c8b6e21",

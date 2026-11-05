@@ -265,6 +265,15 @@ describe('IntegracionService (CU-INT-01)', () => {
           expect(paradas.quitarContenedores).not.toHaveBeenCalled();
         });
 
+        it('una emergencia abierta desde un reclamo no bloquea aunque venga en true', async () => {
+          await conRutas().procesar(
+            incidente({ afectaCirculacion: true, causaId: 're-1', causaTipo: 'RECLAMO' }),
+          );
+
+          expect(paradas.quitarContenedores).not.toHaveBeenCalled();
+          expect(bloqueada('z-palermo')).toBe(false);
+        });
+
         it('un false explicito gana aunque sea un incidente vial', async () => {
           await conRutas().procesar(
             incidente({ afectaCirculacion: false, causaId: 'in-1', causaTipo: 'INCIDENTE_VIAL' }),
