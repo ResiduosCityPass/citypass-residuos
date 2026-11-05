@@ -576,9 +576,11 @@ Comparé el `.avsc` con lo que publica el traductor al gateway: tienen los mismo
 - **`ActividadCreada` de Espacios:** confirmaron las fechas en milisegundos y la `ubicacion` con `lat` y `lng`, que es lo que lee `leerActividad`. El `estado` viene en inglés (`ACTIVE`), pero para crear no nos cambia nada: solo miramos si dice `CANCELADA`.
 - **Cancelaciones:** Espacios las publica en `com.citypass.espacios.EventoCancelado`, con `eventoId` igual al `actividadId`. Lo resuelve el #74 de Tomás; Fran ya se lo pidió.
 - **El corte de 1000 personas queda.** Espacios deja crear eventos de 1000 o más solo en cuatro sedes: Parque Centenario, Recoleta, Usina del Arte y Abasto. Plaza Houssay ya no sirve para la demo.
-- **Tachos cerca de las sedes:** en la base local ninguna tiene un contenedor a menos de 300 m. La más cercana es Recoleta, a 924 m. Hay que adaptar `npm run plaza` a la sede que elijamos, con las coordenadas que use Espacios.
+- **Tachos cerca de las sedes:** en la base local ninguna tiene un contenedor a menos de 300 m. La más cercana es Recoleta, a 924 m.
+- **Abrí el #83:** `npm run plaza` ahora acepta `--nombre`, `--lat` y `--lng`, y crea los 3 contenedores en la sede que elijamos. Sin argumentos sigue usando Plaza Houssay.
 
 **Falta:**
-- Elegir la sede y pedirle a Espacios sus coordenadas.
+- Elegir la sede (propuesta: Recoleta) y pedirle a Espacios sus coordenadas. Con eso, correr `npm run plaza` en Render.
+- Review del #83.
 - Que se registre la versión nueva de `IntervencionProgramada` en EDA. Hasta entonces, no hay release a `main`.
 - Un review nuevo del #78: las aprobaciones se descartaron con el último commit.
