@@ -570,3 +570,15 @@ Comparé el `.avsc` con lo que publica el traductor al gateway: tienen los mismo
 - Confirmar los campos cuando Francisco los pase.
 - Registrar `IntervencionProgramada` en la consola de EDA.
 - Avisarle a Tomás: su caso tiene que salir con `causaTipo = RESERVA`. Hoy sus refuerzos usan el mismo prefijo `act-` y saldrían como `EVENTO_PUBLICO`.
+
+**Tarde del 05/11:**
+- **Adriel aprobó el #80 y entró a `develop`**, con el CI en verde. Avisó un riesgo: en la consola de EDA, `IntervencionProgramada` está registrado con el id 45, con `emergenciaId` obligatorio y sin `causaId`, `causaTipo` ni `camionId`. Con el #80 esos campos salen siempre, en null en el caso de Emergencias. Hay que registrar la versión nueva con el `.avsc` del repo **antes del release a `main`**. Si no, esas intervenciones pueden quedar `FALLIDO` en el outbox.
+- **`ActividadCreada` de Espacios:** confirmaron las fechas en milisegundos y la `ubicacion` con `lat` y `lng`, que es lo que lee `leerActividad`. El `estado` viene en inglés (`ACTIVE`), pero para crear no nos cambia nada: solo miramos si dice `CANCELADA`.
+- **Cancelaciones:** Espacios las publica en `com.citypass.espacios.EventoCancelado`, con `eventoId` igual al `actividadId`. Lo resuelve el #74 de Tomás; Fran ya se lo pidió.
+- **El corte de 1000 personas queda.** Espacios deja crear eventos de 1000 o más solo en cuatro sedes: Parque Centenario, Recoleta, Usina del Arte y Abasto. Plaza Houssay ya no sirve para la demo.
+- **Tachos cerca de las sedes:** en la base local ninguna tiene un contenedor a menos de 300 m. La más cercana es Recoleta, a 924 m. Hay que adaptar `npm run plaza` a la sede que elijamos, con las coordenadas que use Espacios.
+
+**Falta:**
+- Elegir la sede y pedirle a Espacios sus coordenadas.
+- Que se registre la versión nueva de `IntervencionProgramada` en EDA. Hasta entonces, no hay release a `main`.
+- Un review nuevo del #78: las aprobaciones se descartaron con el último commit.
