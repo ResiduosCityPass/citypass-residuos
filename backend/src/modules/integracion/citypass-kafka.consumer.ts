@@ -16,6 +16,7 @@ import { ConfigService } from '@nestjs/config';
 import { SchemaRegistry } from '@kafkajs/confluent-schema-registry';
 import { Consumer, Kafka, logLevel } from 'kafkajs';
 import { GatewayTransporte } from '../../shared/events/gateway/gateway.transporte';
+import { sinBarrasFinales } from '../../shared/events/gateway/url-gateway';
 import { IntegracionService, SobreGateway } from './application/integracion.service';
 
 /**
@@ -53,9 +54,7 @@ export class CitypassKafkaConsumer implements OnApplicationBootstrap, OnApplicat
     private readonly config: ConfigService,
     private readonly estadoBus: EstadoRecepcionBus,
   ) {
-    const urlGateway = config
-      .get<string>('GATEWAY_URL', 'http://localhost:8080')
-      .replace(/\/$/, '');
+    const urlGateway = sinBarrasFinales(config.get<string>('GATEWAY_URL', 'http://localhost:8080'));
     // El gateway responde /schemas/ids/{id} igual que un Schema Registry.
     this.registry = new SchemaRegistry({ host: `${urlGateway}/api/v1` });
   }

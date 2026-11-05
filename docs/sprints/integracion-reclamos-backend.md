@@ -2,7 +2,7 @@
 
 > **Responsable:** Francisco (backend) · **Branch:** `feat/CU-INT-02-reclamo-obstruccion`
 > **Caso de uso integrador:** *"Reclamo ciudadano que desencadena una intervención urbana"*
-> **Estado:** pasos 1 a 7 hechos. Falta que el Squad 1 registre `ReclamoEvaluado` en su catálogo y cerrar el contrato con Reclamos (sección 5).
+> **Estado:** en producción y consumiendo por Kafka. `ReclamoEvaluado` ya está en el catálogo. Falta que Reclamos registre `ReclamoCreado` para probarlo de punta a punta (sección 5).
 
 Este documento separa **qué hago yo** de qué hace cada uno, para que no nos pisemos. Si algo de
 acá te toca y no estás de acuerdo, avisame antes de arrancar.
@@ -243,11 +243,11 @@ frente al contenedor.
 | Tema | Responsable | Qué necesito |
 |---|---|---|
 | **Autenticación** | — | Ya no hace falta nada nuevo: el webhook de Nico autentica con `GATEWAY_WEBHOOK_TOKEN`. **Adri**, si podés, revisá que sumar un tipo de evento más no cambie nada de tu lado |
-| **Front del chofer y del operador**: mostrar que la ruta cambió, el motivo de la parada omitida y qué contenedores están bloqueados | **Maxi** | Nada de mi lado más allá del evento del 3.5. Si necesita `bloqueado: true` en la respuesta de contenedores, me avisa y lo agrego |
+| **Front del chofer y del operador** | — | No hace falta nada nuevo: `DriverStopsPage` y `RouteDetailPage` ya muestran la parada `OMITIDA` con su motivo |
 | **Variables nuevas en Render** | **Ramiro** | Cargar `OBSTRUCCION_RADIO_METROS` y `OBSTRUCCION_VIGENCIA_HORAS` cuando esté el paso 3.3. La migración corre en el deploy como las demás |
-| **Suscripción en el bus** a los eventos de Reclamos | **Nico** (armó la integración con el Squad 1) | Agregar los tipos de Reclamos a la suscripción del webhook |
+| **Recepción de los eventos de Reclamos** | — | No hace falta suscribirse: el consumidor de Kafka escucha todo `com.citypass.reclamos.*`. Un tópico nuevo entra recién después de reiniciar la API |
 | **Contrato con el squad de Reclamos** y con el que resuelva el reclamo | **Nico / Tomi** (o quien vaya a la reunión) | Que confirmen los puntos de la sección 5 |
-| **Resolver el reclamo** (sacar el auto) | Otro squad, a definir | Que avise por el bus con el `reclamoId` |
+| **Resolver el reclamo** (sacar el auto) | Espacios y Reclamos | Espacios publica `IntervencionFinalizada` con el `reclamoId`, y Reclamos cierra el reclamo. Cualquiera de los dos avisos libera el contenedor |
 
 ### Archivos que voy a tocar
 
@@ -282,10 +282,9 @@ frente al contenedor.
 | Reclasificación | `ReclamoReclasificado` implementado de su lado (24/10), falta registrarlo en el catálogo. Mandan `objetoAfectadoAnterior`/`Nuevo` y `afectaCirculacionAnterior`/`Nueva` | ✅ Ya se acepta: si pasa a ser un auto, se evalúa; si deja de serlo, se libera |
 
 Sigue pendiente:
-1. **Grupo 1:** registrar `ReclamoEvaluado` en el catálogo y suscribir nuestro webhook a
-   `ReclamoCreado`, `ReclamoActualizado` y, cuando exista, `ReclamoReclasificado`.
-2. **Avisarles a Reclamos** que Espacios publica `ActividadCreada`, no `EventoComunitarioPublicado`
-   (que es lo que ellos dicen consumir). Es un tema de Maxi y Tomás, pero conviene que se enteren.
+1. **Reclamos:** registrar `ReclamoCreado` en el catálogo (al 05/11 faltaba). Hay que reiniciar la
+   API antes del primer reclamo: si no, ese evento se pierde.
+2. **Espacios:** registrar `IntervencionFinalizada`.
 ---
 
 ## 6. Orden de trabajo
