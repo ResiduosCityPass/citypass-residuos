@@ -548,3 +548,9 @@ Comparé el `.avsc` con lo que publica el traductor al gateway: tienen los mismo
 - Correr `npm run plaza` en Render.
 - Confirmar si `RefuerzoProgramado` está registrado en la consola de EDA.
 - Revisar el #74 cuando Tomás suba las correcciones.
+
+**Respuesta de Francisco Csik (Analítica), noche del 04/11:** sus métricas de Residuos no leen `RefuerzoProgramado`, sino `IntervencionProgramada` e `IntervencionActualizada`, con un campo `causaTipo`.
+- **Nuestro caso (3):** "cuadrillas planificadas para las inmediaciones del evento" = `IntervencionProgramada` con `causaTipo = EVENTO_PUBLICO`, contando `camionId` distintos.
+- **El caso de Tomás (6):** lo mismo, con `causaTipo = RESERVA`.
+- **Choque:** hoy `IntervencionProgramada` sale solo en el caso de Emergencias, sin `causaTipo` ni `camionId` y con `emergenciaId` obligatorio. Además, en nuestro caso el camión recién se conoce cuando el operador genera la ruta, después de que termina el evento.
+- **Siguiente paso:** pedirle a Francisco los campos exactos que espera y acordar en qué momento sale el evento. Después se adapta el esquema, que comparten varios casos del grupo 4.
