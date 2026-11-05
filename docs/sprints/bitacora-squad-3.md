@@ -592,3 +592,9 @@ Comparé el `.avsc` con lo que publica el traductor al gateway: tienen los mismo
 **Falta:**
 - Con las coordenadas de Recoleta, correr `npm run plaza` en Render.
 - Que Rami registre la versión nueva de `IntervencionProgramada` en EDA. Después, el release a `main`.
+
+**Coordenadas de la sede de Recoleta**, que Espacios pasó por Fran: -34.5862976, -58.3925127.
+- **En local:** `npm run plaza` creó CT-0020, CT-0021 y CT-0022 en la zona "Sede Recoleta". Una actividad de 1.500 personas en esas coordenadas quedó con los 3 contenedores.
+- **El guion de la demo** ya usa la sede de Recoleta, en vez de Plaza Houssay.
+
+**Falta:** correr `npm run plaza` en Render, con un token de administrador.
