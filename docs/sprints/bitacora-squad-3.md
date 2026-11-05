@@ -584,3 +584,11 @@ Comparé el `.avsc` con lo que publica el traductor al gateway: tienen los mismo
 - Review del #83.
 - Que se registre la versión nueva de `IntervencionProgramada` en EDA. Hasta entonces, no hay release a `main`.
 - Un review nuevo del #78: las aprobaciones se descartaron con el último commit.
+
+**Noche del 05/11:**
+- **Adriel y Fran aprobaron el #78 y el #83, y entraron a `develop`.** Adriel marcó un detalle que no bloquea: `npm run plaza` no valida que la latitud esté entre -90 y 90, pero la API la rechaza igual.
+- **La sede de la demo es Recoleta.** Fran le pide a Santiago (Espacios) las coordenadas.
+
+**Falta:**
+- Con las coordenadas de Recoleta, correr `npm run plaza` en Render.
+- Que Rami registre la versión nueva de `IntervencionProgramada` en EDA. Después, el release a `main`.
