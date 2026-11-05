@@ -26,6 +26,19 @@ beforeEach(() => {
 afterEach(() => { clearSession(); vi.restoreAllMocks(); vi.unstubAllEnvs(); });
 
 describe('Acceso del operador con Login', () => {
+  it('permite mostrar y ocultar la contraseña sin enviarla ni perder lo escrito', async () => {
+    const user = userEvent.setup(); mount('/login');
+    const password = screen.getByLabelText(/^Contraseña/);
+    await user.type(password, 'clave-de-prueba');
+    expect(password).toHaveAttribute('type', 'password');
+    await user.click(screen.getByRole('button', { name: 'Mostrar contraseña' }));
+    expect(password).toHaveAttribute('type', 'text');
+    expect(password).toHaveValue('clave-de-prueba');
+    await user.click(screen.getByRole('button', { name: 'Ocultar contraseña' }));
+    expect(password).toHaveAttribute('type', 'password');
+    expect(password).toHaveValue('clave-de-prueba');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
   it('pide login, vuelve a la pantalla solicitada y cierra la sesión desde la barra', async () => {
     const user = userEvent.setup(); mount();
     await user.type(await screen.findByLabelText(/^Usuario/), 'test-user');
