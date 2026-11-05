@@ -541,4 +541,72 @@ describe('RutasService (CU-08, CU-09)', () => {
       );
     });
   });
+
+  describe('squad 3 · IntervencionProgramada al asignar', () => {
+    const conRefuerzos = (vigentes: unknown[]) =>
+      new RutasService(
+        rutas,
+        paradas,
+        contenedores,
+        eventos,
+        flota as unknown as FlotaService,
+        choferes as unknown as ChoferesService,
+        zonas as unknown as ZonasService,
+        { ejecutar: <T>(b: () => Promise<T>) => b() } as unknown as ContextoTransaccional,
+        new ConfigService({}),
+        contingencias as unknown as ContingenciasService,
+        { vigentes: jest.fn().mockResolvedValue(vigentes) },
+      );
+
+    const conParadas = (...ids: string[]) =>
+      rutaCreada({
+        paradas: ids.map((id, i) => ({
+          contenedorId: id,
+          orden: i + 1,
+          contenedor: contenedor(id, 0.001 * i),
+        })) as Ruta['paradas'],
+      });
+
+    it('publica una por actividad masiva cuyos contenedores entran en la ruta', async () => {
+      rutas.buscarPorId.mockResolvedValue(conParadas('c-1', 'c-2'));
+
+      await conRefuerzos([{ eventoId: 'act-7781', contenedorIds: ['c-2', 'c-9'] }]).asignar(
+        'rt-1',
+        { choferId: 'ch-1' },
+      );
+
+      const publicadas = eventos.getPublished(EventTypes.INTERVENCION_PROGRAMADA);
+      expect(publicadas).toHaveLength(1);
+      expect(publicadas[0].correlationId).toBe('act-7781');
+      expect(publicadas[0].payload).toMatchObject({
+        intervencionId: 'rt-1:7781',
+        emergenciaId: null,
+        contenedorId: 'c-2',
+        causaId: '7781',
+        causaTipo: 'EVENTO_PUBLICO',
+        camionId: CAMION.patente,
+      });
+    });
+
+    it('no publica nada por refuerzos que no son de una actividad masiva', async () => {
+      rutas.buscarPorId.mockResolvedValue(conParadas('c-1'));
+
+      await conRefuerzos([{ eventoId: 'ev-comunitario-1', contenedorIds: ['c-1'] }]).asignar(
+        'rt-1',
+        { choferId: 'ch-1' },
+      );
+
+      expect(eventos.getPublished(EventTypes.INTERVENCION_PROGRAMADA)).toHaveLength(0);
+    });
+
+    it('no publica nada si la ruta no pasa por los contenedores de la actividad', async () => {
+      rutas.buscarPorId.mockResolvedValue(conParadas('c-1'));
+
+      await conRefuerzos([{ eventoId: 'act-7781', contenedorIds: ['c-5'] }]).asignar('rt-1', {
+        choferId: 'ch-1',
+      });
+
+      expect(eventos.getPublished(EventTypes.INTERVENCION_PROGRAMADA)).toHaveLength(0);
+    });
+  });
 });

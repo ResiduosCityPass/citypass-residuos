@@ -36,6 +36,9 @@ import { AsignarRutaDto } from './dto/asignar-ruta.dto';
 import { GenerarRutaDto } from './dto/generar-ruta.dto';
 import { ContingenciasService } from '../../contingencias/application/contingencias.service';
 
+/** Prefijo de los refuerzos que vienen de una ActividadCreada de Espacios (squad 3). */
+const PREFIJO_ACTIVIDAD = 'act-';
+
 /** Deposito por defecto: el Obelisco. Configurable por entorno. */
 export const DEPOSITO_DEFAULT: Punto = { lat: -34.6037, lng: -58.3816 };
 
@@ -214,8 +217,61 @@ export class RutasService {
         }),
       );
 
+      await this.publicarIntervencionesPorActividad(ruta, camion.patente);
+
       return this.obtener(id);
     });
+  }
+
+  /**
+   * Squad 3: una IntervencionProgramada por cada actividad masiva cuyos
+   * contenedores entran en esta ruta. Analitica cuenta los camiones distintos
+   * con causaTipo EVENTO_PUBLICO. Sale al asignar porque recien ahi hay un
+   * camion comprometido: una propuesta se puede descartar.
+   */
+  private async publicarIntervencionesPorActividad(ruta: Ruta, camionId: string): Promise<void> {
+    if (!this.refuerzos || !ruta.paradas?.length || !ruta.asignadaEn) {
+      return;
+    }
+
+    const paradas = new Map(ruta.paradas.map((p) => [p.contenedorId, p]));
+    const vigentes = await this.refuerzos.vigentes(new Date());
+
+    for (const refuerzo of vigentes) {
+      if (!refuerzo.eventoId?.startsWith(PREFIJO_ACTIVIDAD)) {
+        continue;
+      }
+
+      const parada = refuerzo.contenedorIds.map((id) => paradas.get(id)).find(Boolean);
+      if (!parada) {
+        continue;
+      }
+
+      const contenedor =
+        parada.contenedor ?? (await this.contenedores.buscarPorId(parada.contenedorId));
+      if (!contenedor) {
+        continue;
+      }
+
+      const actividadId = refuerzo.eventoId.slice(PREFIJO_ACTIVIDAD.length);
+      await this.eventos.publish(
+        buildEvent(
+          EventTypes.INTERVENCION_PROGRAMADA,
+          {
+            // Determinista: la misma ruta y actividad dan siempre el mismo id.
+            intervencionId: `${ruta.id}:${actividadId}`,
+            emergenciaId: null,
+            contenedorId: contenedor.id,
+            ubicacion: { lat: contenedor.lat, lng: contenedor.lng },
+            programadaEn: ruta.asignadaEn.toISOString(),
+            causaId: actividadId,
+            causaTipo: 'EVENTO_PUBLICO',
+            camionId,
+          },
+          { correlationId: refuerzo.eventoId },
+        ),
+      );
+    }
   }
 
   /**

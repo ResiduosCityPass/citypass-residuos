@@ -2,7 +2,7 @@
   "type": "record",
   "name": "IntervencionProgramada",
   "namespace": "com.citypass.residuos",
-  "doc": "Residuos programo una intervencion en el lugar de una emergencia cuya causa fue residuos (CU-01 de Emergencias, A7).",
+  "doc": "Residuos programo una intervencion: en el lugar de una emergencia cuya causa fue residuos (CU-01 de Emergencias, A7) o en la zona de una actividad masiva de Espacios (squad 3, causaTipo EVENTO_PUBLICO).",
   "fields": [
     {
       "name": "intervencionId",
@@ -10,7 +10,12 @@
     },
     {
       "name": "emergenciaId",
-      "type": "string"
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "Solo en el caso de Emergencias. Null en las actividades masivas."
     },
     {
       "name": "contenedorId",
@@ -44,7 +49,7 @@
         "string"
       ],
       "default": null,
-      "doc": "Igual al emergenciaId."
+      "doc": "El emergenciaId, o act-<actividadId> en las actividades masivas."
     },
     {
       "name": "occurredAt",
@@ -53,6 +58,33 @@
         "logicalType": "timestamp-millis"
       },
       "doc": "Epoch en milisegundos."
+    },
+    {
+      "name": "causaId",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "Id de lo que origino la intervencion. En el squad 3, el actividadId de ActividadCreada."
+    },
+    {
+      "name": "causaTipo",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "EVENTO_PUBLICO en el squad 3. Null en el caso de Emergencias."
+    },
+    {
+      "name": "camionId",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "Patente del camion de la ruta asignada. Null en el caso de Emergencias."
     }
   ]
 }
