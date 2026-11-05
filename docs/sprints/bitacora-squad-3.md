@@ -528,3 +528,59 @@ Comparé el `.avsc` con lo que publica el traductor al gateway: tienen los mismo
 - Correr `npm run plaza` en Render, con un token de administrador.
 - La prueba con el bus real: el evento de Rodrigo, las credenciales y el release a `main`.
 - **Para confirmar con Rodrigo:** él habla de terminar a los 10 minutos y nuestro guion usa 2. Hay que ver si Espacios deja 2.
+
+## Mié 04/11 · Release a `main` y el PR de Tomás
+
+- **El #69 entró a `develop`**, aprobado por Rami. También entraron el #76 (nuevo diseño del Login, de Rami) y el **#77, el release a `main`**. `main` quedó igual que `develop`: Render ya puede desplegar todo el caso.
+- **Tomás abrió el #74** (squad 6, reserva de espacio con limpieza a la salida). Va sobre el mismo servicio de actividades masivas: desde 100 personas agenda la escuadrilla y publica `RefuerzoProgramado`, y si se cancela la reserva borra el refuerzo y la zona. CI en verde.
+- **Rami encontró dos errores en el #74** y se los pidió a Tomás, con tests:
+  1. Si la cancelación llega antes que `ActividadCreada`, la limpieza se vuelve a programar.
+  2. Si llegan los dos avisos de la misma actividad, al cancelar queda un refuerzo activo.
+
+**Novedades de Espacios:**
+- `ActividadCreada` suma `categoria`, opcional y al final. No cambia nada para nosotros.
+- **Evento nuevo:** `com.citypass.espacios.ActividadModificada`. Sale cuando se cancela una actividad, con `estadoAnterior`/`estadoNuevo`, el motivo, la causa (opcional) y el mismo `correlationId` (`act-<id>`).
+- Reemplaza a `ActividadCancelada` y `ReservaCancelada`, que eran nombres provisorios. El #74 tiene que escuchar `ActividadModificada` con `estadoNuevo = CANCELADA` y suscribirse a ese tipo en el gateway.
+
+**Duda abierta:** con el #74, `RefuerzoProgramado` también sale para eventos de 100 a 999 personas, con el mismo prefijo `act-` y sin la capacidad. Analítica no podría separar las actividades masivas. Hay que confirmarlo con Francisco Csik.
+
+**Falta:**
+- Correr `npm run plaza` en Render.
+- Confirmar si `RefuerzoProgramado` está registrado en la consola de EDA.
+- Revisar el #74 cuando Tomás suba las correcciones.
+
+**Respuesta de Francisco Csik (Analítica), noche del 04/11:** sus métricas de Residuos no leen `RefuerzoProgramado`, sino `IntervencionProgramada` e `IntervencionActualizada`, con un campo `causaTipo`.
+- **Nuestro caso (3):** "cuadrillas planificadas para las inmediaciones del evento" = `IntervencionProgramada` con `causaTipo = EVENTO_PUBLICO`, contando `camionId` distintos.
+- **El caso de Tomás (6):** lo mismo, con `causaTipo = RESERVA`.
+- **Choque:** hoy `IntervencionProgramada` sale solo en el caso de Emergencias, sin `causaTipo` ni `camionId` y con `emergenciaId` obligatorio. Además, en nuestro caso el camión recién se conoce cuando el operador genera la ruta, después de que termina el evento.
+- **Siguiente paso:** pedirle a Francisco los campos exactos que espera y acordar en qué momento sale el evento. Después se adapta el esquema, que comparten varios casos del grupo 4.
+
+## Jue 05/11 · `IntervencionProgramada` para la métrica de Analítica
+
+- **Francisco Csik:** le sirve que el evento salga cuando el operador genera o asigna la ruta, porque el dashboard no es en tiempo real. Los campos los pasa mañana. Dice que en su md no existe `RefuerzoProgramado`.
+- **Reclamos (caso 3):** marcan sus reclamos con `causaTipo = EVENTO_PUBLICO` y `causaId` = el `actividadId` de `ActividadCreada`. Es la misma causa que usamos nosotros.
+
+**Abrí el #80**, que publica `IntervencionProgramada` con `causaTipo = EVENTO_PUBLICO`:
+- Sale al **asignar** una ruta que pasa por contenedores de una actividad masiva, una por actividad. Al asignar, el camión ya quedó comprometido; una propuesta se puede descartar.
+- Trae `causaId` (el `actividadId`), `camionId` (la patente) y `correlationId` `act-<id>`.
+- El esquema suma `causaId`, `causaTipo` y `camionId`, opcionales, y `emergenciaId` pasa a ser opcional. El caso de Emergencias no cambia.
+- **Probado en local:** una actividad en Plaza Houssay y la ruta del XY987ZW con CT-0018. Al asignarla salió la intervención con `EVENTO_PUBLICO` y la patente. Lint, build y 814 unitarios en verde.
+
+**Falta:**
+- Confirmar los campos cuando Francisco los pase.
+- Registrar `IntervencionProgramada` en la consola de EDA.
+- Avisarle a Tomás: su caso tiene que salir con `causaTipo = RESERVA`. Hoy sus refuerzos usan el mismo prefijo `act-` y saldrían como `EVENTO_PUBLICO`.
+
+**Tarde del 05/11:**
+- **Adriel aprobó el #80 y entró a `develop`**, con el CI en verde. Avisó un riesgo: en la consola de EDA, `IntervencionProgramada` está registrado con el id 45, con `emergenciaId` obligatorio y sin `causaId`, `causaTipo` ni `camionId`. Con el #80 esos campos salen siempre, en null en el caso de Emergencias. Hay que registrar la versión nueva con el `.avsc` del repo **antes del release a `main`**. Si no, esas intervenciones pueden quedar `FALLIDO` en el outbox.
+- **`ActividadCreada` de Espacios:** confirmaron las fechas en milisegundos y la `ubicacion` con `lat` y `lng`, que es lo que lee `leerActividad`. El `estado` viene en inglés (`ACTIVE`), pero para crear no nos cambia nada: solo miramos si dice `CANCELADA`.
+- **Cancelaciones:** Espacios las publica en `com.citypass.espacios.EventoCancelado`, con `eventoId` igual al `actividadId`. Lo resuelve el #74 de Tomás; Fran ya se lo pidió.
+- **El corte de 1000 personas queda.** Espacios deja crear eventos de 1000 o más solo en cuatro sedes: Parque Centenario, Recoleta, Usina del Arte y Abasto. Plaza Houssay ya no sirve para la demo.
+- **Tachos cerca de las sedes:** en la base local ninguna tiene un contenedor a menos de 300 m. La más cercana es Recoleta, a 924 m.
+- **Abrí el #83:** `npm run plaza` ahora acepta `--nombre`, `--lat` y `--lng`, y crea los 3 contenedores en la sede que elijamos. Sin argumentos sigue usando Plaza Houssay.
+
+**Falta:**
+- Elegir la sede (propuesta: Recoleta) y pedirle a Espacios sus coordenadas. Con eso, correr `npm run plaza` en Render.
+- Review del #83.
+- Que se registre la versión nueva de `IntervencionProgramada` en EDA. Hasta entonces, no hay release a `main`.
+- Un review nuevo del #78: las aprobaciones se descartaron con el último commit.
