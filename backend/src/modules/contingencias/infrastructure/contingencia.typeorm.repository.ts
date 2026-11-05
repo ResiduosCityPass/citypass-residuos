@@ -118,8 +118,11 @@ export class ContingenciaTypeormRepository
   }
 
   async zonasBloqueadasManualmente(): Promise<string[]> {
+    // `bloqueoManual`, no `bloqueada`: esa tambien la prende una emergencia que
+    // corta la circulacion (CU-INT-01), y ahi el chofer tiene que poder cerrar las
+    // paradas que quedaron fuera del radio. Las de adentro ya las omitio el sistema.
     const rows = await this.repo().query<{ id: string }[]>(
-      'SELECT id FROM zona WHERE bloqueada = true',
+      'SELECT id FROM zona WHERE "bloqueoManual" = true',
     );
     return rows.map((r) => r.id);
   }
