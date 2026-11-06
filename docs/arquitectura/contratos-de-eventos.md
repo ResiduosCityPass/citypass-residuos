@@ -276,7 +276,7 @@ Se publica cuando se programa un refuerzo de recolección. En el bus sale como
 | Campo | Para qué sirve |
 |---|---|
 | `refuerzoId` | Id del refuerzo. Clave para contar: puede repetirse en más de un evento |
-| `eventoId` | Evento que lo originó. Con el prefijo `act-` viene de una actividad masiva del squad 3 |
+| `eventoId` | Evento que lo originó. Con el prefijo `act-` viene de una actividad masiva del squad 3, y con `res-` de una reserva del squad 6 |
 | `zona` | Zona del evento. Vacía en las actividades masivas, porque `ActividadCreada` no la trae |
 | `contenedores` | Cantidad de contenedores reforzados |
 | `programadoPara` | Cuándo arranca el refuerzo. En el squad 3 es la hora de fin de la actividad |
@@ -446,7 +446,7 @@ gateway `{ metadata: { eventId, eventType }, data }`. Se descartan repetidos por
 | `actividadId` | UUID | Id de la actividad |
 | `titulo` | string | Se muestra en el mapa |
 | `capacidad` | entero | Cortes de refuerzo (100) y de evento masivo (1.000) |
-| `estado` | string | Hoy siempre `PROGRAMADA`. Si llega `CANCELADA`, se borran el refuerzo y la zona |
+| `estado` | string | Si es `CANCELADA` o `CANCELLED`, se retiran los refuerzos y la zona. Espacios lo publica en inglés (`ACTIVE`) |
 | `fechaHoraInicio`, `fechaHoraFinalizacion` | milisegundos (epoch, UTC) | La zona se muestra hasta 6 h después del fin; la escuadrilla arranca en el fin |
 | `ubicacion` | `{ lat, lng }`, WGS84 | Centro de la zona |
 
@@ -456,7 +456,8 @@ el log.
 
 **Qué hacemos al recibirlo** (`ActividadesMasivasService`):
 
-1. Si el estado es `CANCELADA`, borra el refuerzo y la zona (ver "Cancelación", abajo) y termina.
+1. Si el estado es cancelado, retira los refuerzos y la zona (ver "Cancelación", abajo) y termina.
+   Si la actividad ya estaba cancelada, la ignora.
 2. Si la capacidad es menor a 100 personas (`INTEGRACION_CUPO_MINIMO_REFUERZO`), no hace nada.
    Desde 100 cubre el caso del squad 6: un ciudadano reserva una plaza para un evento comunitario
    y Residuos refuerza la limpieza a la salida.
@@ -476,24 +477,35 @@ aviso en el log y se responde `204`. No se responde `400`, porque el bus lo rein
 siempre.
 
 5. **Métrica:** al agendar la escuadrilla publica `residuos.refuerzo.programado`, para Analítica.
-   Es lo único que publicamos en respuesta. Desde el squad 6 también sale para los eventos de 100 a
-   999 personas, con el mismo prefijo `act-`.
+   También sale para los eventos de 100 a 999 personas, con el prefijo `res-`.
 
-**Cancelación (squad 6):** si se cancela la reserva, se borran el refuerzo `act-<actividadId>`
-(los contenedores dejan de entrar al ruteo) y la zona del mapa. Borrar algo que no existe no hace
-nada, así que un repetido no molesta. Se acepta de dos formas, porque Espacios todavía no confirmó
-cuál usa:
+**Reserva (squad 6) y métrica de Analítica:** el refuerzo de una actividad de menos de 1.000 personas
+se guarda como `res-<actividadId>`, en vez de `act-<actividadId>`. Por ese prefijo, la
+`IntervencionProgramada` que sale al asignar la ruta lleva `causaTipo = RESERVA` y `correlationId`
+`res-<actividadId>`. Es lo que cuenta Analítica para el caso 6: camiones distintos con ese
+`causaTipo`. Analítica no lee `RefuerzoProgramado`.
 
-- `ActividadCreada` con `estado: CANCELADA`.
-- Un evento aparte: `com.citypass.espacios.ActividadCancelada`, o
-  `com.citypass.espacios.ReservaCancelada` como figura en el `CASO-RESERVA-ESPACIOS.md` de EDA. El
-  id se lee de `actividadId` o, si no está, de `reservaId`. Sin id, se ignora y queda en el log.
+**Limitación:** `ActividadCreada` no dice si la actividad viene de una reserva. Hoy se usa la
+capacidad como aproximación. Espacios también publica `com.citypass.espacios.ReservaConfirmada`, que
+sería el evento natural del caso, pero Residuos no lo consume: solo trae `espacioId` y no tiene
+ubicación, y sin coordenadas no se pueden buscar los contenedores cercanos.
 
-**Limitación conocida:** si la cancelación llega por un tópico aparte, el bus no garantiza que
-llegue después de la `ActividadCreada`. Si llegara antes, la actividad se agendaría igual. Para
-cubrirlo haría falta guardar las reservas canceladas (la "regla del cementerio" del documento de
-EDA). Con `ActividadCreada` + `estado: CANCELADA` no pasa, porque va por el mismo tópico y la misma
-`correlationId`.
+**Cancelación (squad 6):** al cancelar se retiran todos los refuerzos asociados (`<id>`, `act-<id>`
+y `res-<id>`, porque una actividad puede haber llegado también como `EventoComunitarioPublicado`) y
+la zona del mapa. Las formas aceptadas:
+
+| Evento | Id | Condición |
+|---|---|---|
+| `com.citypass.espacios.EventoCancelado` | `eventoId`, igual a `actividadId` según Espacios | Siempre. Es como cancela Espacios |
+| `com.citypass.espacios.ActividadModificada` | `actividadId` | `estadoNuevo` es `CANCELADA` o `CANCELLED` |
+| `com.citypass.espacios.ActividadCreada` | `actividadId` | `estado` es `CANCELADA` o `CANCELLED` |
+| `com.citypass.espacios.ReservaCancelada` | `reservaId` | Siempre. Figura en el caso de EDA, pero no está en el catálogo |
+
+Sin un id válido, el evento se ignora y queda en el log, sin responder `400`. Un repetido no molesta.
+
+La cancelación queda anotada en `actividad_cancelada`. El bus no ordena eventos de tópicos distintos:
+si la cancelación llega antes que `ActividadCreada` o `EventoComunitarioPublicado`, esos avisos se
+ignoran y no se vuelve a agendar la limpieza.
 
 ## Política de errores y reintentos
 

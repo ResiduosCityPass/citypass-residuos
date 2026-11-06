@@ -11,6 +11,7 @@ import { IntervencionesService } from './application/intervenciones.service';
 import { ReclamosService } from './application/reclamos.service';
 import { CitypassKafkaConsumer } from './citypass-kafka.consumer';
 import { CitypassWebhookController } from './citypass-webhook.controller';
+import { ActividadCancelada } from './domain/actividad-cancelada.entity';
 import { ActividadMasiva } from './domain/actividad-masiva.entity';
 import { Intervencion } from './domain/intervencion.entity';
 import { INTERVENCION_REPOSITORY } from './domain/intervencion.repository';
@@ -35,6 +36,7 @@ import { IntegracionTypeormRepository } from './infrastructure/integracion.typeo
       RefuerzoEvento,
       BloqueoPorIncidente,
       ActividadMasiva,
+      ActividadCancelada,
       ObstruccionPorReclamo,
       Intervencion,
     ]),

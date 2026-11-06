@@ -8,6 +8,7 @@ import {
   ContenedorRepository,
 } from '../../contenedores/domain/contenedor.repository';
 import { INTEGRACION_REPOSITORY, IntegracionRepository } from '../domain/integracion.repository';
+import { PREFIJO_ACTIVIDAD, PREFIJO_RESERVA } from '../domain/refuerzo-evento.entity';
 
 /*
  * Topes de las columnas: un valor que no entra hace fallar el insert, el webhook
@@ -18,6 +19,9 @@ const LARGO_MAXIMO_ID = 60;
 const LARGO_MAXIMO_TITULO = 200;
 const CAPACIDAD_MAXIMA = 2_147_483_647;
 
+/** Espacios publica los estados de sus actividades en ingles (`ACTIVE`). */
+const ESTADOS_CANCELADA = new Set(['CANCELADA', 'CANCELLED']);
+
 /** Lo que Residuos necesita de una ActividadCreada, ya validado. */
 interface ActividadLeida {
   actividadId: string;
@@ -26,7 +30,6 @@ interface ActividadLeida {
   punto: { lat: number; lng: number };
   inicio: Date;
   fin: Date;
-  cancelada: boolean;
 }
 
 /**
@@ -37,13 +40,16 @@ interface ActividadLeida {
  *   - desde `INTEGRACION_CUPO_MINIMO_REFUERZO` (100) agenda la escuadrilla: desde
  *     la hora de fin y durante `INTEGRACION_HORAS_ZONA_EVENTO`, los contenedores
  *     cercanos entran a la ruta que genera CU-08 aunque no esten criticos. Reusa
- *     el refuerzo de CU-INT-01 y publica `RefuerzoProgramado` para Analitica.
- *     Cubre la reserva de una plaza para un evento comunitario chico;
+ *     el refuerzo de CU-INT-01 y publica `RefuerzoProgramado`.
+ *     Por debajo de 1000 el refuerzo es `res-<id>` (reserva de un evento
+ *     comunitario chico) y desde ahi `act-<id>`: el prefijo decide si la
+ *     IntervencionProgramada que lee Analitica sale como RESERVA o EVENTO_PUBLICO;
  *   - desde `INTEGRACION_CAPACIDAD_MASIVA` (1000) ademas la guarda con sus
  *     contenedores, para mostrar la zona en el mapa.
  *
- * Si la reserva se cancela (`ActividadCreada` con estado `CANCELADA`, o un
- * evento de cancelacion aparte), se borran el refuerzo y la zona del mapa.
+ * Si Espacios cancela (`EventoCancelado`, `ActividadModificada` o una actividad
+ * con estado cancelado), se borran los refuerzos y la zona, y queda anotado:
+ * si la creacion llega despues, no se vuelve a agendar la limpieza.
  *
  * Lee los campos del contrato del squad (E1 en plan-squad-3.md), que es como
  * Espacios lo publica en el bus.
@@ -76,14 +82,19 @@ export class ActividadesMasivasService {
   }
 
   async registrar(data: Record<string, unknown>): Promise<void> {
+    if (esEstadoCancelado(data.estado)) {
+      await this.cancelar(data);
+      return;
+    }
+
     const actividad = leerActividad(data);
 
     if (!actividad) {
       this.logger.warn(`ActividadCreada ignorada, mal formada: ${JSON.stringify(data)}`);
       return;
     }
-    if (actividad.cancelada) {
-      await this.borrar(actividad.actividadId);
+    if (await this.integracion.estaCancelada(actividad.actividadId)) {
+      this.logger.log(`ActividadCreada ignorada, ya cancelada: ${actividad.actividadId}`);
       return;
     }
     if (actividad.capacidad < this.cupoMinimoRefuerzo) {
@@ -95,8 +106,10 @@ export class ActividadesMasivasService {
       ({ item }) => item.id,
     );
 
+    const masiva = actividad.capacidad >= this.capacidadMasiva;
+
     // La zona en el mapa queda solo para los eventos masivos.
-    if (actividad.capacidad >= this.capacidadMasiva) {
+    if (masiva) {
       await this.integracion.guardarActividad({
         actividadId: actividad.actividadId,
         titulo: actividad.titulo,
@@ -110,7 +123,9 @@ export class ActividadesMasivasService {
     }
 
     if (contenedorIds.length > 0) {
-      const eventoId = idRefuerzo(actividad.actividadId);
+      // Prefijo propio: el id de Espacios podria coincidir con el de un
+      // EventoComunitarioPublicado y pisaria el refuerzo de CU-INT-01.
+      const eventoId = `${masiva ? PREFIJO_ACTIVIDAD : PREFIJO_RESERVA}${actividad.actividadId}`;
 
       await this.integracion.guardarRefuerzo({
         eventoId,
@@ -133,26 +148,38 @@ export class ActividadesMasivasService {
   }
 
   /**
-   * Cancelacion de la reserva por un evento aparte. El nombre todavia no esta
-   * confirmado con Espacios (ver IntegracionService): se acepta el id como
-   * `actividadId` o, como en CASO-RESERVA-ESPACIOS de EDA, como `reservaId`.
-   * Borrar algo que no existe no hace nada, asi que un repetido no molesta.
+   * Anota la cancelacion, retira todos los refuerzos asociados y borra la zona
+   * del mapa. Una misma actividad puede tener mas de un refuerzo, si llegaron
+   * `ActividadCreada` y `EventoComunitarioPublicado`. `eventoId` es el mismo valor
+   * que `actividadId`, lo confirmo Espacios. Un repetido no molesta: borrar algo
+   * que no existe no hace nada.
    */
   async cancelar(data: Record<string, unknown>): Promise<void> {
-    const id = [data.actividadId, data.reservaId].find(esIdValido);
+    const id = [data.actividadId, data.eventoId, data.reservaId].find(esIdValido);
 
     if (!id) {
       this.logger.warn(`Cancelacion de actividad ignorada, sin id: ${JSON.stringify(data)}`);
       return;
     }
 
-    await this.borrar(id);
+    await this.integracion.registrarCancelacion(id);
+
+    for (const eventoId of [id, `${PREFIJO_ACTIVIDAD}${id}`, `${PREFIJO_RESERVA}${id}`]) {
+      await this.integracion.borrarRefuerzo(eventoId);
+    }
+    await this.integracion.borrarActividad(id);
   }
 
-  /** Saca los contenedores del ruteo y la zona del mapa. */
-  private async borrar(actividadId: string): Promise<void> {
-    await this.integracion.borrarRefuerzo(idRefuerzo(actividadId));
-    await this.integracion.borrarActividad(actividadId);
+  /** Espacios cambio el estado de una actividad: solo importa si la cancelo. */
+  async modificar(data: Record<string, unknown>): Promise<void> {
+    if (esEstadoCancelado(data.estadoNuevo)) {
+      await this.cancelar(data);
+    }
+  }
+
+  /** Para el refuerzo de CU-INT-01, que entra por `EventoComunitarioPublicado`. */
+  estaCancelada(id: string): Promise<boolean> {
+    return this.integracion.estaCancelada(id);
   }
 
   /**
@@ -178,12 +205,8 @@ export class ActividadesMasivasService {
   }
 }
 
-/**
- * Prefijo propio: el id de Espacios podria coincidir con el de un
- * EventoComunitarioPublicado y pisaria el refuerzo de CU-INT-01.
- */
-function idRefuerzo(actividadId: string): string {
-  return `act-${actividadId}`;
+function esEstadoCancelado(estado: unknown): boolean {
+  return typeof estado === 'string' && ESTADOS_CANCELADA.has(estado.toUpperCase());
 }
 
 function esIdValido(valor: unknown): valor is string {
@@ -192,7 +215,7 @@ function esIdValido(valor: unknown): valor is string {
 
 /** null si falta el id, la ubicacion o una fecha valida, o si la capacidad no es un entero. */
 function leerActividad(data: Record<string, unknown>): ActividadLeida | null {
-  const { actividadId, titulo, estado } = data;
+  const { actividadId, titulo } = data;
   const capacidad = Number(data.capacidad ?? 0);
   const punto = ubicacionDe(data);
   const inicio = leerFecha(data.fechaHoraInicio);
@@ -216,8 +239,6 @@ function leerActividad(data: Record<string, unknown>): ActividadLeida | null {
     punto,
     inicio,
     fin,
-    // En el nucleo siempre llega PROGRAMADA; el contrato deja lugar a CANCELADA.
-    cancelada: estado === 'CANCELADA',
   };
 }
 

@@ -73,14 +73,14 @@ function estadoDe(data: Record<string, unknown>): string {
  * Reacciones a eventos de otros modulos de CityPass+ (CU-INT-01).
  *
  *   EventoComunitarioPublicado -> refuerzo de recoleccion cerca del espacio
- *   EventoCancelado            -> se cancela el refuerzo
+ *   EventoCancelado            -> se cancelan los refuerzos y la zona (ActividadesMasivasService)
  *   EmergenciaCreada           -> se bloquean para el ruteo las zonas afectadas y
  *                                 se sacan los contenedores cercanos de las rutas vivas
  *   EmergenciaActualizada      -> al terminar la emergencia se desbloquean
  *   EmergenciaEstadoActualizado-> igual: es como la publica Emergencias de verdad
  *   EmergenciaCerrada          -> igual, y si trae causa RESIDUOS, intervencion
  *   ActividadCreada            -> zona del evento y escuadrilla (squads 3 y 6, ActividadesMasivasService)
- *   ActividadCancelada         -> se borran la escuadrilla y la zona (squad 6)
+ *   ActividadModificada        -> igual, si el estado nuevo es cancelado (squad 6)
  *   Reclamos (CU-INT-02)       -> ver ReclamosService
  *
  * Todo corre en una transaccion: si algo falla tampoco queda registrado el
@@ -166,8 +166,11 @@ export class IntegracionService {
         case `${ESPACIOS}EventoComunitarioPublicado`:
           await this.programarRefuerzo(data);
           return 'procesado';
+        // EventoCancelado es como cancela Espacios. ReservaCancelada figura en el
+        // CASO-RESERVA-ESPACIOS de EDA, pero todavia no esta en el catalogo.
         case `${ESPACIOS}EventoCancelado`:
-          await this.integracion.borrarRefuerzo(texto(data, 'eventoId'));
+        case `${ESPACIOS}ReservaCancelada`:
+          await this.actividades.cancelar(data);
           return 'procesado';
         case `${EMERGENCIAS}EmergenciaCreada`:
           await this.bloquearZonas(data);
@@ -199,11 +202,8 @@ export class IntegracionService {
         case `${ESPACIOS}ActividadCreada`:
           await this.actividades.registrar(data);
           return 'procesado';
-        // Cancelacion de una reserva (squad 6). Nombre sin confirmar con Espacios:
-        // ReservaCancelada es como figura en CASO-RESERVA-ESPACIOS de EDA.
-        case `${ESPACIOS}ActividadCancelada`:
-        case `${ESPACIOS}ReservaCancelada`:
-          await this.actividades.cancelar(data);
+        case `${ESPACIOS}ActividadModificada`:
+          await this.actividades.modificar(data);
           return 'procesado';
         default:
           if (await this.reclamos?.procesar(eventType, data)) {
@@ -230,6 +230,11 @@ export class IntegracionService {
     }
 
     const eventoId = texto(data, 'eventoId');
+    // La cancelacion pudo llegar antes: el bus no ordena entre topicos.
+    if (await this.actividades.estaCancelada(eventoId)) {
+      return;
+    }
+
     const desde = new Date(texto(data, 'fin'));
     const hasta = new Date(desde.getTime() + this.ventanaRefuerzoHoras * 3_600_000);
     const zona = typeof data.zona === 'string' ? data.zona : null;
