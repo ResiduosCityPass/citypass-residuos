@@ -645,3 +645,11 @@ Con el script del plan B (`npm run actividad`), en vez de Espacios, mandé al we
 **Falta:**
 - Probar con una actividad real que cree Rodrigo desde Espacios (llega por la suscripción del webhook).
 - Del 13 al 18/11: ensayo completo de la demo en Render.
+
+## Vie 06/11 · Repaso del chat del squad
+
+Crucé lo que se habló en el grupo del squad con lo que hicimos en Residuos.
+- **Coincide:** el contrato de `ActividadCreada` (milisegundos, `ubicacion { lat, lng }`, `correlationId = act-<id>`), los cortes de 1.000 personas, 300 m y 6 h (los mismos que Reclamos y Movilidad), la salida de la escuadrilla con `fechaHoraFinalizacion` y los campos de `IntervencionProgramada` que pidió Analítica.
+- **Recepción:** Render está conectado al bus por Kafka, como recomendó Franco, y escucha todos los eventos de Espacios. El webhook queda como segunda vía; los repetidos se descartan por `eventId`.
+- **Guion corregido:** el Centro Cultural Recoleta admite hasta 1.200 personas, así que la demo pasa de 5.000 a 1.200, con 3 contenedores en la zona. Rodrigo confirmó que no hay duración mínima, pero el inicio tiene que ser futuro.
+- **Pedido de Analítica que no tomamos:** Francisco propuso publicar `IntervencionProgramada` también en los recorridos normales, para comparar. Nuestra métrica (cuadrillas por evento público) no lo necesita, así que quedó afuera.
