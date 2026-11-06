@@ -598,3 +598,13 @@ Comparé el `.avsc` con lo que publica el traductor al gateway: tienen los mismo
 - **El guion de la demo** ya usa la sede de Recoleta, en vez de Plaza Houssay.
 
 **Falta:** correr `npm run plaza` en Render, con un token de administrador.
+
+**Respuestas del 05/11 a la noche:**
+- **Nicolas Hernández (Login)** pasó por privado el `client_id` y el secreto de Residuos para el paso 5. Quedaron en `backend/.env`, fuera del repo.
+- **Francisco Csik (Analítica)** pasó los campos de `IntervencionProgramada`. Coinciden con el `.avsc`, salvo `alertaId` (uuid o null), que es para las intervenciones por una `AlertaGenerada` propia.
+- **`causaTipo`:** Analítica pide usar los mismos valores que Emergencias: `EVENTO_PUBLICO`, `RECLAMO`, `EVENTO_CLIMATICO`, `INCIDENTE_VIAL` y `RESERVA`. Nuestro `EVENTO_PUBLICO` ya coincide.
+- **Abrí el #85:** suma `alertaId` al `.avsc` y al evento, siempre en null por ahora, y documenta los valores de `causaTipo`. 819 unitarios en verde. Conviene que entre antes de que Rami registre el esquema, así se registra una sola vez.
+
+**Falta:**
+- Review del #85 (`alertaId`). Cuando entre, Rami registra esa versión del `.avsc`.
+- Probar el paso 5 con las credenciales.
