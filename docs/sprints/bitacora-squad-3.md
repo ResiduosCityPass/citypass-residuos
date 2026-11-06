@@ -622,3 +622,13 @@ Tomás subió las correcciones: guarda las cancelaciones aunque lleguen antes qu
 - **Lo que toca a mi caso:** desde 1000 personas sigue todo igual (zona en el mapa, refuerzo `act-<id>` e `IntervencionProgramada` con `EVENTO_PUBLICO`). De 100 a 999 el refuerzo es `res-<id>` y la intervención sale con `causaTipo = RESERVA`. Con eso queda resuelta la duda del 04/11: Analítica ya puede separar los dos casos.
 - **Cancelación:** si Espacios cancela una actividad masiva, también se borra su zona del mapa.
 - **Cruce con el #85:** no tocan los mismos archivos. Los junté sobre `develop` en una rama temporal: 843 unitarios en verde y compila.
+
+## Vie 06/11 · Release a `main`
+
+- **Entraron a `develop`** el #85 (`alertaId`, aprobado por Rami) y el #74 de Tomás.
+- **Release:** Rami mergeó el #86 (`develop` → `main`), aprobado por Nicolas Damm, y desplegó en Render. La API responde en `/api/v1/health`.
+- **Token del webhook:** Rami confirmó que el de Render es distinto al que teníamos. Lo pasa por privado y va solo a `backend/.env`.
+
+**Falta:**
+- Confirmar con Rami que registró en EDA la versión nueva de `IntervencionProgramada`.
+- Con el token nuevo, suscribir el webhook de Render a `ActividadCreada`.
