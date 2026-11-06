@@ -110,7 +110,7 @@ export function traducirAGateway(evento: DomainEvent): EventoGateway | null {
         tipo: 'IntervencionProgramada',
         datos: {
           intervencionId: p.intervencionId,
-          emergenciaId: p.emergenciaId,
+          emergenciaId: p.emergenciaId ?? null,
           contenedorId: p.contenedorId ?? null,
           latitud: ubicacion(p).lat,
           longitud: ubicacion(p).lng,
@@ -118,6 +118,13 @@ export function traducirAGateway(evento: DomainEvent): EventoGateway | null {
           programadaEn: Date.parse(String(p.programadaEn)),
           correlationId,
           occurredAt: Date.parse(evento.occurredAt),
+          // Squad 3: EVENTO_PUBLICO con el actividadId. Null en Emergencias.
+          causaId: p.causaId ?? null,
+          causaTipo: p.causaTipo ?? null,
+          camionId: p.camionId ?? null,
+          // Analitica lo pide para las intervenciones por una AlertaGenerada
+          // propia. Hoy ninguna sale por ahi, asi que va en null.
+          alertaId: p.alertaId ?? null,
         },
       };
 

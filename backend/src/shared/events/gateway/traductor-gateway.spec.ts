@@ -28,7 +28,37 @@ describe('traducirAGateway (CU-INT-01)', () => {
         programadaEn: Date.parse('2026-11-01T15:00:00.000Z'),
         correlationId: 'EMG-1',
         occurredAt: Date.parse(evento.occurredAt),
+        causaId: null,
+        causaTipo: null,
+        camionId: null,
+        alertaId: null,
       },
+    });
+  });
+
+  it('la intervencion por una actividad masiva sale con causaTipo EVENTO_PUBLICO y el camion', () => {
+    const evento = buildEvent(
+      EventTypes.INTERVENCION_PROGRAMADA,
+      {
+        intervencionId: 'rt-1:7781',
+        emergenciaId: null,
+        contenedorId: 'ct-18',
+        ubicacion,
+        programadaEn: '2026-11-01T15:00:00.000Z',
+        causaId: '7781',
+        causaTipo: 'EVENTO_PUBLICO',
+        camionId: 'XY987ZW',
+      },
+      { correlationId: 'act-7781' },
+    );
+
+    expect(traducirAGateway(evento)?.datos).toMatchObject({
+      emergenciaId: null,
+      causaId: '7781',
+      causaTipo: 'EVENTO_PUBLICO',
+      camionId: 'XY987ZW',
+      alertaId: null,
+      correlationId: 'act-7781',
     });
   });
 

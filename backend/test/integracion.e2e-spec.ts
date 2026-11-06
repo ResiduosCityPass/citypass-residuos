@@ -1,4 +1,5 @@
 import * as request from 'supertest';
+import { RefuerzoEvento } from '../src/modules/integracion/domain/refuerzo-evento.entity';
 import { Rol, TipoResiduo } from '../src/shared/domain/enums';
 import { AppDePrueba, crearAppDePrueba } from './helpers/app-de-prueba';
 
@@ -183,6 +184,136 @@ describe('Integracion CityPass+ (e2e)', () => {
       const lista = await intervenciones();
       expect(lista).toHaveLength(1);
       expect(lista[0].contenedorId).toBeNull();
+    });
+  });
+
+  describe('reserva de espacio publico + limpieza a la salida (squad 6)', () => {
+    const fin = Date.now() + 2 * 3_600_000;
+
+    const actividadCreada = (eventId: string, cambios: Record<string, unknown> = {}) =>
+      http
+        .post(webhook)
+        .send({
+          metadata: { eventId, eventType: 'com.citypass.espacios.ActividadCreada' },
+          data: {
+            actividadId: 'res-1',
+            titulo: 'Feria de barrio',
+            estado: 'PROGRAMADA',
+            capacidad: 300,
+            fechaHoraInicio: fin - 4 * 3_600_000,
+            fechaHoraFinalizacion: fin,
+            ubicacion: PLAZA_ITALIA,
+            ...cambios,
+          },
+        })
+        .expect(204);
+
+    const refuerzos = () => ctx.dataSource.getRepository(RefuerzoEvento).find();
+    const zonasEnElMapa = async () =>
+      (await http.get('/api/v1/actividades-masivas').set(auth(admin)).expect(200)).body;
+
+    it('una reserva de 300 personas refuerza la limpieza pero no marca zona en el mapa', async () => {
+      await zonaConContenedor();
+
+      await actividadCreada('ev-1');
+
+      const [refuerzo] = await refuerzos();
+      expect(refuerzo).toMatchObject({ eventoId: 'res-res-1' });
+      expect(refuerzo.contenedorIds).toHaveLength(1);
+      expect(refuerzo.desde.getTime()).toBe(fin);
+      expect(await zonasEnElMapa()).toHaveLength(0);
+    });
+
+    it('una reserva de 1.000 personas o mas tambien marca la zona en el mapa', async () => {
+      await zonaConContenedor();
+
+      await actividadCreada('ev-1', { capacidad: 1500 });
+
+      expect(await refuerzos()).toHaveLength(1);
+      expect(await zonasEnElMapa()).toEqual([
+        expect.objectContaining({ actividadId: 'res-1', capacidad: 1500, contenedores: 1 }),
+      ]);
+    });
+
+    it('si la reserva llega cancelada, se borran el refuerzo y la zona', async () => {
+      await zonaConContenedor();
+      await actividadCreada('ev-1', { capacidad: 1500 });
+
+      await actividadCreada('ev-2', { capacidad: 1500, estado: 'CANCELADA' });
+
+      expect(await refuerzos()).toHaveLength(0);
+      expect(await zonasEnElMapa()).toHaveLength(0);
+    });
+
+    const eventoCancelado = (eventId: string) =>
+      http
+        .post(webhook)
+        .send({
+          metadata: { eventId, eventType: 'com.citypass.espacios.EventoCancelado' },
+          data: { eventoId: 'res-1', espacioId: 'plaza-1', motivo: 'Lluvia' },
+        })
+        .expect(204);
+
+    it('EventoCancelado retira el refuerzo y la zona', async () => {
+      await zonaConContenedor();
+      await actividadCreada('ev-1', { capacidad: 1500 });
+
+      await eventoCancelado('ev-2');
+
+      expect(await refuerzos()).toHaveLength(0);
+      expect(await zonasEnElMapa()).toHaveLength(0);
+    });
+
+    it('ActividadModificada con estadoNuevo CANCELADA retira el refuerzo y la zona', async () => {
+      await zonaConContenedor();
+      await actividadCreada('ev-1', { capacidad: 1500 });
+
+      await http
+        .post(webhook)
+        .send({
+          metadata: { eventId: 'ev-2', eventType: 'com.citypass.espacios.ActividadModificada' },
+          data: { actividadId: 'res-1', estadoAnterior: 'ACTIVE', estadoNuevo: 'CANCELADA' },
+        })
+        .expect(204);
+
+      expect(await refuerzos()).toHaveLength(0);
+      expect(await zonasEnElMapa()).toHaveLength(0);
+    });
+
+    it('si la cancelacion llega antes que la creacion, no se agenda la limpieza', async () => {
+      await zonaConContenedor();
+
+      await eventoCancelado('ev-1');
+      await eventoCancelado('ev-2');
+      await actividadCreada('ev-3');
+
+      expect(await refuerzos()).toHaveLength(0);
+    });
+
+    it('con los dos avisos de la misma actividad, cancelar retira todos los refuerzos', async () => {
+      await zonaConContenedor();
+      await actividadCreada('ev-1');
+      await http
+        .post(webhook)
+        .send({
+          metadata: {
+            eventId: 'ev-2',
+            eventType: 'com.citypass.espacios.EventoComunitarioPublicado',
+          },
+          data: {
+            eventoId: 'res-1',
+            cupoMaximo: 300,
+            latitud: PLAZA_ITALIA.lat,
+            longitud: PLAZA_ITALIA.lng,
+            fin: new Date(fin).toISOString(),
+          },
+        })
+        .expect(204);
+      expect(await refuerzos()).toHaveLength(2);
+
+      await eventoCancelado('ev-3');
+
+      expect(await refuerzos()).toHaveLength(0);
     });
   });
 

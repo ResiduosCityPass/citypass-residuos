@@ -15,6 +15,11 @@ export interface IntegracionRepository {
   bloqueosActivos(): Promise<BloqueoPorIncidente[]>;
 
   guardarActividad(actividad: Partial<ActividadMasiva>): Promise<ActividadMasiva>;
+  /** No hace nada si la actividad no estaba guardada. */
+  borrarActividad(actividadId: string): Promise<void>;
+  /** Anota la cancelacion. Una segunda vez no cambia nada. */
+  registrarCancelacion(actividadId: string): Promise<void>;
+  estaCancelada(actividadId: string): Promise<boolean>;
   /** Actividades que terminan despues de `desde`, ordenadas por hora de fin. */
   actividadesQueTerminanDespuesDe(desde: Date): Promise<ActividadMasiva[]>;
 }

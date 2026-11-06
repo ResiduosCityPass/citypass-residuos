@@ -73,13 +73,14 @@ function estadoDe(data: Record<string, unknown>): string {
  * Reacciones a eventos de otros modulos de CityPass+ (CU-INT-01).
  *
  *   EventoComunitarioPublicado -> refuerzo de recoleccion cerca del espacio
- *   EventoCancelado            -> se cancela el refuerzo
+ *   EventoCancelado            -> se cancelan los refuerzos y la zona (ActividadesMasivasService)
  *   EmergenciaCreada           -> se bloquean para el ruteo las zonas afectadas y
  *                                 se sacan los contenedores cercanos de las rutas vivas
  *   EmergenciaActualizada      -> al terminar la emergencia se desbloquean
  *   EmergenciaEstadoActualizado-> igual: es como la publica Emergencias de verdad
  *   EmergenciaCerrada          -> igual, y si trae causa RESIDUOS, intervencion
- *   ActividadCreada            -> zona del evento y escuadrilla (squad 3, ActividadesMasivasService)
+ *   ActividadCreada            -> zona del evento y escuadrilla (squads 3 y 6, ActividadesMasivasService)
+ *   ActividadModificada        -> igual, si el estado nuevo es cancelado (squad 6)
  *   Reclamos (CU-INT-02)       -> ver ReclamosService
  *
  * Todo corre en una transaccion: si algo falla tampoco queda registrado el
@@ -165,8 +166,11 @@ export class IntegracionService {
         case `${ESPACIOS}EventoComunitarioPublicado`:
           await this.programarRefuerzo(data);
           return 'procesado';
+        // EventoCancelado es como cancela Espacios. ReservaCancelada figura en el
+        // CASO-RESERVA-ESPACIOS de EDA, pero todavia no esta en el catalogo.
         case `${ESPACIOS}EventoCancelado`:
-          await this.integracion.borrarRefuerzo(texto(data, 'eventoId'));
+        case `${ESPACIOS}ReservaCancelada`:
+          await this.actividades.cancelar(data);
           return 'procesado';
         case `${EMERGENCIAS}EmergenciaCreada`:
           await this.bloquearZonas(data);
@@ -198,6 +202,9 @@ export class IntegracionService {
         case `${ESPACIOS}ActividadCreada`:
           await this.actividades.registrar(data);
           return 'procesado';
+        case `${ESPACIOS}ActividadModificada`:
+          await this.actividades.modificar(data);
+          return 'procesado';
         default:
           if (await this.reclamos?.procesar(eventType, data)) {
             return 'procesado';
@@ -223,6 +230,11 @@ export class IntegracionService {
     }
 
     const eventoId = texto(data, 'eventoId');
+    // La cancelacion pudo llegar antes: el bus no ordena entre topicos.
+    if (await this.actividades.estaCancelada(eventoId)) {
+      return;
+    }
+
     const desde = new Date(texto(data, 'fin'));
     const hasta = new Date(desde.getTime() + this.ventanaRefuerzoHoras * 3_600_000);
     const zona = typeof data.zona === 'string' ? data.zona : null;
@@ -257,7 +269,7 @@ export class IntegracionService {
     const punto = ubicacionDe(data);
 
     // Las emergencias que no cortan la circulacion (medica, panico) llegan sin coordenadas.
-    if (data.afectaCirculacion !== true || !punto) {
+    if (!afectaLaCirculacion(data) || !punto) {
       return;
     }
 
@@ -338,6 +350,28 @@ function texto(data: Record<string, unknown>, campo: string): string {
  * `causaId` es null. Analitica no infiere causas, asi que una emergencia sin
  * causa corta el camino igual, pero no suma a ninguna metrica por causa.
  */
+/**
+ * Emergencias todavia no completa `afectaCirculacion` y lo manda en null
+ * (Kevin, 05/11). Mientras tanto, un incidente vial cuenta como corte: es
+ * justamente lo que mide el caso 4 de Analitica. Un booleano explicito, true o
+ * false, gana, salvo con causa RECLAMO.
+ *
+ * Una emergencia que Emergencias abre desde un reclamo es el mismo auto que ya
+ * resuelve CU-INT-02 sacando los contenedores a 15 m. Bloquear la zona y las
+ * paradas a 300 m seria reaccionar dos veces, y de mas (Fran, 05/11).
+ */
+function afectaLaCirculacion(data: Record<string, unknown>): boolean {
+  if (data.causaTipo === 'RECLAMO') {
+    return false;
+  }
+
+  if (typeof data.afectaCirculacion === 'boolean') {
+    return data.afectaCirculacion;
+  }
+
+  return data.causaTipo === 'INCIDENTE_VIAL';
+}
+
 function causaDeLaEmergencia(data: Record<string, unknown>, emergenciaId: string): CausaAfectacion {
   const { causaId, causaTipo, correlationId } = data;
   const completa = typeof causaId === 'string' && typeof causaTipo === 'string';
