@@ -276,7 +276,7 @@ Se publica cuando se programa un refuerzo de recolección. En el bus sale como
 | Campo | Para qué sirve |
 |---|---|
 | `refuerzoId` | Id del refuerzo. Clave para contar: puede repetirse en más de un evento |
-| `eventoId` | Evento que lo originó. Con el prefijo `act-` viene de una actividad masiva del squad 3 |
+| `eventoId` | Evento que lo originó. Con el prefijo `act-` viene de una actividad masiva del squad 3, y con `res-` de una reserva del squad 6 |
 | `zona` | Zona del evento. Vacía en las actividades masivas, porque `ActividadCreada` no la trae |
 | `contenedores` | Cantidad de contenedores reforzados |
 | `programadoPara` | Cuándo arranca el refuerzo. En el squad 3 es la hora de fin de la actividad |
@@ -445,8 +445,8 @@ gateway `{ metadata: { eventId, eventType }, data }`. Se descartan repetidos por
 |---|---|---|
 | `actividadId` | UUID | Id de la actividad |
 | `titulo` | string | Se muestra en el mapa |
-| `capacidad` | entero | Corte de evento masivo |
-| `estado` | string | Siempre `PROGRAMADA`. Si algún día llega `CANCELADA`, se ignora |
+| `capacidad` | entero | Cortes de refuerzo (100) y de evento masivo (1.000) |
+| `estado` | string | Si es `CANCELADA` o `CANCELLED`, se retiran los refuerzos y la zona. Espacios lo publica en inglés (`ACTIVE`) |
 | `fechaHoraInicio`, `fechaHoraFinalizacion` | milisegundos (epoch, UTC) | La zona se muestra hasta 6 h después del fin; la escuadrilla arranca en el fin |
 | `ubicacion` | `{ lat, lng }`, WGS84 | Centro de la zona |
 
@@ -456,14 +456,18 @@ el log.
 
 **Qué hacemos al recibirlo** (`ActividadesMasivasService`):
 
-1. Si la capacidad es menor a 1.000 personas (`INTEGRACION_CAPACIDAD_MASIVA`) o el estado es
-   `CANCELADA`, no hace nada.
-2. Busca los contenedores activos a 300 m o menos (`INTEGRACION_RADIO_METROS`) y guarda la
-   actividad en `actividad_masiva`.
-3. **Zona en el mapa:** `GET /actividades-masivas` devuelve las actividades que no terminaron o
+1. Si el estado es cancelado, retira los refuerzos y la zona (ver "Cancelación", abajo) y termina.
+   Si la actividad ya estaba cancelada, la ignora.
+2. Si la capacidad es menor a 100 personas (`INTEGRACION_CUPO_MINIMO_REFUERZO`), no hace nada.
+   Desde 100 cubre el caso del squad 6: un ciudadano reserva una plaza para un evento comunitario
+   y Residuos refuerza la limpieza a la salida.
+3. Busca los contenedores activos a 300 m o menos (`INTEGRACION_RADIO_METROS`). Solo si la
+   capacidad es de 1.000 personas o más (`INTEGRACION_CAPACIDAD_MASIVA`) guarda la actividad en
+   `actividad_masiva`.
+   **Zona en el mapa:** `GET /actividades-masivas` devuelve las actividades que no terminaron o
    que terminaron hace menos de 6 h (`INTEGRACION_HORAS_ZONA_EVENTO`). El mapa de CU-07 las dibuja
-   como un círculo, con un aviso con la hora de fin.
-4. **Escuadrilla:** si hay contenedores cerca, crea un refuerzo `act-<actividadId>` que va
+   como un círculo, con un aviso con la hora de fin. Un evento comunitario chico no aparece.
+4. **Escuadrilla:** desde 100 personas, si hay contenedores cerca, crea un refuerzo `act-<actividadId>` que va
    desde `fechaHoraFinalizacion` hasta 6 h después. En esa ventana, esos contenedores entran a la ruta que
    genera CU-08 aunque no estén críticos, salvo que ya se hayan vaciado desde que arrancó el
    refuerzo. El operador genera y asigna la ruta, y el chofer la cierra con CU-10.
@@ -473,7 +477,35 @@ aviso en el log y se responde `204`. No se responde `400`, porque el bus lo rein
 siempre.
 
 5. **Métrica:** al agendar la escuadrilla publica `residuos.refuerzo.programado`, para Analítica.
-   Es lo único que publicamos en respuesta.
+   También sale para los eventos de 100 a 999 personas, con el prefijo `res-`.
+
+**Reserva (squad 6) y métrica de Analítica:** el refuerzo de una actividad de menos de 1.000 personas
+se guarda como `res-<actividadId>`, en vez de `act-<actividadId>`. Por ese prefijo, la
+`IntervencionProgramada` que sale al asignar la ruta lleva `causaTipo = RESERVA` y `correlationId`
+`res-<actividadId>`. Es lo que cuenta Analítica para el caso 6: camiones distintos con ese
+`causaTipo`. Analítica no lee `RefuerzoProgramado`.
+
+**Limitación:** `ActividadCreada` no dice si la actividad viene de una reserva. Hoy se usa la
+capacidad como aproximación. Espacios también publica `com.citypass.espacios.ReservaConfirmada`, que
+sería el evento natural del caso, pero Residuos no lo consume: solo trae `espacioId` y no tiene
+ubicación, y sin coordenadas no se pueden buscar los contenedores cercanos.
+
+**Cancelación (squad 6):** al cancelar se retiran todos los refuerzos asociados (`<id>`, `act-<id>`
+y `res-<id>`, porque una actividad puede haber llegado también como `EventoComunitarioPublicado`) y
+la zona del mapa. Las formas aceptadas:
+
+| Evento | Id | Condición |
+|---|---|---|
+| `com.citypass.espacios.EventoCancelado` | `eventoId`, igual a `actividadId` según Espacios | Siempre. Es como cancela Espacios |
+| `com.citypass.espacios.ActividadModificada` | `actividadId` | `estadoNuevo` es `CANCELADA` o `CANCELLED` |
+| `com.citypass.espacios.ActividadCreada` | `actividadId` | `estado` es `CANCELADA` o `CANCELLED` |
+| `com.citypass.espacios.ReservaCancelada` | `reservaId` | Siempre. Figura en el caso de EDA, pero no está en el catálogo |
+
+Sin un id válido, el evento se ignora y queda en el log, sin responder `400`. Un repetido no molesta.
+
+La cancelación queda anotada en `actividad_cancelada`. El bus no ordena eventos de tópicos distintos:
+si la cancelación llega antes que `ActividadCreada` o `EventoComunitarioPublicado`, esos avisos se
+ignoran y no se vuelve a agendar la limpieza.
 
 ## Política de errores y reintentos
 

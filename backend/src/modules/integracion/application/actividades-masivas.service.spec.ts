@@ -33,7 +33,13 @@ describe('ActividadesMasivasService (squad 3)', () => {
   let integracion: jest.Mocked<
     Pick<
       IntegracionRepository,
-      'guardarActividad' | 'guardarRefuerzo' | 'actividadesQueTerminanDespuesDe'
+      | 'guardarActividad'
+      | 'guardarRefuerzo'
+      | 'borrarActividad'
+      | 'borrarRefuerzo'
+      | 'registrarCancelacion'
+      | 'estaCancelada'
+      | 'actividadesQueTerminanDespuesDe'
     >
   >;
   let contenedores: jest.Mocked<Pick<ContenedorRepository, 'listar'>>;
@@ -44,6 +50,10 @@ describe('ActividadesMasivasService (squad 3)', () => {
     integracion = {
       guardarActividad: jest.fn().mockImplementation(async (a) => a),
       guardarRefuerzo: jest.fn().mockImplementation(async (r) => r),
+      borrarActividad: jest.fn().mockResolvedValue(undefined),
+      borrarRefuerzo: jest.fn().mockResolvedValue(undefined),
+      registrarCancelacion: jest.fn().mockResolvedValue(undefined),
+      estaCancelada: jest.fn().mockResolvedValue(false),
       actividadesQueTerminanDespuesDe: jest.fn().mockResolvedValue([]),
     };
     contenedores = { listar: jest.fn().mockResolvedValue([CERCA, LEJOS]) };
@@ -113,19 +123,150 @@ describe('ActividadesMasivasService (squad 3)', () => {
     expect(eventos.publish).not.toHaveBeenCalled();
   });
 
-  it('una actividad de menos de 1.000 personas no es masiva', async () => {
-    await service.registrar(actividad({ capacidad: 300 }));
+  describe('reserva de un evento comunitario chico (squad 6)', () => {
+    it('de 100 a 999 personas agenda la escuadrilla pero no marca zona en el mapa', async () => {
+      await service.registrar(actividad({ capacidad: 300 }));
 
-    expect(integracion.guardarActividad).not.toHaveBeenCalled();
-    expect(integracion.guardarRefuerzo).not.toHaveBeenCalled();
-    expect(eventos.publish).not.toHaveBeenCalled();
+      expect(integracion.guardarActividad).not.toHaveBeenCalled();
+      expect(integracion.guardarRefuerzo).toHaveBeenCalledWith({
+        eventoId: 'res-act-1',
+        zona: null,
+        contenedorIds: ['c-cerca'],
+        desde: new Date('2026-11-01T20:00:00.000Z'),
+        hasta: new Date('2026-11-02T02:00:00.000Z'),
+      });
+      expect(eventos.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ eventType: EventTypes.REFUERZO_PROGRAMADO }),
+      );
+    });
+
+    it('desde 1.000 personas el refuerzo sigue siendo de actividad masiva', async () => {
+      await service.registrar(actividad({ capacidad: 1000 }));
+
+      expect(integracion.guardarRefuerzo).toHaveBeenCalledWith(
+        expect.objectContaining({ eventoId: 'act-act-1' }),
+      );
+    });
+
+    it('el cupo minimo de 100 personas ya tiene refuerzo', async () => {
+      await service.registrar(actividad({ capacidad: 100 }));
+
+      expect(integracion.guardarRefuerzo).toHaveBeenCalledTimes(1);
+    });
+
+    it('con menos de 100 personas no hace nada', async () => {
+      await service.registrar(actividad({ capacidad: 99 }));
+
+      expect(contenedores.listar).not.toHaveBeenCalled();
+      expect(integracion.guardarActividad).not.toHaveBeenCalled();
+      expect(integracion.guardarRefuerzo).not.toHaveBeenCalled();
+      expect(eventos.publish).not.toHaveBeenCalled();
+    });
+
+    it('el cupo minimo se configura con INTEGRACION_CUPO_MINIMO_REFUERZO', async () => {
+      const conCupo = new ActividadesMasivasService(
+        integracion as unknown as IntegracionRepository,
+        contenedores as unknown as ContenedorRepository,
+        eventos,
+        new ConfigService({ INTEGRACION_CUPO_MINIMO_REFUERZO: '500' }),
+      );
+
+      await conCupo.registrar(actividad({ capacidad: 300 }));
+
+      expect(integracion.guardarRefuerzo).not.toHaveBeenCalled();
+    });
+
+    it('sin contenedores cerca no guarda nada ni publica', async () => {
+      contenedores.listar.mockResolvedValue([LEJOS]);
+
+      await service.registrar(actividad({ capacidad: 300 }));
+
+      expect(integracion.guardarActividad).not.toHaveBeenCalled();
+      expect(integracion.guardarRefuerzo).not.toHaveBeenCalled();
+      expect(eventos.publish).not.toHaveBeenCalled();
+    });
   });
 
-  it('una actividad cancelada no se guarda', async () => {
-    await service.registrar(actividad({ estado: 'CANCELADA' }));
+  describe('cancelacion (squad 6)', () => {
+    const retiroTodo = (id: string) => {
+      expect(integracion.registrarCancelacion).toHaveBeenCalledWith(id);
+      expect(integracion.borrarRefuerzo.mock.calls.flat()).toEqual([id, `act-${id}`, `res-${id}`]);
+      expect(integracion.borrarActividad).toHaveBeenCalledWith(id);
+    };
 
-    expect(integracion.guardarActividad).not.toHaveBeenCalled();
-    expect(eventos.publish).not.toHaveBeenCalled();
+    it.each(['CANCELADA', 'CANCELLED', 'cancelled'])(
+      'una actividad con estado %s retira todo, sin guardar nada',
+      async (estado) => {
+        await service.registrar(actividad({ estado }));
+
+        retiroTodo('act-1');
+        expect(integracion.guardarActividad).not.toHaveBeenCalled();
+        expect(integracion.guardarRefuerzo).not.toHaveBeenCalled();
+        expect(eventos.publish).not.toHaveBeenCalled();
+      },
+    );
+
+    it('una actividad cancelada se retira aunque le falten campos', async () => {
+      await service.registrar({ actividadId: 'act-1', estado: 'CANCELLED' });
+
+      retiroTodo('act-1');
+    });
+
+    it.each([
+      ['eventoId, como en EventoCancelado', { eventoId: 'evt-1' }],
+      ['actividadId', { actividadId: 'evt-1' }],
+      ['reservaId', { reservaId: 'evt-1' }],
+    ])('un evento de cancelacion con %s retira todo', async (_caso, data) => {
+      await service.cancelar(data);
+
+      retiroTodo('evt-1');
+    });
+
+    it('si la cancelacion llego antes, la actividad no se agenda', async () => {
+      integracion.estaCancelada.mockResolvedValue(true);
+
+      await service.registrar(actividad());
+
+      expect(integracion.estaCancelada).toHaveBeenCalledWith('act-1');
+      expect(integracion.guardarActividad).not.toHaveBeenCalled();
+      expect(integracion.guardarRefuerzo).not.toHaveBeenCalled();
+      expect(eventos.publish).not.toHaveBeenCalled();
+    });
+
+    it.each(['CANCELADA', 'CANCELLED'])(
+      'ActividadModificada con estadoNuevo %s cancela',
+      async (estadoNuevo) => {
+        await service.modificar({ actividadId: 'act-1', estadoNuevo });
+
+        retiroTodo('act-1');
+      },
+    );
+
+    it('ActividadModificada con otro estado no toca nada', async () => {
+      await service.modificar({ actividadId: 'act-1', estadoNuevo: 'ACTIVE_FULL' });
+
+      expect(integracion.registrarCancelacion).not.toHaveBeenCalled();
+      expect(integracion.borrarRefuerzo).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['sin id', {}],
+      ['con un id vacio', { actividadId: '' }],
+      ['con un id que no es texto', { actividadId: 42 }],
+      ['con un id demasiado largo', { actividadId: 'x'.repeat(61) }],
+    ])('un evento de cancelacion %s se ignora sin error', async (_caso, data) => {
+      await expect(service.cancelar(data)).resolves.toBeUndefined();
+
+      expect(integracion.registrarCancelacion).not.toHaveBeenCalled();
+      expect(integracion.borrarRefuerzo).not.toHaveBeenCalled();
+      expect(integracion.borrarActividad).not.toHaveBeenCalled();
+    });
+
+    it('dice si una actividad esta cancelada', async () => {
+      integracion.estaCancelada.mockResolvedValue(true);
+
+      await expect(service.estaCancelada('act-1')).resolves.toBe(true);
+    });
   });
 
   describe('un evento mal formado se ignora sin error, para que el bus no lo reintente', () => {

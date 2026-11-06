@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager, IsNull, LessThanOrEqual, MoreThan } from 'typeorm';
 import { ContextoTransaccional } from '../../../shared/persistence/contexto-transaccional';
+import { ActividadCancelada } from '../domain/actividad-cancelada.entity';
 import { ActividadMasiva } from '../domain/actividad-masiva.entity';
 import { BloqueoPorIncidente } from '../domain/bloqueo-por-incidente.entity';
 import {
@@ -62,6 +63,25 @@ export class IntegracionTypeormRepository
   guardarActividad(actividad: Partial<ActividadMasiva>): Promise<ActividadMasiva> {
     const repo = this.manager().getRepository(ActividadMasiva);
     return repo.save(repo.create(actividad));
+  }
+
+  async borrarActividad(actividadId: string): Promise<void> {
+    await this.manager().getRepository(ActividadMasiva).delete({ actividadId });
+  }
+
+  async registrarCancelacion(actividadId: string): Promise<void> {
+    await this.manager()
+      .getRepository(ActividadCancelada)
+      .createQueryBuilder()
+      .insert()
+      .values({ actividadId })
+      .orIgnore()
+      .execute();
+  }
+
+  async estaCancelada(actividadId: string): Promise<boolean> {
+    const filas = await this.manager().getRepository(ActividadCancelada).countBy({ actividadId });
+    return filas > 0;
   }
 
   actividadesQueTerminanDespuesDe(desde: Date): Promise<ActividadMasiva[]> {

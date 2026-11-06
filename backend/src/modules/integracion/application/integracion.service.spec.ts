@@ -54,7 +54,9 @@ describe('IntegracionService (CU-INT-01)', () => {
   let intervenciones: { programarSiCorresponde: jest.Mock };
   let bloqueos: BloqueoPorIncidente[];
   let zonasGuardadas: Map<string, Zona>;
-  let actividades: jest.Mocked<Pick<ActividadesMasivasService, 'registrar'>>;
+  let actividades: jest.Mocked<
+    Pick<ActividadesMasivasService, 'registrar' | 'cancelar' | 'modificar' | 'estaCancelada'>
+  >;
 
   const bloqueada = (zonaId: string) => zonasGuardadas.get(zonaId)?.bloqueada;
 
@@ -75,9 +77,17 @@ describe('IntegracionService (CU-INT-01)', () => {
         ),
       bloqueosActivos: jest.fn().mockImplementation(async () => bloqueos.filter((b) => b.activo)),
       guardarActividad: jest.fn(),
+      borrarActividad: jest.fn(),
+      registrarCancelacion: jest.fn(),
+      estaCancelada: jest.fn(),
       actividadesQueTerminanDespuesDe: jest.fn(),
     };
-    actividades = { registrar: jest.fn() };
+    actividades = {
+      registrar: jest.fn(),
+      cancelar: jest.fn(),
+      modificar: jest.fn(),
+      estaCancelada: jest.fn().mockResolvedValue(false),
+    };
     contenedores = { listar: jest.fn().mockResolvedValue([CERCA, LEJOS]) };
     // ZonasService real sobre un repositorio en memoria, con estado como la base:
     // lo que bloquea una emergencia lo ve la siguiente, y el bloqueo de un
@@ -146,12 +156,13 @@ describe('IntegracionService (CU-INT-01)', () => {
       expect(eventos.getPublished(EventTypes.REFUERZO_PROGRAMADO)).toHaveLength(0);
     });
 
-    it('si el evento se cancela, se borra el refuerzo', async () => {
-      await service.procesar(
-        sobre('com.citypass.espacios.EventoCancelado', { eventoId: 'evt-1', motivo: 'lluvia' }),
-      );
+    it('si el evento ya se cancelo, no se programa el refuerzo', async () => {
+      actividades.estaCancelada.mockResolvedValue(true);
 
-      expect(integracion.borrarRefuerzo).toHaveBeenCalledWith('evt-1');
+      await service.procesar(eventoCultural());
+
+      expect(actividades.estaCancelada).toHaveBeenCalledWith('evt-1');
+      expect(integracion.guardarRefuerzo).not.toHaveBeenCalled();
     });
   });
 
@@ -163,6 +174,30 @@ describe('IntegracionService (CU-INT-01)', () => {
     ).resolves.toBe('procesado');
 
     expect(actividades.registrar).toHaveBeenCalledWith(data);
+  });
+
+  it.each(['EventoCancelado', 'ReservaCancelada'])(
+    'una %s la cancela ActividadesMasivasService (squad 6)',
+    async (tipo) => {
+      const data = { eventoId: 'act-1' };
+
+      await expect(service.procesar(sobre(`com.citypass.espacios.${tipo}`, data))).resolves.toBe(
+        'procesado',
+      );
+
+      expect(actividades.cancelar).toHaveBeenCalledWith(data);
+      expect(actividades.registrar).not.toHaveBeenCalled();
+    },
+  );
+
+  it('una ActividadModificada la maneja ActividadesMasivasService (squad 6)', async () => {
+    const data = { actividadId: 'act-1', estadoNuevo: 'CANCELADA' };
+
+    await expect(
+      service.procesar(sobre('com.citypass.espacios.ActividadModificada', data)),
+    ).resolves.toBe('procesado');
+
+    expect(actividades.modificar).toHaveBeenCalledWith(data);
   });
 
   describe('emergencias', () => {

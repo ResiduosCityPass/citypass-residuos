@@ -35,9 +35,7 @@ import { CandidatoRuteo, litrosOcupados, planificarRuta } from '../domain/reglas
 import { AsignarRutaDto } from './dto/asignar-ruta.dto';
 import { GenerarRutaDto } from './dto/generar-ruta.dto';
 import { ContingenciasService } from '../../contingencias/application/contingencias.service';
-
-/** Prefijo de los refuerzos que vienen de una ActividadCreada de Espacios (squad 3). */
-const PREFIJO_ACTIVIDAD = 'act-';
+import { causaDelRefuerzo } from '../../integracion/domain/refuerzo-evento.entity';
 
 /** Deposito por defecto: el Obelisco. Configurable por entorno. */
 export const DEPOSITO_DEFAULT: Punto = { lat: -34.6037, lng: -58.3816 };
@@ -224,10 +222,10 @@ export class RutasService {
   }
 
   /**
-   * Squad 3: una IntervencionProgramada por cada actividad masiva cuyos
+   * Squads 3 y 6: una IntervencionProgramada por cada actividad o reserva cuyos
    * contenedores entran en esta ruta. Analitica cuenta los camiones distintos
-   * con causaTipo EVENTO_PUBLICO. Sale al asignar porque recien ahi hay un
-   * camion comprometido: una propuesta se puede descartar.
+   * por causaTipo (EVENTO_PUBLICO o RESERVA). Sale al asignar porque recien ahi
+   * hay un camion comprometido: una propuesta se puede descartar.
    */
   private async publicarIntervencionesPorActividad(ruta: Ruta, camionId: string): Promise<void> {
     if (!this.refuerzos || !ruta.paradas?.length || !ruta.asignadaEn) {
@@ -238,7 +236,8 @@ export class RutasService {
     const vigentes = await this.refuerzos.vigentes(new Date());
 
     for (const refuerzo of vigentes) {
-      if (!refuerzo.eventoId?.startsWith(PREFIJO_ACTIVIDAD)) {
+      const causa = causaDelRefuerzo(refuerzo.eventoId ?? '');
+      if (!causa) {
         continue;
       }
 
@@ -253,19 +252,17 @@ export class RutasService {
         continue;
       }
 
-      const actividadId = refuerzo.eventoId.slice(PREFIJO_ACTIVIDAD.length);
       await this.eventos.publish(
         buildEvent(
           EventTypes.INTERVENCION_PROGRAMADA,
           {
             // Determinista: la misma ruta y actividad dan siempre el mismo id.
-            intervencionId: `${ruta.id}:${actividadId}`,
+            intervencionId: `${ruta.id}:${causa.causaId}`,
             emergenciaId: null,
             contenedorId: contenedor.id,
             ubicacion: { lat: contenedor.lat, lng: contenedor.lng },
             programadaEn: ruta.asignadaEn.toISOString(),
-            causaId: actividadId,
-            causaTipo: 'EVENTO_PUBLICO',
+            ...causa,
             camionId,
           },
           { correlationId: refuerzo.eventoId },

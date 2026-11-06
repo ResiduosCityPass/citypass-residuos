@@ -588,6 +588,23 @@ describe('RutasService (CU-08, CU-09)', () => {
       });
     });
 
+    it('la reserva de un evento comunitario sale con causaTipo RESERVA (squad 6)', async () => {
+      rutas.buscarPorId.mockResolvedValue(conParadas('c-1'));
+
+      await conRefuerzos([{ eventoId: 'res-7781', contenedorIds: ['c-1'] }]).asignar('rt-1', {
+        choferId: 'ch-1',
+      });
+
+      const [publicada] = eventos.getPublished(EventTypes.INTERVENCION_PROGRAMADA);
+      expect(publicada.correlationId).toBe('res-7781');
+      expect(publicada.payload).toMatchObject({
+        intervencionId: 'rt-1:7781',
+        causaId: '7781',
+        causaTipo: 'RESERVA',
+        camionId: CAMION.patente,
+      });
+    });
+
     it('no publica nada por refuerzos que no son de una actividad masiva', async () => {
       rutas.buscarPorId.mockResolvedValue(conParadas('c-1'));
 
