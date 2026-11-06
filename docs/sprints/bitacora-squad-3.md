@@ -608,3 +608,10 @@ Comparé el `.avsc` con lo que publica el traductor al gateway: tienen los mismo
 **Falta:**
 - Review del #85 (`alertaId`). Cuando entre, Rami registra esa versión del `.avsc`.
 - Probar el paso 5 con las credenciales.
+
+**Tachos de Recoleta en Render:** con un token de administrador, `npm run plaza -- --nombre "Sede Recoleta" --lat -34.5862976 --lng -58.3925127` creó CT-0022 (común), CT-0023 (reciclable) y CT-0024 (orgánico) en la zona "Sede Recoleta", a 43–46 m de la sede.
+- **Credenciales del bus:** el `client_id` de Nicolas saca token en el bus. Residuos todavía no tiene suscripciones.
+
+**Falta:**
+- Review del #85. Después, que Rami registre el esquema y haga el release a `main`.
+- Suscribir el webhook de Render a `ActividadCreada` (`npm run bus -- suscribir`).
