@@ -631,4 +631,6 @@ Tomás subió las correcciones: guarda las cancelaciones aunque lleguen antes qu
 
 **Falta:**
 - Confirmar con Rami que registró en EDA la versión nueva de `IntervencionProgramada`.
-- Con el token nuevo, suscribir el webhook de Render a `ActividadCreada`.
+- Probar con una actividad real de Espacios en Recoleta.
+
+**Webhook suscripto al bus:** con el token nuevo, el webhook de Render lo acepta (el viejo daba 401). `npm run bus -- suscribir` dio de alta `com.citypass.espacios.ActividadCreada`, activa, con id `db00c6de-c176-4b7e-b1c8-1f2dc3f5a19d` (sirve para darla de baja).
