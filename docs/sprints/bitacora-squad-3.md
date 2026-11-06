@@ -584,3 +584,64 @@ Comparé el `.avsc` con lo que publica el traductor al gateway: tienen los mismo
 - Review del #83.
 - Que se registre la versión nueva de `IntervencionProgramada` en EDA. Hasta entonces, no hay release a `main`.
 - Un review nuevo del #78: las aprobaciones se descartaron con el último commit.
+
+**Noche del 05/11:**
+- **Adriel y Fran aprobaron el #78 y el #83, y entraron a `develop`.** Adriel marcó un detalle que no bloquea: `npm run plaza` no valida que la latitud esté entre -90 y 90, pero la API la rechaza igual.
+- **La sede de la demo es Recoleta.** Fran le pide a Santiago (Espacios) las coordenadas.
+
+**Falta:**
+- Con las coordenadas de Recoleta, correr `npm run plaza` en Render.
+- Que Rami registre la versión nueva de `IntervencionProgramada` en EDA. Después, el release a `main`.
+
+**Coordenadas de la sede de Recoleta**, que Espacios pasó por Fran: -34.5862976, -58.3925127.
+- **En local:** `npm run plaza` creó CT-0020, CT-0021 y CT-0022 en la zona "Sede Recoleta". Una actividad de 1.500 personas en esas coordenadas quedó con los 3 contenedores.
+- **El guion de la demo** ya usa la sede de Recoleta, en vez de Plaza Houssay.
+
+**Falta:** correr `npm run plaza` en Render, con un token de administrador.
+
+**Respuestas del 05/11 a la noche:**
+- **Nicolas Hernández (Login)** pasó por privado el `client_id` y el secreto de Residuos para el paso 5. Quedaron en `backend/.env`, fuera del repo.
+- **Francisco Csik (Analítica)** pasó los campos de `IntervencionProgramada`. Coinciden con el `.avsc`, salvo `alertaId` (uuid o null), que es para las intervenciones por una `AlertaGenerada` propia.
+- **`causaTipo`:** Analítica pide usar los mismos valores que Emergencias: `EVENTO_PUBLICO`, `RECLAMO`, `EVENTO_CLIMATICO`, `INCIDENTE_VIAL` y `RESERVA`. Nuestro `EVENTO_PUBLICO` ya coincide.
+- **Abrí el #85:** suma `alertaId` al `.avsc` y al evento, siempre en null por ahora, y documenta los valores de `causaTipo`. 819 unitarios en verde. Conviene que entre antes de que Rami registre el esquema, así se registra una sola vez.
+
+**Falta:**
+- Review del #85 (`alertaId`). Cuando entre, Rami registra esa versión del `.avsc`.
+- Probar el paso 5 con las credenciales.
+
+**Tachos de Recoleta en Render:** con un token de administrador, `npm run plaza -- --nombre "Sede Recoleta" --lat -34.5862976 --lng -58.3925127` creó CT-0022 (común), CT-0023 (reciclable) y CT-0024 (orgánico) en la zona "Sede Recoleta", a 43–46 m de la sede.
+- **Credenciales del bus:** el `client_id` de Nicolas saca token en el bus. Residuos todavía no tiene suscripciones.
+
+**Falta:**
+- Review del #85. Después, que Rami registre el esquema y haga el release a `main`.
+- Suscribir el webhook de Render a `ActividadCreada` (`npm run bus -- suscribir`).
+
+## Vie 06/11 · Revisé el #74 de Tomás
+
+Tomás subió las correcciones: guarda las cancelaciones aunque lleguen antes que la creación, escucha `EventoCancelado` y `ActividadModificada`, acepta `CANCELLED` y separa su caso del nuestro.
+- **Lo que toca a mi caso:** desde 1000 personas sigue todo igual (zona en el mapa, refuerzo `act-<id>` e `IntervencionProgramada` con `EVENTO_PUBLICO`). De 100 a 999 el refuerzo es `res-<id>` y la intervención sale con `causaTipo = RESERVA`. Con eso queda resuelta la duda del 04/11: Analítica ya puede separar los dos casos.
+- **Cancelación:** si Espacios cancela una actividad masiva, también se borra su zona del mapa.
+- **Cruce con el #85:** no tocan los mismos archivos. Los junté sobre `develop` en una rama temporal: 843 unitarios en verde y compila.
+
+## Vie 06/11 · Release a `main`
+
+- **Entraron a `develop`** el #85 (`alertaId`, aprobado por Rami) y el #74 de Tomás.
+- **Release:** Rami mergeó el #86 (`develop` → `main`), aprobado por Nicolas Damm, y desplegó en Render. La API responde en `/api/v1/health`.
+- **Token del webhook:** Rami confirmó que el de Render es distinto al que teníamos. Lo pasa por privado y va solo a `backend/.env`.
+
+**Falta:**
+- Probar con una actividad real de Espacios en Recoleta.
+
+**Webhook suscripto al bus:** con el token nuevo, el webhook de Render lo acepta (el viejo daba 401). `npm run bus -- suscribir` dio de alta `com.citypass.espacios.ActividadCreada`, activa, con id `db00c6de-c176-4b7e-b1c8-1f2dc3f5a19d` (sirve para darla de baja).
+
+## Vie 06/11 · Primera prueba completa en Render
+
+Con el script del plan B (`npm run actividad`), en vez de Espacios, mandé al webhook de Render una actividad de 1.500 personas en la sede de Recoleta que terminaba a los 2 minutos.
+- **Mapa:** apareció el aviso "Actividad masiva: Prueba sede Recoleta · 1.500 personas · 3 contenedores en la zona".
+- **Ruta:** generé una ruta para la zona "Sede Recoleta" y CT-0022 entró con 0% de llenado, por el refuerzo del evento. La asigné a AB123CD con Juana Perez (CH-001).
+- **Evento publicado:** en el bus (`GET /events?topic=com.citypass.residuos.IntervencionProgramada`) quedó la `IntervencionProgramada` con `causaTipo = EVENTO_PUBLICO`, `alertaId` en null, `camionId = AB123CD` y las coordenadas del tacho. Con `alertaId` incluido pasó, así que el esquema nuevo está andando en EDA.
+- **Bus:** no hay envíos fallidos.
+
+**Falta:**
+- Probar con una actividad real que cree Rodrigo desde Espacios (llega por la suscripción del webhook).
+- Del 13 al 18/11: ensayo completo de la demo en Render.

@@ -13,7 +13,7 @@ Se ensaya entera al menos una vez el día anterior.
 
 > Espacios publica un festival de 5.000 personas → Residuos lo recibe por el bus → la zona aparece
 > en el mapa con la cuenta regresiva → termina el festival → el operador genera la ruta y los
-> tachos de la plaza entran aunque no estén llenos → el chofer la cierra.
+> tachos de la sede entran aunque no estén llenos → el chofer la cierra.
 
 La idea a dejar clara: **Residuos no recibe órdenes de Espacios, reacciona a un hecho.** Espacios
 no sabe que existimos; solo publica que se creó una actividad.
@@ -29,8 +29,8 @@ no sabe que existimos; solo publica que se creó una actividad.
 - [ ] Hay un camión y un chofer de prueba con ruta vacía.
 - [ ] No quedan rutas en `PROPUESTA` ni actividades de ensayos que tapen el mapa: los contenedores
       de una ruta viva quedan fuera del ruteo nuevo.
-- [ ] Crear los contenedores de **Plaza Houssay**, una sola vez por base:
-      `API_URL=<api-de-render>/api/v1 TOKEN=<token-de-administrador> npm run plaza`. Sin ellos no
+- [ ] Crear los contenedores de la **sede de Recoleta**, una sola vez por base:
+      `API_URL=<api-de-render>/api/v1 TOKEN=<token-de-administrador> npm run plaza -- --nombre "Sede Recoleta" --lat -34.5862976 --lng -58.3925127`. Sin ellos no
       hay ninguno a menos de 300 m y la escuadrilla no sale. Anotar sus códigos: son los que entran
       a la ruta gracias a la escuadrilla.
 
@@ -47,15 +47,16 @@ no sabe que existimos; solo publica que se creó una actividad.
 
 ### 1. Llega el evento (30 s)
 
-**Con el bus real:** Rodrigo crea la actividad en Espacios, en Plaza Houssay (-34.5994, -58.3988)
-y con la hora de fin en 2 minutos.
+**Con el bus real:** Rodrigo crea la actividad en Espacios, en la sede de Recoleta
+(-34.5862976, -58.3925127), con 1000 personas o más y la hora de fin en 2 minutos. Espacios solo
+deja crear eventos de ese tamaño en cuatro sedes: Parque Centenario, Recoleta, Usina del Arte y Abasto.
 
 **Plan B (si el bus o Espacios fallan):** el script hace de Espacios y manda el mismo evento al
 webhook:
 
 ```bash
 cd simulator
-API_URL=<api-de-render>/api/v1 WEBHOOK_TOKEN=<el-de-render> npm run actividad -- --lat -34.5994 --lng -58.3988 --termina-en 2
+API_URL=<api-de-render>/api/v1 WEBHOOK_TOKEN=<el-de-render> npm run actividad -- --lat -34.5862976 --lng -58.3925127 --termina-en 2
 ```
 
 En Render se usa `--lat` y `--lng` porque `--contenedor` necesita un token de administrador. En
@@ -78,7 +79,7 @@ publicó, y cada módulo del squad decide qué hacer."
 
 - Esperar a que el aviso diga *"Terminó a las 20:00"* y refrescar.
 - Ir a **Rutas** y generar la ruta para el camión.
-- Mostrar que el **contenedor de la plaza** está en la ruta aunque esté en verde.
+- Mostrar que el **contenedor de la sede** está en la ruta aunque esté en verde.
 
 **Qué decir:** "Desde que termina el evento y durante 6 horas, los tachos de la zona entran a la
 ruta aunque no estén llenos. Después de un festival se van a llenar seguro. La ruta la confirma
@@ -92,7 +93,7 @@ el operador, como siempre: el sistema propone y una persona decide camión y cho
   Sensors → Location con las coordenadas del contenedor.
 - La ruta pasa a **COMPLETADA** y los contenedores quedan vacíos.
 
-**Cierre:** "Un evento de otro módulo terminó en un camión vaciando los tachos de la plaza, sin
+**Cierre:** "Un evento de otro módulo terminó en un camión vaciando los tachos de la sede, sin
 que nadie tuviera que avisarnos."
 
 ---
@@ -103,7 +104,7 @@ que nadie tuviera que avisarnos."
 |---|---|
 | El evento no aparece en el mapa | Refrescar. Si sigue sin aparecer, `npm run bus -- fallidos`; si tarda, pasar al plan B |
 | El bus o Espacios no responden | Plan B: el script, mismo evento, misma historia |
-| La ruta sale sin el tacho de la plaza | El evento no terminó todavía (la escuadrilla arranca a la hora de fin) o el tacho está en otra ruta viva |
+| La ruta sale sin el tacho de la sede | El evento no terminó todavía (la escuadrilla arranca a la hora de fin) o el tacho está en otra ruta viva |
 | "No hay contenedores para la ruta" | El evento todavía no terminó: esperar a que el aviso diga "Terminó" y generar de nuevo. Si no, hay una ruta en `PROPUESTA` colgada: descartarla y generar de nuevo. Si los tachos ya se vaciaron, no vuelven a entrar: mandar otra actividad para repetir |
 | El chofer no puede confirmar | La ubicación de DevTools no es la del contenedor |
 | `/chofer` dice que no hay ruta | La ruta está asignada a otro chofer. En local, el token de chofer es el de Juana Perez, no el de `dev-chofer`. Una ruta asignada no se puede reasignar: hay que generar otra |
@@ -118,3 +119,4 @@ que nadie tuviera que avisarnos."
 | 30/10 | Local, por API y pantalla | Pasos 1 a 4 con `develop` adentro: zona en el mapa, CT-0005 en la ruta y ruta cerrada por el chofer, con GPS simulado. Falta el ensayo en Render con el bus real |
 | 31/10 | Local, por API y pantalla | Pasos 1 a 4 con el #66 adentro: zona en el mapa, CT-0005 al 0 % en la ruta y ruta cerrada por el chofer, con GPS simulado. Falta el ensayo en Render con el bus real |
 | 02/11 | Local, por webhook y pantalla | Pasos 1 a 4 en Plaza Houssay, con el #68 adentro y el plan B: zona con 3 contenedores, CT-0018 al 0 % en la ruta del camión de reciclables y ruta cerrada por el chofer, con GPS simulado. Falta el ensayo en Render con el bus real |
+| 05/11 | Local, por webhook | Paso 1 en la sede de Recoleta: `npm run plaza` creó CT-0020, CT-0021 y CT-0022, y la actividad de 1.500 personas quedó con los 3. Falta el ensayo en Render |
