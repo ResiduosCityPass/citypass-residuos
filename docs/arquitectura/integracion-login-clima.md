@@ -57,15 +57,21 @@ valida `module=residuos`, `token_use=human`, versión 1, expiración y firma RS2
 Política elegida explícitamente por Ramiro: el grupo LDAP `delegados` tiene rol
 **OPERADOR**, sin permisos de ADMINISTRADOR. Los grupos quedan configurados así:
 
+Cuando un token contiene varios grupos reconocidos, se resuelve un único rol
+con prioridad **ADMINISTRADOR > OPERADOR > CHOFER**, independientemente del orden
+en que Login entregue los grupos. El delegado sin otros grupos sigue siendo OPERADOR.
+
 ```dotenv
 JWT_ADMIN_GROUPS=administrador
 JWT_OPERATOR_GROUPS=operador,delegados
 JWT_DRIVER_GROUPS=chofer
 ```
 
-No se crearon grupos ni se modificaron membresías del directorio remoto. Los permisos de
-administración (por ejemplo crear camiones) siguen requiriendo administrador y devuelven 403
-al delegado. Las credenciales internas del chofer siguen con HS256 y su emisor propio;
+Los grupos y membresías se administran en Login con el delegado; no se crean desde
+los endpoints de Residuos. Para el ensayo desplegado del 03/11 se creó `qa-admin-res`
+con el único grupo `residuos-administradores`, sin modificar los grupos del delegado.
+Los permisos de administración (por ejemplo crear camiones) siguen requiriendo administrador
+y devuelven 403 al delegado. Las credenciales internas del chofer siguen con HS256 y su emisor propio;
 no se mezclan con la sesión del personal.
 
 ## Sesión del frontend

@@ -23,6 +23,7 @@ describe('Recalculo de rutas por obstruccion (e2e)', () => {
   const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
 
   interface ParadaRespuesta {
+    id: string;
     contenedorId: string;
     orden: number;
     estado: EstadoParada;
@@ -251,6 +252,61 @@ describe('Recalculo de rutas por obstruccion (e2e)', () => {
           camionId: expect.stringMatching(/^AB\d{3}CD$/),
         }),
       );
+    });
+
+    it('con una emergencia en la zona, el chofer cierra las paradas fuera del radio; un bloqueo manual lo frena', async () => {
+      const { rutaId, contenedorIds } = await propuestaConTresParadas();
+      const [primero, segundo] = contenedorIds;
+      const chofer = await http
+        .post('/api/v1/choferes')
+        .set(auth(admin))
+        .send({
+          nombre: 'Juana Perez',
+          legajo: `CH-${Date.now().toString().slice(-8)}`,
+          usuarioSub: 'test-CHOFER',
+        })
+        .expect(201);
+      await http
+        .patch(`/api/v1/rutas/${rutaId}/asignar`)
+        .set(auth(admin))
+        .send({ choferId: chofer.body.id })
+        .expect(200);
+
+      // Bloquea la zona entera y omite solo el tercero, a ~170 m.
+      await enviar('ev-emergencia-2', 'com.citypass.emergencias.EmergenciaCreada', {
+        emergenciaId: 'EM-ZONA',
+        latitud: DEPOSITO.lat - 0.0075,
+        longitud: DEPOSITO.lng,
+        afectaCirculacion: true,
+      });
+
+      const tokenChofer = ctx.token(Rol.CHOFER);
+      const parada = (contenedorId: string) =>
+        detalle(rutaId).then((r) => r.paradas.find((p) => p.contenedorId === contenedorId)!);
+      const contenedor = async (id: string) =>
+        (await http.get(`/api/v1/contenedores/${id}`).set(auth(admin)).expect(200)).body;
+
+      const delPrimero = await contenedor(primero);
+      expect((await http.get(`/api/v1/zonas/${delPrimero.zonaId}`).set(auth(admin))).body).toEqual(
+        expect.objectContaining({ bloqueada: true }),
+      );
+      await http
+        .patch(`/api/v1/paradas/${(await parada(primero)).id}/confirmar`)
+        .set(auth(tokenChofer))
+        .send({ lat: delPrimero.lat, lng: delPrimero.lng })
+        .expect(200);
+
+      await http
+        .patch(`/api/v1/zonas/${delPrimero.zonaId}/bloqueo?bloqueada=true`)
+        .set(auth(admin))
+        .expect(200);
+      const delSegundo = await contenedor(segundo);
+      const frenado = await http
+        .patch(`/api/v1/paradas/${(await parada(segundo)).id}/confirmar`)
+        .set(auth(tokenChofer))
+        .send({ lat: delSegundo.lat, lng: delSegundo.lng })
+        .expect(409);
+      expect(frenado.body.code).toBe('ZONA_BLOQUEADA');
     });
 
     it('queda afuera del ruteo hasta que otro squad avisa que el auto ya no esta', async () => {

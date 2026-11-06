@@ -74,6 +74,17 @@ Usa `WEBHOOK_TOKEN` (default `local-dev`), que tiene que coincidir con `GATEWAY_
 backend. Sin `--contenedor` la actividad cae en el Obelisco, pero el seed reparte los contenedores
 hasta a 1 km, así que puede quedar sin ninguno dentro de los 300 m.
 
+El seed no deja contenedores cerca de las sedes de Espacios. `npm run plaza` crea 3 a menos de
+100 m del punto que se le pase, uno de cada tipo. Se corre una sola vez por base y por sede:
+
+```bash
+TOKEN=<token-de-administrador> npm run plaza -- --nombre "<sede>" --lat <lat> --lng <lng>
+npm run actividad -- --lat <lat> --lng <lng>
+```
+
+Las coordenadas tienen que ser las que Espacios publica para la sede. Sin `--lat` y `--lng` usa
+Plaza Houssay (-34.5994, -58.3988).
+
 ## Suscribirse al bus real
 
 `bus.js` da de alta el webhook de Residuos en Render para que el bus le mande `ActividadCreada`.

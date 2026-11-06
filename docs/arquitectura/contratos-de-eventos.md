@@ -152,6 +152,35 @@ se crea un refuerzo interno para que entre en la próxima ruta. **No se publica 
 
 **Consumidores esperados:** EDA (Squad 1) para verificar el flujo; Analítica Urbana (Squad 8), que solo lee eventos y arma gráficos, no publica nada.
 
+**También en el squad 3 (actividad masiva de Espacios).** Cuando el operador **asigna** una ruta que
+pasa por contenedores de una actividad masiva, sale una `IntervencionProgramada` por actividad. Es
+lo que lee Analítica para "cuadrillas planificadas para las inmediaciones del evento" (cuenta
+`camionId` distintos con `causaTipo = EVENTO_PUBLICO`). Sale al asignar, no al generar: recién ahí
+hay un camión comprometido, y una propuesta se puede descartar.
+
+```json
+{
+  "intervencionId": "3f0c...:7781",
+  "emergenciaId": null,
+  "contenedorId": "CT-0018",
+  "latitud": -34.5994,
+  "longitud": -58.3988,
+  "programadaEn": 1793000000000,
+  "correlationId": "act-7781",
+  "occurredAt": 1793000000000,
+  "causaId": "7781",
+  "causaTipo": "EVENTO_PUBLICO",
+  "camionId": "XY987ZW"
+}
+```
+
+- `intervencionId` es `<rutaId>:<actividadId>`: la misma ruta y actividad dan siempre el mismo id.
+- `causaId` es el `actividadId` de `ActividadCreada`, y `correlationId` es `act-<actividadId>`.
+- `camionId` es la patente del camión de la ruta. `contenedorId` es el primer contenedor de la
+  actividad que entra en la ruta.
+- En el caso de Emergencias, `causaId`, `causaTipo` y `camionId` van en `null`. `emergenciaId` va en
+  `null` en el squad 3.
+
 ### `residuos.intervencion.completada` — CU-01 de Emergencias (A7)
 
 Se emite cuando el operador marca la intervención como completada (`PATCH /intervenciones/:id/completar`). Está en el catálogo del CU-01 (versión del 29/10). Sale al bus como `IntervencionCompletada`; esquema en [`schemas/IntervencionCompletada.avsc`](schemas/IntervencionCompletada.avsc).
@@ -279,6 +308,14 @@ Sale al bus como **`com.citypass.residuos.IntervencionActualizada`**. Se emite *
 cuando llega una `EmergenciaCreada` con `afectaCirculacion: true` y un contenedor a menos de 300 m
 tiene una parada pendiente en una ruta `ASIGNADA` o `EN_CURSO`. Esa parada queda `OMITIDA` y la ruta
 se recalcula. En una ruta `PROPUESTA` la parada se borra sin publicar nada: el camión no salió.
+
+**Mientras Emergencias mande `afectaCirculacion` en `null`** (acordado con Kevin el 05/11), una
+emergencia con `causaTipo = INCIDENTE_VIAL` cuenta como corte de circulación. Un `false` explícito
+se respeta siempre, y con otra causa en `null` no se bloquea nada.
+
+**Una emergencia con `causaTipo = RECLAMO` nunca bloquea**, aunque traiga `afectaCirculacion: true`
+(acordado con Fran el 05/11). Es el mismo auto que ya resuelve CU-INT-02 sacando los contenedores a
+15 m; bloquear la zona y las paradas a 300 m sería reaccionar dos veces.
 
 ```json
 {

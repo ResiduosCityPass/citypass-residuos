@@ -13,6 +13,7 @@
     "emergencia-residuos": "node emergencia.js --causa RESIDUOS",
     "emergencia-via": "node emergencia.js --causa VIA",
     "actividad": "node actividad-masiva.js",
+    "plaza": "node plaza-demo.js",
     "bus": "node bus.js",
     "reclamo": "node reclamo.js",
     "reclamo:resuelto": "node reclamo.js resuelto"

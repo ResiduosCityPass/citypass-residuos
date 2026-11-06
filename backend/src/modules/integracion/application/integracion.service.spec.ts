@@ -258,6 +258,45 @@ describe('IntegracionService (CU-INT-01)', () => {
 
         expect(paradas.quitarContenedores).not.toHaveBeenCalled();
       });
+
+      // Emergencias todavia manda afectaCirculacion en null (Kevin, 05/11).
+      describe('sin afectaCirculacion', () => {
+        it.each([
+          ['en null', { afectaCirculacion: null }],
+          ['sin el campo', { afectaCirculacion: undefined }],
+        ])('%s, un incidente vial corta la circulacion', async (_caso, cambios) => {
+          await conRutas().procesar(
+            incidente({ ...cambios, causaId: 'in-1', causaTipo: 'INCIDENTE_VIAL' }),
+          );
+
+          expect(paradas.quitarContenedores).toHaveBeenCalledTimes(1);
+        });
+
+        it('en null, otra causa no corta la circulacion', async () => {
+          await conRutas().procesar(
+            incidente({ afectaCirculacion: null, causaId: 're-1', causaTipo: 'RECLAMO' }),
+          );
+
+          expect(paradas.quitarContenedores).not.toHaveBeenCalled();
+        });
+
+        it('una emergencia abierta desde un reclamo no bloquea aunque venga en true', async () => {
+          await conRutas().procesar(
+            incidente({ afectaCirculacion: true, causaId: 're-1', causaTipo: 'RECLAMO' }),
+          );
+
+          expect(paradas.quitarContenedores).not.toHaveBeenCalled();
+          expect(bloqueada('z-palermo')).toBe(false);
+        });
+
+        it('un false explicito gana aunque sea un incidente vial', async () => {
+          await conRutas().procesar(
+            incidente({ afectaCirculacion: false, causaId: 'in-1', causaTipo: 'INCIDENTE_VIAL' }),
+          );
+
+          expect(paradas.quitarContenedores).not.toHaveBeenCalled();
+        });
+      });
     });
 
     it('una emergencia que no corta la circulacion no bloquea nada', async () => {

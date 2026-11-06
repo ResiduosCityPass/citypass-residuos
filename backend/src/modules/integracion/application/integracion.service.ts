@@ -264,7 +264,7 @@ export class IntegracionService {
     const punto = ubicacionDe(data);
 
     // Las emergencias que no cortan la circulacion (medica, panico) llegan sin coordenadas.
-    if (data.afectaCirculacion !== true || !punto) {
+    if (!afectaLaCirculacion(data) || !punto) {
       return;
     }
 
@@ -345,6 +345,28 @@ function texto(data: Record<string, unknown>, campo: string): string {
  * `causaId` es null. Analitica no infiere causas, asi que una emergencia sin
  * causa corta el camino igual, pero no suma a ninguna metrica por causa.
  */
+/**
+ * Emergencias todavia no completa `afectaCirculacion` y lo manda en null
+ * (Kevin, 05/11). Mientras tanto, un incidente vial cuenta como corte: es
+ * justamente lo que mide el caso 4 de Analitica. Un booleano explicito, true o
+ * false, gana, salvo con causa RECLAMO.
+ *
+ * Una emergencia que Emergencias abre desde un reclamo es el mismo auto que ya
+ * resuelve CU-INT-02 sacando los contenedores a 15 m. Bloquear la zona y las
+ * paradas a 300 m seria reaccionar dos veces, y de mas (Fran, 05/11).
+ */
+function afectaLaCirculacion(data: Record<string, unknown>): boolean {
+  if (data.causaTipo === 'RECLAMO') {
+    return false;
+  }
+
+  if (typeof data.afectaCirculacion === 'boolean') {
+    return data.afectaCirculacion;
+  }
+
+  return data.causaTipo === 'INCIDENTE_VIAL';
+}
+
 function causaDeLaEmergencia(data: Record<string, unknown>, emergenciaId: string): CausaAfectacion {
   const { causaId, causaTipo, correlationId } = data;
   const completa = typeof causaId === 'string' && typeof causaTipo === 'string';
