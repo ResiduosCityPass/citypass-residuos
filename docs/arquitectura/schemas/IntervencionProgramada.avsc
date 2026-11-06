@@ -75,7 +75,7 @@
         "string"
       ],
       "default": null,
-      "doc": "EVENTO_PUBLICO en el squad 3. Null en el caso de Emergencias."
+      "doc": "EVENTO_PUBLICO en el squad 3 y RESERVA en el squad 6. Usa los mismos valores que Emergencias: EVENTO_PUBLICO, RECLAMO, EVENTO_CLIMATICO, INCIDENTE_VIAL, RESERVA. Null en el caso de Emergencias."
     },
     {
       "name": "camionId",
@@ -85,6 +85,15 @@
       ],
       "default": null,
       "doc": "Patente del camion de la ruta asignada. Null en el caso de Emergencias."
+    },
+    {
+      "name": "alertaId",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "Id de la AlertaGenerada de Residuos que origino la intervencion, si la hubo. Hoy siempre null."
     }
   ]
 }
