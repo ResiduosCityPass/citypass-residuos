@@ -630,7 +630,18 @@ Tomás subió las correcciones: guarda las cancelaciones aunque lleguen antes qu
 - **Token del webhook:** Rami confirmó que el de Render es distinto al que teníamos. Lo pasa por privado y va solo a `backend/.env`.
 
 **Falta:**
-- Confirmar con Rami que registró en EDA la versión nueva de `IntervencionProgramada`.
 - Probar con una actividad real de Espacios en Recoleta.
 
 **Webhook suscripto al bus:** con el token nuevo, el webhook de Render lo acepta (el viejo daba 401). `npm run bus -- suscribir` dio de alta `com.citypass.espacios.ActividadCreada`, activa, con id `db00c6de-c176-4b7e-b1c8-1f2dc3f5a19d` (sirve para darla de baja).
+
+## Vie 06/11 · Primera prueba completa en Render
+
+Con el script del plan B (`npm run actividad`), en vez de Espacios, mandé al webhook de Render una actividad de 1.500 personas en la sede de Recoleta que terminaba a los 2 minutos.
+- **Mapa:** apareció el aviso "Actividad masiva: Prueba sede Recoleta · 1.500 personas · 3 contenedores en la zona".
+- **Ruta:** generé una ruta para la zona "Sede Recoleta" y CT-0022 entró con 0% de llenado, por el refuerzo del evento. La asigné a AB123CD con Juana Perez (CH-001).
+- **Evento publicado:** en el bus (`GET /events?topic=com.citypass.residuos.IntervencionProgramada`) quedó la `IntervencionProgramada` con `causaTipo = EVENTO_PUBLICO`, `alertaId` en null, `camionId = AB123CD` y las coordenadas del tacho. Con `alertaId` incluido pasó, así que el esquema nuevo está andando en EDA.
+- **Bus:** no hay envíos fallidos.
+
+**Falta:**
+- Probar con una actividad real que cree Rodrigo desde Espacios (llega por la suscripción del webhook).
+- Del 13 al 18/11: ensayo completo de la demo en Render.
