@@ -615,3 +615,10 @@ Comparé el `.avsc` con lo que publica el traductor al gateway: tienen los mismo
 **Falta:**
 - Review del #85. Después, que Rami registre el esquema y haga el release a `main`.
 - Suscribir el webhook de Render a `ActividadCreada` (`npm run bus -- suscribir`).
+
+## Vie 06/11 · Revisé el #74 de Tomás
+
+Tomás subió las correcciones: guarda las cancelaciones aunque lleguen antes que la creación, escucha `EventoCancelado` y `ActividadModificada`, acepta `CANCELLED` y separa su caso del nuestro.
+- **Lo que toca a mi caso:** desde 1000 personas sigue todo igual (zona en el mapa, refuerzo `act-<id>` e `IntervencionProgramada` con `EVENTO_PUBLICO`). De 100 a 999 el refuerzo es `res-<id>` y la intervención sale con `causaTipo = RESERVA`. Con eso queda resuelta la duda del 04/11: Analítica ya puede separar los dos casos.
+- **Cancelación:** si Espacios cancela una actividad masiva, también se borra su zona del mapa.
+- **Cruce con el #85:** no tocan los mismos archivos. Los junté sobre `develop` en una rama temporal: 843 unitarios en verde y compila.
