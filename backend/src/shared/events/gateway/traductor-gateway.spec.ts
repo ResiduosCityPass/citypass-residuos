@@ -31,6 +31,7 @@ describe('traducirAGateway (CU-INT-01)', () => {
         causaId: null,
         causaTipo: null,
         camionId: null,
+        alertaId: null,
       },
     });
   });
@@ -56,6 +57,7 @@ describe('traducirAGateway (CU-INT-01)', () => {
       causaId: '7781',
       causaTipo: 'EVENTO_PUBLICO',
       camionId: 'XY987ZW',
+      alertaId: null,
       correlationId: 'act-7781',
     });
   });

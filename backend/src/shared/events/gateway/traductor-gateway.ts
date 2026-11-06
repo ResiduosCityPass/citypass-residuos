@@ -122,6 +122,9 @@ export function traducirAGateway(evento: DomainEvent): EventoGateway | null {
           causaId: p.causaId ?? null,
           causaTipo: p.causaTipo ?? null,
           camionId: p.camionId ?? null,
+          // Analitica lo pide para las intervenciones por una AlertaGenerada
+          // propia. Hoy ninguna sale por ahi, asi que va en null.
+          alertaId: p.alertaId ?? null,
         },
       };
 
