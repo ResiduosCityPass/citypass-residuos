@@ -11,7 +11,7 @@ Se ensaya entera al menos una vez el día anterior.
 
 ## La historia
 
-> Espacios publica un festival de 5.000 personas → Residuos lo recibe por el bus → la zona aparece
+> Espacios publica un festival de 1.200 personas → Residuos lo recibe por el bus → la zona aparece
 > en el mapa con la cuenta regresiva → termina el festival → el operador genera la ruta y los
 > tachos de la sede entran aunque no estén llenos → el chofer la cierra.
 
@@ -48,7 +48,7 @@ no sabe que existimos; solo publica que se creó una actividad.
 ### 1. Llega el evento (30 s)
 
 **Con el bus real:** Rodrigo crea la actividad en Espacios, en la sede de Recoleta
-(-34.5862976, -58.3925127), con 1000 personas o más y la hora de fin en 2 minutos. Espacios solo
+(-34.5862976, -58.3925127), con 1.000 a 1.200 personas (es lo que admite el Centro Cultural Recoleta), inicio en 1–2 minutos y fin 2 minutos después (el inicio tiene que ser futuro). Espacios solo
 deja crear eventos de ese tamaño en cuatro sedes: Parque Centenario, Recoleta, Usina del Arte y Abasto.
 
 **Plan B (si el bus o Espacios fallan):** el script hace de Espacios y manda el mismo evento al
@@ -56,7 +56,7 @@ webhook:
 
 ```bash
 cd simulator
-API_URL=<api-de-render>/api/v1 WEBHOOK_TOKEN=<el-de-render> npm run actividad -- --lat -34.5862976 --lng -58.3925127 --termina-en 2
+API_URL=<api-de-render>/api/v1 WEBHOOK_TOKEN=<el-de-render> npm run actividad -- --capacidad 1200 --lat -34.5862976 --lng -58.3925127 --termina-en 2
 ```
 
 En Render se usa `--lat` y `--lng` porque `--contenedor` necesita un token de administrador. En
@@ -69,7 +69,7 @@ publicó, y cada módulo del squad decide qué hacer."
 
 - Apretar **"Refrescar ahora"** (si no, aparece con el próximo refresco, a los 30 s).
 - Se ve el **círculo azul de 300 m** y el aviso: *"Actividad masiva: Festival de Primavera ·
-  5.000 personas · Termina a las 20:00 (en 2 min) · 1 contenedor en la zona"*.
+  1.200 personas · Termina a las 20:00 (en 2 min) · 3 contenedores en la zona"*.
 
 **Qué decir:** "Solo reaccionamos a eventos de 1.000 personas o más. Buscamos los contenedores a
 300 m o menos: esos son los que va a limpiar la escuadrilla. El corte de 1.000 personas y los
