@@ -653,3 +653,27 @@ Crucé lo que se habló en el grupo del squad con lo que hicimos en Residuos.
 - **Recepción:** Render está conectado al bus por Kafka, como recomendó Franco, y escucha todos los eventos de Espacios. El webhook queda como segunda vía; los repetidos se descartan por `eventId`.
 - **Guion corregido:** el Centro Cultural Recoleta admite hasta 1.200 personas, así que la demo pasa de 5.000 a 1.200, con 3 contenedores en la zona. Rodrigo confirmó que no hay duración mínima, pero el inicio tiene que ser futuro.
 - **Pedido de Analítica que no tomamos:** Francisco propuso publicar `IntervencionProgramada` también en los recorridos normales, para comparar. Nuestra métrica (cuadrillas por evento público) no lo necesita, así que quedó afuera.
+
+## Vie 06/11 · Guion de Recoleta mergeado
+
+- **#88 mergeado a `develop`:** guion con 1.200 personas y 3 contenedores, y el repaso del chat. Lo aprobó Tomás, que confirmó que CT-0022, CT-0023 y CT-0024 están a menos de 50 m de la sede.
+- **CI:** falló un test del frontend (`RouteDetailPage.test.jsx`, paradas suspendidas) que no tenía que ver con el PR, porque solo cambiaba docs y `develop` pasaba en el commit base. Al reintentar el job pasó: es un test que falla a veces.
+
+**Falta:**
+- Del 13 al 18/11: ensayo completo en Render, con una actividad real de Rodrigo en Recoleta.
+
+## Vie 06/11 · Ensayo en Render
+
+Ensayé la demo en Render con el plan B: 1.200 personas en la sede de Recoleta, terminando a los 2 minutos.
+- **Bus:** la suscripción sigue activa y no había envíos fallidos.
+- **Mapa:** apareció "Festival de Primavera · 1.200 personas · 3 contenedores en la zona".
+- **Primer intento de ruta:** salió `RUTA_SIN_CONTENEDORES`. CT-0022 seguía pendiente en la ruta de la prueba anterior y los contenedores de una ruta abierta no entran a otra. CT-0023 es de reciclables y CT-0024 orgánico, y los camiones libres eran de residuo común. Le emití una credencial a Juana Perez, entré como ella y omití la parada: la ruta vieja se cerró y AB123CD quedó libre.
+- **Ruta:** generé la ruta de AB123CD para la zona "Sede Recoleta". CT-0022 entró al 0 % y la asigné a Juana Perez.
+- **Evento publicado:** en el bus quedó la `IntervencionProgramada` de la ruta nueva, con `causaTipo = EVENTO_PUBLICO`, `camionId = AB123CD` y `alertaId` en null.
+
+**Para el 19/11:**
+- Antes de la demo, cerrar las rutas abiertas que tengan CT-0022: si no, la ruta sale vacía.
+- El único contenedor de la sede que entra a la ruta de un camión de residuo común es CT-0022.
+
+**Falta:**
+- Probar con una actividad real que cree Rodrigo desde Espacios.
