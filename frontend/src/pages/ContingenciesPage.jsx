@@ -62,12 +62,12 @@ export default function ContingenciesPage() {
 
   return (
     <div className="screen flood-screen">
-      <Notice type="info" title="Suspensión y recuperación por inundación">
+      <Notice type="info" title="Suspensión y recuperación por eventos climáticos">
         Las paradas suspendidas siguen pendientes y los contenedores conservan su llenado y sus alertas.
-        Al finalizar la inundación, revisá las condiciones y habilitá la recuperación.
+        Al finalizar el evento climático, revisá las condiciones y habilitá la recuperación.
       </Notice>
       <div className="filter-bar">
-        <Link to="/contingencias/clima">Revisar eventos de Espacios Públicos</Link>
+        <Link to="/alertas">Ver alertas climáticas</Link>
         <Link to="/rutas">Ver rutas de recolección</Link>
         <Button variant="secondary" onClick={load} disabled={Boolean(busy)}>Actualizar</Button>
         <span className="muted">Se actualiza cada 15 s</span>
@@ -103,7 +103,7 @@ export default function ContingenciesPage() {
         </section>
       )}
 
-      {!loading && !error && data.contingencias.length === 0 && <Notice type="info" title="No hay inundaciones registradas">Las contingencias aparecerán acá cuando se reciban sus eventos.</Notice>}
+      {!loading && !error && data.contingencias.length === 0 && <Notice type="info" title="No hay suspensiones por eventos climáticos">Las contingencias aparecerán acá cuando se reciban sus eventos.</Notice>}
 
       <div className="flood-list">
         {data.contingencias.map((flood) => {
@@ -118,7 +118,7 @@ export default function ContingenciesPage() {
               <p className="muted">Zonas: {flood.zonas.map((z) => z.zona?.nombre ?? z.zonaId).join(', ')}</p>
               <p>{pending} contenedor(es) pendientes de recuperación · {affectedRoutes.length} ruta(s) con paradas suspendidas</p>
               {flood.estado === 'ACTIVA' && <p>La recolección permanece suspendida hasta recibir la finalización y habilitar la recuperación.</p>}
-              {flood.estado === 'PENDIENTE_RECUPERACION' && <Notice type="warning" title="La inundación finalizó">Revisá que se pueda recolectar antes de habilitar. Los bloqueos manuales y otras inundaciones seguirán vigentes.</Notice>}
+              {flood.estado === 'PENDIENTE_RECUPERACION' && <Notice type="warning" title="El evento climático finalizó">Revisá que se pueda recolectar antes de habilitar. Los bloqueos manuales y otras contingencias seguirán vigentes.</Notice>}
               {flood.estado === 'EN_RECUPERACION' && <Notice type="info" title="Recuperación habilitada">Retomá las paradas existentes o generá propuestas para los contenedores sin ruta. Se incluyen aunque no estén críticos. Omitir una parada no cuenta como vaciado.</Notice>}
               {flood.estado === 'RECUPERADA' && <p>Se completaron los vaciados pendientes de esta contingencia.</p>}
 

@@ -26,7 +26,7 @@ export default function TokenBar({
 
   const save = (event) => {
     event.preventDefault();
-    // Lo que no tiene forma de JWT no se guarda. Decirlo aca es la diferencia
+    // Una credencial incompleta no se guarda. Decirlo acá es la diferencia
     // entre "te falto pegar un pedazo" y un 401 que parece falta de permisos.
     if (!saveToken(value)) {
       setInvalid(true);
@@ -64,8 +64,8 @@ export default function TokenBar({
       )}
       {invalid && (
         <p className="token-bar-error" role="alert">
-          Eso no parece una credencial completa. Son tres bloques separados por puntos: copiala
-          entera, sin espacios.
+          Eso no parece una credencial completa. Usá el código que empieza con CH-
+          o copiá el token anterior entero, sin espacios.
         </p>
       )}
     </form>

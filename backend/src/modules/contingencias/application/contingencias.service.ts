@@ -52,7 +52,7 @@ export class ContingenciasService {
     if (!contingencia)
       throw new NotFoundException({
         code: 'CONTINGENCIA_NO_ENCONTRADA',
-        message: 'No existe la inundacion indicada.',
+        message: 'No existe la contingencia indicada.',
       });
     return contingencia;
   }
@@ -231,7 +231,7 @@ export class ContingenciasService {
       if (c.estado === EstadoContingencia.ACTIVA)
         throw new ConflictException({
           code: 'INUNDACION_ACTIVA',
-          message: 'Primero debe finalizar la inundacion.',
+          message: 'Primero debe finalizar el evento climático.',
         });
       if (c.estado !== EstadoContingencia.PENDIENTE_RECUPERACION) return c;
       // Incluye lo acumulado hasta habilitar la recuperacion, no solo lo que habia al inicio.
@@ -266,7 +266,8 @@ export class ContingenciasService {
     if (restricciones.length)
       throw new ConflictException({
         code: 'PARADA_SUSPENDIDA_INUNDACION',
-        message: 'La recoleccion esta suspendida por inundacion o pendiente de habilitacion.',
+        message:
+          'La recolección está suspendida por un evento climático o pendiente de habilitación.',
         contingenciaIds: restricciones.map((r) => r.contingenciaId),
       });
     if ((await this.repo.zonasBloqueadasManualmente()).includes(zonaId)) {

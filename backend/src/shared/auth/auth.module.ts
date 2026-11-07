@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtModule, JwtModuleOptions } from '@nestjs/jwt';
 import { AUDIENCIA_TOKEN_DEFAULT, EMISOR_TOKEN_DEFAULT } from '../../config/env.validation';
+import { CodigoChoferService } from './codigo-chofer.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { RolesGuard } from './roles.guard';
 import { JwksService } from './jwks.service';
@@ -56,6 +57,7 @@ export function opcionesJwt(config: ConfigService): JwtModuleOptions {
   ],
   providers: [
     JwksService,
+    CodigoChoferService,
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
   ],

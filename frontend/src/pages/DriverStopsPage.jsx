@@ -236,7 +236,7 @@ export default function DriverStopsPage() {
         });
         await load();
       } else if (err.code === 'PARADA_SUSPENDIDA_INUNDACION') {
-        setFeedback({ stopId: stop.id, type: 'warning', title: 'Recolección suspendida por inundación', body: 'La parada sigue pendiente. Esperá la habilitación del operador.' });
+        setFeedback({ stopId: stop.id, type: 'warning', title: 'Recolección suspendida por evento climático', body: 'La parada sigue pendiente. Esperá la habilitación del operador.' });
         await load();
       } else if (err.code === 'PARADA_YA_CONFIRMADA') {
         // Casi siempre es un doble tap o el otro dispositivo. No es una falla.
@@ -333,7 +333,7 @@ export default function DriverStopsPage() {
         await load();
       } else if (err.code === 'PARADA_SUSPENDIDA_INUNDACION') {
         setSkippingId(null);
-        setFeedback({ stopId: stop.id, type: 'warning', title: 'Recolección suspendida por inundación', body: 'La parada sigue pendiente. Esperá la habilitación del operador.' });
+        setFeedback({ stopId: stop.id, type: 'warning', title: 'Recolección suspendida por evento climático', body: 'La parada sigue pendiente. Esperá la habilitación del operador.' });
         await load();
       } else if (err.code === 'PARADA_YA_OMITIDA' || err.code === 'PARADA_YA_CONFIRMADA') {
         // Una parada cerrada no se reabre por ninguno de los dos caminos. Casi
@@ -457,7 +457,7 @@ export default function DriverStopsPage() {
 
         {route && (
           <>
-            {route.paradasSuspendidas > 0 && <Notice type="warning" title="Hay paradas suspendidas por inundación">
+            {route.paradasSuspendidas > 0 && <Notice type="warning" title="Hay paradas suspendidas por evento climático">
               Podés continuar con las paradas habilitadas. Las suspendidas conservan su llenado y quedan pendientes hasta la habilitación.
             </Notice>}
             <Button variant="secondary" onClick={() => load()} disabled={confirmingId !== null || submittingSkip}>Actualizar ruta</Button>
@@ -508,7 +508,7 @@ export default function DriverStopsPage() {
                         el problema es de la calle. Por eso se muestra, no se
                         guarda y se olvida. */}
                     {stop.bloqueoManual && <Notice type="warning" title="Zona con bloqueo manual">Esperá la habilitación del operador antes de recolectar.</Notice>}
-                    {isStopSuspended(stop) && <Notice type="warning" title="Parada suspendida por inundación">
+                    {isStopSuspended(stop) && <Notice type="warning" title="Parada suspendida por evento climático">
                       {stop.restriccionesInundacion.map((r) => r.descripcion).join(', ')}. Esperá la habilitación antes de recolectar.
                     </Notice>}
                     {stop.estado === 'OMITIDA' && stop.motivo && (

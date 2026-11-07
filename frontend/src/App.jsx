@@ -13,8 +13,9 @@ import RoutesPage from './pages/RoutesPage.jsx';
 import RouteDetailPage from './pages/RouteDetailPage.jsx';
 import MetricsPage from './pages/MetricsPage.jsx';
 import NearbyContainersPage from './pages/NearbyContainersPage.jsx';
-import { fetchAlerts } from './api/waste.js';
+import { fetchAlerts, fetchClimateAlerts } from './api/waste.js';
 import { seedDevToken } from './api/client.js';
+import { climateAlertNeedsAttention } from './domain/climate-alerts.js';
 import { matchesAnyPath } from './domain/paths.js';
 import './App.css';
 import OperatorSession from './auth/OperatorSession.jsx';
@@ -22,7 +23,6 @@ import { federatedEnabled, accessToken, startSessionRefresh } from './auth/sessi
 import LoginPage from './pages/LoginPage.jsx';
 
 const ContingenciesPage = lazy(() => import('./pages/ContingenciesPage.jsx'));
-const ClimateEventsPage = lazy(() => import('./pages/ClimateEventsPage.jsx'));
 const DriverStopsPage = lazy(() => import('./pages/DriverStopsPage.jsx'));
 
 /**
@@ -36,11 +36,11 @@ const TITLES = {
   '/mapa': ['Mapa en tiempo real', 'Estado de los contenedores, minuto a minuto'],
   '/contenedores': ['Contenedores', 'Alta, edición, baja y vinculación de sensores'],
   '/zonas': ['Zonas y umbrales', 'A partir de qué nivel un contenedor es crítico'],
-  '/alertas': ['Alertas', 'Saturación e incendio'],
+  '/alertas': ['Alertas', 'Contenedores y eventos climáticos'],
   '/flota': ['Flota', 'Camiones, capacidad y disponibilidad'],
   '/choferes': ['Choferes', 'A quién se le asigna una ruta y cómo entra a verla'],
   '/rutas': ['Rutas', 'Generación y asignación'],
-  '/contingencias': ['Inundaciones', 'Suspensión del servicio y recuperación de la recolección'],
+  '/contingencias': ['Eventos climáticos', 'Suspensión del servicio y recuperación de la recolección'],
   '/contingencias/clima': ['Eventos climáticos', 'Recepción y revisión de alertas de Espacios Públicos'],
   '/intervenciones': ['Intervenciones', 'Emergencias cuya causa fue residuos'],
   '/metricas': ['Métricas', 'El dashboard de Residuos que arma Analítica'],
@@ -88,8 +88,11 @@ function Application() {
   // El globo del sidebar cuenta lo que alguien todavia tiene que atender:
   // ABIERTA y EN_ATENCION. Las resueltas ya no le piden nada a nadie.
   const countAlerts = useCallback(() => {
-    fetchAlerts()
-      .then((alerts) => setOpenAlerts(alerts.filter((a) => a.estado !== 'RESUELTA').length))
+    Promise.all([fetchAlerts().catch(() => []), fetchClimateAlerts().catch(() => ({ alertas: [] }))])
+      .then(([alerts, climate]) => setOpenAlerts(
+        alerts.filter((a) => a.estado !== 'RESUELTA').length +
+        climate.alertas.filter(climateAlertNeedsAttention).length,
+      ))
       .catch(() => setOpenAlerts(0));
   }, []);
 
@@ -112,6 +115,8 @@ function Application() {
     // se ve.
     if (isPublicPath(pathname) || (federatedEnabled() && !accessToken())) return;
     countAlerts();
+    const timer = setInterval(countAlerts, 15000);
+    return () => clearInterval(timer);
   }, [countAlerts, tokenVersion, pathname]);
 
   const onTokenChange = () => setTokenVersion((v) => v + 1);
@@ -133,8 +138,8 @@ function Application() {
         <Route path="/rutas" element={<RoutesPage />} />
         <Route path="/intervenciones" element={<InterventionsPage />} />
         <Route path="/rutas/:id" element={<RouteDetailPage />} />
-        <Route path="/contingencias" element={<Suspense fallback={<p className="muted">Cargando inundaciones…</p>}><ContingenciesPage /></Suspense>} />
-        <Route path="/contingencias/clima" element={<Suspense fallback={<p className="muted">Cargando eventos climáticos…</p>}><ClimateEventsPage /></Suspense>} />
+        <Route path="/contingencias" element={<Suspense fallback={<p className="muted">Cargando eventos climáticos…</p>}><ContingenciesPage /></Suspense>} />
+        <Route path="/contingencias/clima" element={<Navigate to="/alertas" replace />} />
         <Route path="/metricas" element={<MetricsPage />} />
         <Route path="*" element={<Navigate to="/mapa" replace />} />
       </Route>

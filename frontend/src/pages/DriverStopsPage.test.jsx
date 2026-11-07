@@ -68,7 +68,7 @@ describe('Suspension por inundacion en la vista del chofer', () => {
   it('mantiene el llenado y no ofrece confirmar ni omitir una parada suspendida', async () => {
     fetchMyRoute.mockResolvedValue({ ...route([stop({ restriccionesInundacion: [{ contingenciaId: 'f1', descripcion: 'Inundacion Centro' }] })]), paradasSuspendidas: 1 });
     render(<DriverStopsPage />);
-    expect(await screen.findByText('Parada suspendida por inundación')).toBeInTheDocument();
+    expect(await screen.findByText('Parada suspendida por evento climático')).toBeInTheDocument();
     expect(screen.getByText('88%')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Confirmar vaciado' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'No pude vaciar' })).not.toBeInTheDocument();
@@ -78,7 +78,7 @@ describe('Suspension por inundacion en la vista del chofer', () => {
   it('puede continuar con las paradas habilitadas de la misma ruta', async () => {
     fetchMyRoute.mockResolvedValue(route([stop({ id: 'p1', restriccionesInundacion: [{ contingenciaId: 'f1', descripcion: 'Inundacion Centro' }] }), stop({ id: 'p2', orden: 3 })]));
     render(<DriverStopsPage />);
-    await screen.findByText('Parada suspendida por inundación');
+    await screen.findByText('Parada suspendida por evento climático');
     expect(screen.getAllByRole('button', { name: 'Confirmar vaciado' })).toHaveLength(1);
     expect(screen.getAllByRole('button', { name: 'No pude vaciar' })).toHaveLength(1);
   });
@@ -88,17 +88,17 @@ describe('Suspension por inundacion en la vista del chofer', () => {
     confirmStop.mockRejectedValue(new ApiError({ code: 'PARADA_SUSPENDIDA_INUNDACION', status: 409, message: 'Suspendida' }));
     render(<DriverStopsPage />);
     await user.click(await screen.findByRole('button', { name: 'Confirmar vaciado' }));
-    expect(await screen.findByText('Recolección suspendida por inundación')).toBeInTheDocument();
+    expect(await screen.findByText('Recolección suspendida por evento climático')).toBeInTheDocument();
     expect(fetchMyRoute).toHaveBeenCalledTimes(2);
   });
 
   it('revisa la ruta nuevamente cuando el operador habilita la recuperacion', async () => {
     fetchMyRoute.mockResolvedValueOnce(route([stop({ restriccionesInundacion: [{ contingenciaId: 'f1', descripcion: 'Inundacion Centro' }] })])).mockResolvedValue(route());
     const user = userEvent.setup(); render(<DriverStopsPage />);
-    await screen.findByText('Parada suspendida por inundación');
+    await screen.findByText('Parada suspendida por evento climático');
     await user.click(screen.getByRole('button', { name: 'Actualizar ruta' }));
     expect(await screen.findByRole('button', { name: 'Confirmar vaciado' })).toBeInTheDocument();
-    expect(screen.queryByText('Parada suspendida por inundación')).not.toBeInTheDocument();
+    expect(screen.queryByText('Parada suspendida por evento climático')).not.toBeInTheDocument();
   });
 });
 
@@ -578,7 +578,7 @@ describe('CU-10 · credencial del chofer', () => {
     await user.type(await screen.findByPlaceholderText(/Pegá acá tu credencial/), 'eyJhbGciOiJI');
     await user.click(screen.getByRole('button', { name: 'Entrar' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/tres bloques separados por puntos/);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/código que empieza con CH-/);
     expect(readToken()).toBe('');
     expect(fetchMyRoute).toHaveBeenCalledTimes(1);
   });

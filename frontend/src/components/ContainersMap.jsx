@@ -77,7 +77,7 @@ export default function ContainersMap({ containers, selectedId, onSelect, massEv
                 {container.zonaNombre && <span className="tooltip-zone"> · {container.zonaNombre}</span>}
                 <br />
                 {STATE_LABEL[container.estado]} · {container.nivelLlenadoPct}%
-                {container.recoleccionSuspendida && <><br /><strong>Recolección suspendida por inundación</strong></>}
+                {container.recoleccionSuspendida && <><br /><strong>Recolección suspendida por evento climático</strong></>}
                 {/* "94% sobre un umbral de 70" se entiende mucho mejor que un 94%
                     solo. El umbral viene en el payload del mapa, asi que no hay
                     que pedir la zona aparte para mostrarlo. */}

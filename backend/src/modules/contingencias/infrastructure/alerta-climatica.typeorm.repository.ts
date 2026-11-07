@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { Contingencia, EstadoContingencia } from '../domain/contingencia.entity';
 import { ContextoTransaccional } from '../../../shared/persistence/contexto-transaccional';
 import { RepositorioTypeorm } from '../../../shared/persistence/repositorio-typeorm';
 import {
@@ -22,8 +23,17 @@ export class AlertaClimaticaTypeormRepository
   buscar(alertaId: string) {
     return this.repo().findOneBy({ alertaId });
   }
-  listar() {
-    return this.repo().find({ order: { recibidaEn: 'DESC', alertaId: 'ASC' } });
+  async listar() {
+    const { entities, raw } = await this.repo()
+      .createQueryBuilder('alerta')
+      .leftJoin(Contingencia, 'contingencia', 'contingencia.id = alerta.contingenciaId')
+      .addSelect('contingencia.estado', 'estadoContingencia')
+      .orderBy('alerta.recibidaEn', 'DESC')
+      .addOrderBy('alerta.alertaId', 'ASC')
+      .getRawAndEntities<{ estadoContingencia: EstadoContingencia | null }>();
+    return entities.map((alerta, index) =>
+      Object.assign(alerta, { estadoContingencia: raw[index].estadoContingencia }),
+    );
   }
   guardar(alerta: AlertaClimaticaExterna) {
     return this.repo().save(alerta);

@@ -45,7 +45,7 @@ export default function RoutesPage() {
       key: 'estado',
       title: 'Estado',
       render: (r) => <div><Chip variant={ROUTE_STATE_CHIP[r.estado]}>{ROUTE_STATE_LABEL[r.estado]}</Chip>
-        {r.paradasSuspendidas > 0 && <p className="text-warning">{r.paradasSuspendidas} suspendida(s) por inundación</p>}
+        {r.paradasSuspendidas > 0 && <p className="text-warning">{r.paradasSuspendidas} suspendida(s) por evento climático</p>}
       </div>,
     },
     {

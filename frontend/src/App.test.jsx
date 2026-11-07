@@ -9,6 +9,7 @@ import {
   fetchContainers,
   fetchMyRoute,
   fetchFloods,
+  fetchClimateAlerts,
 } from './api/waste.js';
 
 vi.mock('./api/waste.js', () => ({
@@ -19,6 +20,8 @@ vi.mock('./api/waste.js', () => ({
   fetchContainer: vi.fn(),
   fetchZones: vi.fn(),
   fetchAlerts: vi.fn(),
+  fetchClimateAlerts: vi.fn(() => Promise.resolve({ alertas: [], simuladorHabilitado: false })),
+  resolveClimateAlert: vi.fn(), simulateClimateEvent: vi.fn(),
   createContainer: vi.fn(),
   updateContainer: vi.fn(),
   deleteContainer: vi.fn(),
@@ -73,6 +76,7 @@ describe('shell de la aplicacion', () => {
     fetchContainers.mockResolvedValue([]);
     fetchZones.mockResolvedValue([]);
     fetchAlerts.mockResolvedValue([]);
+    fetchClimateAlerts.mockResolvedValue({ alertas: [], simuladorHabilitado: false });
     fetchMyRoute.mockResolvedValue(null);
   });
 
@@ -110,10 +114,19 @@ describe('shell de la aplicacion', () => {
 
   it('navega desde el menu a la gestion de inundaciones', async () => {
     const user = userEvent.setup(); render(<App />);
-    await user.click(await screen.findByRole('link', { name: 'Inundaciones' }));
-    expect(await screen.findByRole('heading', { name: 'Inundaciones' })).toBeInTheDocument();
-    expect(await screen.findByText('No hay inundaciones registradas')).toBeInTheDocument();
+    await user.click(await screen.findByRole('link', { name: 'Eventos climáticos' }));
+    expect(await screen.findByRole('heading', { name: 'Eventos climáticos' })).toBeInTheDocument();
+    expect(await screen.findByText('No hay suspensiones por eventos climáticos')).toBeInTheDocument();
     expect(fetchFloods).toHaveBeenCalled();
+  });
+
+  it('incluye las alertas climáticas pendientes en el contador y mantiene el acceso anterior', async () => {
+    fetchClimateAlerts.mockResolvedValue({ alertas: [{ alertaId: 'cl-1', decision: 'PENDIENTE_REVISION' }, { alertaId: 'cl-2', decision: 'SIN_AFECTACION' }], simuladorHabilitado: false });
+    window.history.pushState({}, '', '/contingencias/clima');
+    render(<App />);
+    expect(await screen.findByRole('heading', { name: 'Alertas' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTitle('1 alertas sin resolver')).toBeInTheDocument());
+    expect(window.location.pathname).toBe('/alertas');
   });
 
   it('el globo cuenta solo las alertas que alguien todavia tiene que atender', async () => {

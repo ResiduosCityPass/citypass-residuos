@@ -148,3 +148,23 @@ con `409 CHOFER_CON_RUTA_ACTIVA`: primero se cierra o se reasigna la ruta.
 
 Lo demás de ADR-005 sigue vigente sin cambios: administradores, operadores y ciudadanos no se ven
 afectados, y los sensores tampoco — nunca estuvieron dentro del contrato de identidad.
+
+
+### Mejora de usabilidad: credencial corta (noviembre de 2026)
+
+El ABM emite ahora un código `CH-…` de 32 caracteres, con 128 bits aleatorios
+criptográficos y vencimiento a los 30 días. Se mantiene el campo `token` de la
+respuesta para que el frontend lo copie del mismo modo. No se trunca un JWT.
+
+Se persiste únicamente `chofer_codigo_` + SHA-256 del código completo en
+`usuarioSub`, aprovechando su índice existente. El vencimiento viaja en el
+código y forma parte del hash: modificarlo no permite prolongar el acceso.
+El guard verifica formato, fecha y coincidencia con un chofer activo en cada
+petición. Resuelve exclusivamente el rol CHOFER y la identidad interna de
+Residuos, sin intervención del IdP. No requiere migración ni secretos nuevos.
+
+Emitir otro código reemplaza el hash y revoca el anterior y cualquier JWT
+anterior asociado al viejo sub. Dar de baja revoca el acceso; reactivar conserva
+el código si todavía está vigente. Los JWT emitidos antes del cambio siguen
+aceptándose por la vía existente hasta vencer o perder su asociación. El seed
+y los comandos de desarrollo pueden seguir usando JWT.

@@ -1,4 +1,4 @@
-import { randomBytes } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import { Rol } from '../domain/enums';
 import { JwtPayload } from './jwt-payload';
 
@@ -52,4 +52,21 @@ export function payloadDeCredencialChofer(
     groups: [Rol.CHOFER.toLowerCase()],
     jti: randomBytes(12).toString('hex'),
   };
+}
+
+/** Código opaco de 128 bits. El vencimiento forma parte del hash guardado:
+ * editar la fecha invalida el código. No se guarda el secreto en la base.
+ */
+export function generarCodigoChofer(ahora = Date.now()): string {
+  const exp = Math.floor(ahora / 1000) + 30 * 24 * 60 * 60;
+  return `CH-${randomBytes(16).toString('base64url')}-${exp.toString(36)}`;
+}
+
+export function subDeCodigoChofer(codigo: string): string {
+  return `chofer_codigo_${createHash('sha256').update(codigo).digest('hex')}`;
+}
+
+export function vencimientoCodigoChofer(codigo: string): number | null {
+  const match = /^CH-[A-Za-z0-9_-]{22}-([0-9a-z]{6,8})$/.exec(codigo);
+  return match ? Number.parseInt(match[1], 36) : null;
 }
