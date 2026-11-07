@@ -661,3 +661,19 @@ Crucé lo que se habló en el grupo del squad con lo que hicimos en Residuos.
 
 **Falta:**
 - Del 13 al 18/11: ensayo completo en Render, con una actividad real de Rodrigo en Recoleta.
+
+## Vie 06/11 · Ensayo en Render
+
+Ensayé la demo en Render con el plan B: 1.200 personas en la sede de Recoleta, terminando a los 2 minutos.
+- **Bus:** la suscripción sigue activa y no había envíos fallidos.
+- **Mapa:** apareció "Festival de Primavera · 1.200 personas · 3 contenedores en la zona".
+- **Primer intento de ruta:** salió `RUTA_SIN_CONTENEDORES`. CT-0022 seguía pendiente en la ruta de la prueba anterior y los contenedores de una ruta abierta no entran a otra. CT-0023 es de reciclables y CT-0024 orgánico, y los camiones libres eran de residuo común. Le emití una credencial a Juana Perez, entré como ella y omití la parada: la ruta vieja se cerró y AB123CD quedó libre.
+- **Ruta:** generé la ruta de AB123CD para la zona "Sede Recoleta". CT-0022 entró al 0 % y la asigné a Juana Perez.
+- **Evento publicado:** en el bus quedó la `IntervencionProgramada` de la ruta nueva, con `causaTipo = EVENTO_PUBLICO`, `camionId = AB123CD` y `alertaId` en null.
+
+**Para el 19/11:**
+- Antes de la demo, cerrar las rutas abiertas que tengan CT-0022: si no, la ruta sale vacía.
+- El único contenedor de la sede que entra a la ruta de un camión de residuo común es CT-0022.
+
+**Falta:**
+- Probar con una actividad real que cree Rodrigo desde Espacios.
