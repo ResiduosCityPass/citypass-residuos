@@ -679,6 +679,10 @@ body.no-scroll { overflow: hidden; }
   font-size: var(--font-size-xs);
 }
 
+/* Cada mapa encierra sus capas: sin esto los controles de zoom de Leaflet
+   (z-index 1000) quedan por encima del menu lateral (901) al abrirlo. */
+.leaflet-container { isolation: isolate; }
+
 /* --- CU-08 / CU-09 · Rutas ---------------------------------------------- */
 .map-route { height: 320px; flex: none; margin-bottom: var(--space-4); }
 
