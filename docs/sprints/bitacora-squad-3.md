@@ -677,3 +677,13 @@ Ensayé la demo en Render con el plan B: 1.200 personas en la sede de Recoleta, 
 
 **Falta:**
 - Probar con una actividad real que cree Rodrigo desde Espacios.
+
+## Dom 08/11 · Ruta cerrada y zoom del mapa
+
+- **#89 mergeado a `develop`:** bitácora del ensayo en Render.
+- **#90 revisado:** menú "Eventos climáticos", alertas de Espacios Públicos en Alertas y credencial corta de chofer. Ya lo había aprobado Adriel; no toca la demo y la credencial vieja de Juana sigue andando.
+- **Ruta del ensayo cerrada:** entré a `/chofer` como Juana Perez y omití CT-0022. La ruta 31fb37eb se cerró y AB123CD quedó libre. Ninguna otra ruta abierta tiene CT-0022.
+- **Zoom del mapa:** en el celular, los botones + y − del mapa quedaban por encima del menú lateral abierto. Cada mapa ahora encierra sus capas y el menú queda arriba.
+
+**Falta:**
+- Del 13 al 18/11: ensayo con una actividad real de Rodrigo en Recoleta.
