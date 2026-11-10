@@ -687,3 +687,11 @@ Ensayé la demo en Render con el plan B: 1.200 personas en la sede de Recoleta, 
 
 **Falta:**
 - Del 13 al 18/11: ensayo con una actividad real de Rodrigo en Recoleta.
+
+## Mar 10/11 · Zoom del mapa mergeado y pregunta de Analítica
+
+- **#91 mergeado a `develop`:** arreglo del zoom del mapa sobre el menú lateral y la bitácora del 08/11. Lo aprobó Adriel. Llega a Render cuando se pase `develop` a `main`.
+- **Pregunta de Analítica:** Fran preguntó si los eventos de Residuos ya están modelados. Sí: Residuos publica `IntervencionProgramada` al asignar la ruta, con `causaTipo = EVENTO_PUBLICO` (actividad de 1.000 personas o más, squad 3) o `RESERVA` (evento comunitario chico, squad 6), más `causaId` y `camionId`. El esquema ya pasa en el bus desde el 06/11.
+
+**Falta:**
+- Del 13 al 18/11: ensayo con una actividad real de Rodrigo en Recoleta.
