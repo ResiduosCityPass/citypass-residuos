@@ -99,7 +99,11 @@ bicisenda y lo denuncia en la app de Reclamos."
 
 ```bash
 npm run reclamo -- --ruta <id>
+export TAPA=$(cat ultimo-reclamo.txt)
 ```
+
+`TAPA` guarda el id de este reclamo para resolverlo en el paso 5: el del paso 4 pisa
+`ultimo-reclamo.txt`.
 
 **Mostrar:** la salida del script, con la ruta antes y después. La parada del contenedor tapado
 pasa a `OMITIDA`, con el motivo "Acceso bloqueado por vehiculo (reclamo …)", y bajan los km.
@@ -114,8 +118,9 @@ Recargar el detalle de la ruta en el front con F5.
 
 ### 3 · La decisión sale al bus (1 min)
 
-**Mostrar:** si alguien tiene abiertos los logs de la API en Render, la línea
-`[residuos.reclamo.evaluado]`. Si no, contarlo con lo que se comprobó el 12/11.
+**Mostrar:** el `ReclamoEvaluado` en la consola de EDA, buscando el id que guardó `TAPA`
+(`echo $TAPA`). En Render el bus no deja una línea en los logs de la API, así que si no hay acceso a
+EDA, contarlo con lo que se comprobó el 12/11.
 
 **Decir:**
 - "Esa decisión se publica en el bus como `ReclamoEvaluado`: si el auto afecta la recolección,
@@ -136,8 +141,11 @@ decisión, con `afectaRecoleccion` en false: sin los 'no', no hay contra qué ca
 ### 5 · Reclamos avisa que se retiró el auto (1 min 30 s)
 
 ```bash
-npm run reclamo:resuelto
+npm run reclamo:resuelto -- "$TAPA"
 ```
+
+Con el id explícito: sin argumento resolvería el reclamo lejano del paso 4 y el contenedor seguiría
+tapado.
 
 **Mostrar:** generar una ruta con el **segundo camión**. **La ruta incluye el contenedor** que
 estaba tapado, aunque la ruta original siga en curso: mientras duraba el bloqueo no entraba en
@@ -150,7 +158,7 @@ ninguna.
   nadie, así que otro camión puede levantarlo."
 - "Si ese aviso no llega nunca, el bloqueo vence solo a las 4 horas."
 
-**Al terminar:** `unset TOKEN WEBHOOK_TOKEN`.
+**Al terminar:** `unset TOKEN WEBHOOK_TOKEN TAPA`.
 
 ---
 
@@ -167,10 +175,18 @@ ninguna.
 | La parada omitida no es la que se esperaba | El script toma la próxima pendiente | Es correcto: es la que el camión tenía que visitar primero |
 
 **Plan B, sin Render:** el mismo guion en local, con el backend en `EVENT_BUS_DRIVER=inmemory` y
-`GATEWAY_WEBHOOK_TOKEN=webhook-local` en el `.env`; `TOKEN` sale de
-`cd ../backend && npm run token:dev -- ADMINISTRADOR` y los datos de `TOKEN=<token> npm run seed`.
-En vez de los logs de Render, la línea `[residuos.reclamo.evaluado]` aparece en la consola del
-backend.
+`GATEWAY_WEBHOOK_TOKEN=webhook-local` en el `.env`. Cambiar el `.env` no toca las variables de la
+terminal del simulador, que siguen apuntando a Render: antes del seed y de los eventos, en
+`simulator/`,
+
+```bash
+export API_URL='http://localhost:3000/api/v1'
+export WEBHOOK_TOKEN='webhook-local'
+```
+
+`TOKEN` sale de `cd ../backend && npm run token:dev -- ADMINISTRADOR` y los datos de
+`TOKEN=<token> npm run seed`. En vez de EDA, la línea `[residuos.reclamo.evaluado]` aparece en la
+consola del backend.
 
 ---
 
