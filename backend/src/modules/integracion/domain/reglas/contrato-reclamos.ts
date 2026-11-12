@@ -78,7 +78,9 @@ export function interpretarReclamo(
   eventType: string,
   data: Record<string, unknown>,
 ): ReclamoInterpretado | null {
-  const nombre = eventType.slice(eventType.lastIndexOf('.') + 1);
+  // El gateway versiona el topico (ReclamoCreado.v3): sin esto el nombre seria "v3".
+  const tipo = eventType.replace(/\.v\d+$/, '');
+  const nombre = tipo.slice(tipo.lastIndexOf('.') + 1);
   const deReclamos = eventType.startsWith(PREFIJO_RECLAMOS);
   const reclamoId = idDelReclamo(data, deReclamos);
 

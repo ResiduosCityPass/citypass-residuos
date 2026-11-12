@@ -14,6 +14,10 @@ describe('interpretarReclamo (CU-INT-02)', () => {
       });
     });
 
+    it('acepta el tipo con la version del topico (ReclamoCreado.v3)', () => {
+      expect(interpretarReclamo(`${CREADO}.v3`, AUTO)?.tipo).toBe('creado');
+    });
+
     it.each(['ReclamoRegistrado', 'ReclamoPublicado'])('acepta %s como sinonimo', (nombre) => {
       expect(interpretarReclamo(`com.citypass.reclamos.${nombre}`, AUTO)?.tipo).toBe('creado');
     });
