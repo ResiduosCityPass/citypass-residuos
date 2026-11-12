@@ -695,3 +695,13 @@ Ensayé la demo en Render con el plan B: 1.200 personas en la sede de Recoleta, 
 
 **Falta:**
 - Del 13 al 18/11: ensayo con una actividad real de Rodrigo en Recoleta.
+
+## Jue 12/11 · Todo en main
+
+- **#92 mergeado a `develop`:** bitácora del 10/11. Lo aprobó Adriel.
+- **#90 mergeado a `develop`:** eventos climáticos en Alertas y credencial corta de chofer.
+- **#93 mergeado a `main`:** Ramiro pasó `develop` a `main`. Con eso llegan a Render el arreglo del zoom del mapa y las docs nuevas. La API de Render responde bien.
+- **`ActividadModificada` con suspensión:** Espacios va a publicarlo también al suspender (`SUSPENDIDA`) y al reanudar (`PROGRAMADA`), con el mismo esquema. Residuos solo actúa cuando el estado nuevo es `CANCELADA`, así que no hay que cambiar nada: una suspensión no borra la limpieza agendada.
+
+**Falta:**
+- Del 13 al 18/11: ensayo con una actividad real de Rodrigo en Recoleta, incluido el paso 4 (chofer).
