@@ -185,4 +185,35 @@ describe('AlertasService (CU-05, CU-06)', () => {
       expect(repo.guardar).toHaveBeenCalledTimes(2);
     });
   });
+  describe('acceso bloqueado (CU-INT-02)', () => {
+    it('abre una sola alerta por contenedor y sin publicar evento', async () => {
+      await service.registrarAccesoBloqueado('c-1', 'RC-123');
+      repo.buscarAbierta.mockResolvedValue({ id: 'a-1' } as Alerta);
+      await service.registrarAccesoBloqueado('c-1', 'RC-124');
+
+      expect(repo.crear).toHaveBeenCalledTimes(1);
+      expect(repo.crear).toHaveBeenCalledWith(
+        expect.objectContaining({
+          contenedorId: 'c-1',
+          tipo: TipoAlerta.ACCESO_BLOQUEADO,
+          detalle: 'Acceso bloqueado por un vehiculo (reclamo RC-123)',
+        }),
+      );
+      expect(eventos.publish).not.toHaveBeenCalled();
+    });
+
+    it('cierra solo las de contenedores que ya no estan tapados', async () => {
+      const liberada = { contenedorId: 'c-1', estado: EstadoAlerta.ABIERTA } as Alerta;
+      const tapada = { contenedorId: 'c-2', estado: EstadoAlerta.EN_ATENCION } as Alerta;
+      repo.listar.mockResolvedValue([liberada, tapada]);
+
+      expect(await service.resolverAccesosLiberados(['c-2'])).toBe(1);
+      expect(repo.listar).toHaveBeenCalledWith(
+        expect.objectContaining({ tipo: TipoAlerta.ACCESO_BLOQUEADO }),
+      );
+      expect(liberada.estado).toBe(EstadoAlerta.RESUELTA);
+      expect(tapada.estado).toBe(EstadoAlerta.EN_ATENCION);
+      expect(repo.guardar).toHaveBeenCalledTimes(1);
+    });
+  });
 });

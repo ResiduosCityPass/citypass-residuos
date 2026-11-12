@@ -1,3 +1,4 @@
+import { AlertasModule } from '../alertas/alertas.module';
 import { ContingenciasModule } from '../contingencias/contingencias.module';
 import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -40,6 +41,7 @@ import { IntegracionTypeormRepository } from './infrastructure/integracion.typeo
       ObstruccionPorReclamo,
       Intervencion,
     ]),
+    AlertasModule,
     ContenedoresModule,
     ContingenciasModule,
     ZonasModule,

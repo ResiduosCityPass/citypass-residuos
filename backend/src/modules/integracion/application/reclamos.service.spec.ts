@@ -25,6 +25,7 @@ describe('ReclamosService (CU-INT-02)', () => {
   let obstrucciones: jest.Mocked<ObstruccionRepository>;
   let contenedores: jest.Mocked<Pick<ContenedorRepository, 'listar'>>;
   let paradas: { quitarContenedores: jest.Mock };
+  let alertas: { registrarAccesoBloqueado: jest.Mock; resolverAccesosLiberados: jest.Mock };
   let eventos: InMemoryEventPublisher;
   let service: ReclamosService;
 
@@ -32,10 +33,11 @@ describe('ReclamosService (CU-INT-02)', () => {
     obstrucciones = {
       guardarObstrucciones: jest.fn(),
       resolverReclamo: jest.fn().mockResolvedValue(1),
-      contenedoresObstruidos: jest.fn(),
+      contenedoresObstruidos: jest.fn().mockResolvedValue([]),
     };
     contenedores = { listar: jest.fn().mockResolvedValue([TAPADO, LEJOS]) };
     paradas = { quitarContenedores: jest.fn().mockResolvedValue(['rt-1']) };
+    alertas = { registrarAccesoBloqueado: jest.fn(), resolverAccesosLiberados: jest.fn() };
     eventos = new InMemoryEventPublisher();
 
     service = new ReclamosService(
@@ -43,6 +45,7 @@ describe('ReclamosService (CU-INT-02)', () => {
       contenedores as unknown as ContenedorRepository,
       eventos,
       paradas,
+      alertas,
       new ConfigService({}),
     );
   });
@@ -114,6 +117,7 @@ describe('ReclamosService (CU-INT-02)', () => {
         contenedores as unknown as ContenedorRepository,
         eventos,
         paradas,
+        alertas,
         new ConfigService({ OBSTRUCCION_VIGENCIA_HORAS: 2 }),
       );
       const antes = Date.now();
@@ -147,6 +151,7 @@ describe('ReclamosService (CU-INT-02)', () => {
         contenedores as unknown as ContenedorRepository,
         eventos,
         paradas,
+        alertas,
         new ConfigService({ OBSTRUCCION_RADIO_METROS: 200 }),
       );
 
@@ -154,6 +159,23 @@ describe('ReclamosService (CU-INT-02)', () => {
 
       expect(paradas.quitarContenedores.mock.calls[0][0]).toEqual(['ct-tapado', 'ct-lejos']);
     });
+  });
+
+  it('un auto que tapa un contenedor le abre una alerta al operador, solo a ese', async () => {
+    await service.procesar(CREADO, reclamo());
+
+    expect(alertas.registrarAccesoBloqueado).toHaveBeenCalledTimes(1);
+    expect(alertas.registrarAccesoBloqueado).toHaveBeenCalledWith('ct-tapado', 'RC-123');
+  });
+
+  it('al resolverse cierra las alertas de los contenedores que ya no estan tapados', async () => {
+    obstrucciones.contenedoresObstruidos.mockResolvedValue(['ct-otro-reclamo']);
+
+    await service.procesar('com.citypass.emergencias.IntervencionFinalizada', {
+      reclamoId: 'RC-123',
+    });
+
+    expect(alertas.resolverAccesosLiberados).toHaveBeenCalledWith(['ct-otro-reclamo']);
   });
 
   it('el aviso de resolucion destapa los contenedores del reclamo', async () => {

@@ -5,7 +5,12 @@ import { EVENT_PUBLISHER, EventPublisher } from '../../../shared/events/event-pu
 import { Contenedor } from '../../contenedores/domain/contenedor.entity';
 import { Zona } from '../../zonas/domain/zona.entity';
 import { Alerta } from '../domain/alerta.entity';
-import { ALERTA_REPOSITORY, AlertaRepository, FiltroAlertas } from '../domain/alerta.repository';
+import {
+  ALERTA_REPOSITORY,
+  AlertaRepository,
+  ESTADOS_SIN_RESOLVER,
+  FiltroAlertas,
+} from '../domain/alerta.repository';
 
 /**
  * Alerta tal como la ve el tablero del operador: con el codigo legible del
@@ -155,6 +160,46 @@ export class AlertasService {
       detectadaEn: new Date(),
       detalle: `Bateria del sensor al ${bateriaPct}%`,
     });
+  }
+
+  /**
+   * CU-INT-02 · Un auto tapa el contenedor. No publica evento: la decision ya sale
+   * al bus como `ReclamoEvaluado`. Es para que el operador se entere en el tablero.
+   */
+  async registrarAccesoBloqueado(contenedorId: string, reclamoId: string): Promise<Alerta | null> {
+    const abierta = await this.alertas.buscarAbierta(contenedorId, TipoAlerta.ACCESO_BLOQUEADO);
+    if (abierta) {
+      return null;
+    }
+
+    return this.alertas.crear({
+      contenedorId,
+      tipo: TipoAlerta.ACCESO_BLOQUEADO,
+      severidad: Severidad.MEDIA,
+      estado: EstadoAlerta.ABIERTA,
+      detectadaEn: new Date(),
+      detalle: `Acceso bloqueado por un vehiculo (reclamo ${reclamoId})`,
+    });
+  }
+
+  /**
+   * Cierra las alertas de acceso bloqueado de los contenedores que ya no estan
+   * tapados. Devuelve cuantas cerro.
+   */
+  async resolverAccesosLiberados(siguenBloqueados: string[]): Promise<number> {
+    const abiertas = await this.alertas.listar({
+      tipo: TipoAlerta.ACCESO_BLOQUEADO,
+      estado: ESTADOS_SIN_RESOLVER,
+    });
+    const bloqueados = new Set(siguenBloqueados);
+    const liberadas = abiertas.filter((alerta) => !bloqueados.has(alerta.contenedorId));
+
+    for (const alerta of liberadas) {
+      alerta.estado = EstadoAlerta.RESUELTA;
+      alerta.resueltaEn = new Date();
+      await this.alertas.guardar(alerta);
+    }
+    return liberadas.length;
   }
 
   /** Cierra las alertas abiertas de un tipo. Lo usa CU-10 al confirmar el vaciado. */
