@@ -643,16 +643,12 @@ const randomHex = (length) =>
   Array.from(crypto.getRandomValues(new Uint8Array(length)), (byte) =>
     (byte % 16).toString(16),
   ).join('');
-const base64url = (value) =>
-  btoa(JSON.stringify(value)).replaceAll('=', '').replaceAll('+', '-').replaceAll('/', '_');
-
 /**
  * Emite la credencial del chofer.
  *
  * Rotar el `usuarioSub` es lo que revoca la anterior, y el mock lo hace igual:
  * sin eso, emitir dos veces se veria inofensivo aca y romperia recien contra el
- * backend. El token tiene forma de JWT para que el bloque de la pantalla se vea
- * con el largo real, pero no esta firmado: con mocks nadie lo valida.
+ * backend. El código tiene el mismo formato corto que la API; con mocks nadie lo valida.
  */
 export function issueDriverCredential(id) {
   const driver = driverById(id);
@@ -664,16 +660,9 @@ export function issueDriverCredential(id) {
   driver.usuarioSub = `chofer_${randomHex(48)}`;
   driver.actualizadoEn = now();
 
-  const token = [
-    base64url({ alg: 'HS256', typ: 'JWT' }),
-    base64url({
-      sub: driver.usuarioSub,
-      preferred_username: driver.legajo,
-      token_use: 'chofer-interno',
-      groups: ['chofer'],
-    }),
-    randomHex(43),
-  ].join('.');
+  const random = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))))
+    .replaceAll('=', '').replaceAll('+', '-').replaceAll('/', '_');
+  const token = `CH-${random}-${(Math.floor(Date.now() / 1000) + 30 * 86400).toString(36)}`;
 
   return respond({
     choferId: driver.id,

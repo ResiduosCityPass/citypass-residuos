@@ -153,7 +153,7 @@ export class CriticidadClimaticaService {
       payload: {
         inundacionId: alerta.contingenciaId,
         revision: inicio ? 1 : 2,
-        descripcion: `${alerta.origen === 'eda-simulacro' ? 'SIMULACRO · ' : ''}Suspension por inundacion · ${confirmacion.fenomeno} (${confirmacion.nivelCriticidad})`,
+        descripcion: `${alerta.origen === 'eda-simulacro' ? 'SIMULACRO · ' : ''}Suspension por evento climatico · ${confirmacion.fenomeno} (${confirmacion.nivelCriticidad})`,
         zonaIds,
         alertaId: alerta.alertaId,
         actorSub: inicio

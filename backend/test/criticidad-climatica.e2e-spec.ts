@@ -55,82 +55,93 @@ describe('Contrato real de Espacios Publicos y revision de zonas (e2e)', () => {
     await ctx?.cerrar();
   });
 
-  it('recibe, revisa, suspende y recupera hasta el vaciado real del chofer', async () => {
-    const z = await zone();
-    const p = start();
-    const cont = (
-      await http
-        .post('/api/v1/contenedores')
-        .set(admin)
-        .send({
-          zonaId: z.id,
-          tipoResiduo: 'COMUN',
-          capacidadLitros: 1100,
-          lat: -34.6037,
-          lng: -58.3816,
-        })
-        .expect(201)
-    ).body;
-    await ctx.dataSource.query(
-      'UPDATE contenedor SET "nivelLlenadoPct" = 90, estado = $2 WHERE id = $1',
-      [cont.id, 'CRITICO'],
-    );
-    const truck = (
-      await http
-        .post('/api/v1/camiones')
-        .set(admin)
-        .send({ patente: 'AB123CD', capacidadLitros: 10000, tipoResiduoHabilitado: 'COMUN' })
-        .expect(201)
-    ).body;
-    const driver = (
-      await http
-        .post('/api/v1/choferes')
-        .set(admin)
-        .send({ nombre: 'Juana Perez', legajo: 'CH001', usuarioSub: 'test-CHOFER' })
-        .expect(201)
-    ).body;
-    const route = (
-      await http.post('/api/v1/rutas/generar').set(admin).send({ camionId: truck.id }).expect(201)
-    ).body;
-    await http
-      .patch(`/api/v1/rutas/${route.id}/asignar`)
-      .set(admin)
-      .send({ choferId: driver.id })
-      .expect(200);
-    await receive(INICIO, p).expect(201);
-    expect((await http.get('/api/v1/zonas').set(admin)).body[0].restriccionesInundacion).toEqual(
-      [],
-    );
-    const decision = (await resolve(p.alertaId, [z.id]).expect(200)).body;
-    expect(decision.revisadoPor).toBe('test-ADMINISTRADOR');
-    const authDriver = { Authorization: `Bearer ${ctx.token(Rol.CHOFER)}` };
-    const my = (await http.get('/api/v1/rutas/mias').set(authDriver).expect(200)).body;
-    expect(my.paradasSuspendidas).toBe(1);
-    const confirm = () =>
-      http
-        .patch(`/api/v1/paradas/${my.paradas[0].id}/confirmar`)
-        .set(authDriver)
-        .send({ lat: -34.6037, lng: -58.3816 });
-    await confirm().expect(409);
-    // La vigencia estimada ya paso; la restriccion sigue hasta recibir el fin real.
-    expect(
-      (await http.get(`/api/v1/contingencias/${decision.contingenciaId}`).set(admin)).body.estado,
-    ).toBe('ACTIVA');
-    await receive(FIN, end(p.alertaId)).expect(201);
-    await confirm().expect(409);
-    expect(
-      (
+  it.each(['TORMENTA_FUERTE', 'VIENTO_FUERTE'])(
+    'recibe %s, revisa, suspende y recupera hasta el vaciado real del chofer',
+    async (fenomeno) => {
+      const z = await zone();
+      const p = { ...start(), fenomeno };
+      const cont = (
         await http
-          .patch(`/api/v1/contingencias/${decision.contingenciaId}/recuperar`)
+          .post('/api/v1/contenedores')
           .set(admin)
-          .expect(200)
-      ).body.estado,
-    ).toBe('EN_RECUPERACION');
-    await confirm().expect(200);
-    expect(
-      (await http.get(`/api/v1/contingencias/${decision.contingenciaId}`).set(admin)).body.estado,
-    ).toBe('RECUPERADA');
-  });
+          .send({
+            zonaId: z.id,
+            tipoResiduo: 'COMUN',
+            capacidadLitros: 1100,
+            lat: -34.6037,
+            lng: -58.3816,
+          })
+          .expect(201)
+      ).body;
+      await ctx.dataSource.query(
+        'UPDATE contenedor SET "nivelLlenadoPct" = 90, estado = $2 WHERE id = $1',
+        [cont.id, 'CRITICO'],
+      );
+      const truck = (
+        await http
+          .post('/api/v1/camiones')
+          .set(admin)
+          .send({ patente: 'AB123CD', capacidadLitros: 10000, tipoResiduoHabilitado: 'COMUN' })
+          .expect(201)
+      ).body;
+      const driver = (
+        await http
+          .post('/api/v1/choferes')
+          .set(admin)
+          .send({ nombre: 'Juana Perez', legajo: 'CH001', usuarioSub: 'test-CHOFER' })
+          .expect(201)
+      ).body;
+      const route = (
+        await http.post('/api/v1/rutas/generar').set(admin).send({ camionId: truck.id }).expect(201)
+      ).body;
+      await http
+        .patch(`/api/v1/rutas/${route.id}/asignar`)
+        .set(admin)
+        .send({ choferId: driver.id })
+        .expect(200);
+      await receive(INICIO, p).expect(201);
+      expect((await http.get('/api/v1/zonas').set(admin)).body[0].restriccionesInundacion).toEqual(
+        [],
+      );
+      const decision = (await resolve(p.alertaId, [z.id]).expect(200)).body;
+      expect(decision.revisadoPor).toBe('test-ADMINISTRADOR');
+      const authDriver = { Authorization: `Bearer ${ctx.token(Rol.CHOFER)}` };
+      const my = (await http.get('/api/v1/rutas/mias').set(authDriver).expect(200)).body;
+      expect(my.paradasSuspendidas).toBe(1);
+      const confirm = () =>
+        http
+          .patch(`/api/v1/paradas/${my.paradas[0].id}/confirmar`)
+          .set(authDriver)
+          .send({ lat: -34.6037, lng: -58.3816 });
+      await confirm().expect(409);
+      // La vigencia estimada ya paso; la restriccion sigue hasta recibir el fin real.
+      expect(
+        (await http.get(`/api/v1/contingencias/${decision.contingenciaId}`).set(admin)).body.estado,
+      ).toBe('ACTIVA');
+      await receive(FIN, end(p.alertaId)).expect(201);
+      expect(
+        (await http.get('/api/v1/contingencias/clima').set(admin).expect(200)).body.alertas[0]
+          .estadoContingencia,
+      ).toBe('PENDIENTE_RECUPERACION');
+      await confirm().expect(409);
+      expect(
+        (
+          await http
+            .patch(`/api/v1/contingencias/${decision.contingenciaId}/recuperar`)
+            .set(admin)
+            .expect(200)
+        ).body.estado,
+      ).toBe('EN_RECUPERACION');
+      await confirm().expect(200);
+      expect(
+        (await http.get(`/api/v1/contingencias/${decision.contingenciaId}`).set(admin)).body.estado,
+      ).toBe('RECUPERADA');
+      expect(
+        (await http.get('/api/v1/contingencias/clima').set(admin).expect(200)).body.alertas[0]
+          .estadoContingencia,
+      ).toBe('RECUPERADA');
+    },
+  );
 
   it('deduplica entregas concurrentes y mantiene un cierre recibido primero', async () => {
     const z = await zone();

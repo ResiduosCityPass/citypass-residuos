@@ -70,7 +70,7 @@ export default function ZonesPage() {
       setSuccess(
         zone.bloqueada
           ? zone.restriccionesInundacion?.length
-            ? `Se quitó el bloqueo manual de ${zone.nombre}. La restricción por inundación sigue vigente.`
+            ? `Se quitó el bloqueo manual de ${zone.nombre}. La restricción por evento climático sigue vigente.`
             : `La zona ${zone.nombre} vuelve a entrar en el ruteo.`
           : `La zona ${zone.nombre} queda excluida del ruteo.`,
       );
@@ -136,7 +136,7 @@ export default function ZonesPage() {
       <Notice type="info" title="Qué define una zona">
         El umbral de llenado decide a partir de qué porcentaje un contenedor pasa a CRÍTICO. El de
         temperatura dispara las alertas de incendio, sin importar cuán lleno esté. Una zona
-        bloqueada queda excluida del ruteo. Las restricciones por inundación se gestionan desde Inundaciones y se conservan al quitar un bloqueo manual.
+        bloqueada queda excluida del ruteo. Las restricciones por evento climático se gestionan desde Eventos climáticos y se conservan al quitar un bloqueo manual.
       </Notice>
 
       <div className="filter-bar">

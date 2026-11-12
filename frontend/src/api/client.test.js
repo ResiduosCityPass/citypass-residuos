@@ -7,6 +7,7 @@ import {
   saveToken,
   clearToken,
   readToken,
+  readDriverToken,
   seedDevToken,
 } from './client.js';
 
@@ -340,5 +341,17 @@ describe('cliente de la API', () => {
       expect(seedDevToken('/mapa')).toBe(false);
       expect(readToken()).toBe('');
     });
+  });
+});
+
+
+describe('credencial corta de chofer', () => {
+  it('acepta el código corto y rechaza uno truncado sin pisar la sesión', () => {
+    const code = 'CH-abcdefghijklmnopqrstuv-tp9abc';
+    expect(saveToken(code)).toBe(true);
+    expect(readDriverToken()).toBe(code);
+    expect(saveToken(code.slice(0, -8))).toBe(false);
+    expect(readDriverToken()).toBe(code);
+    clearToken();
   });
 });

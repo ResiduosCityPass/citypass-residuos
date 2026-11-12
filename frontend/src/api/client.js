@@ -79,7 +79,7 @@ export const readToken = () => federatedEnabled() ? accessToken() : readDriverTo
 export const tokenSource = () => (readManual() ? 'manual' : localStorage.getItem(TOKEN_SOURCE_KEY));
 
 /**
- * Un JWT y nada mas: tres bloques base64url separados por puntos.
+ * Acepta el código corto CH- y conserva los JWT anteriores.
  *
  * Lo que entra por un input no se guarda tal cual. Ademas de ser lo unico que
  * el backend va a aceptar, ataja el error humano que en /chofer es facil de
@@ -92,11 +92,11 @@ const JWT = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
 /**
  * Guarda una credencial pegada por una persona mientras viva esta pestaña.
  *
- * @returns {boolean} false si no tiene forma de JWT, y entonces NO guarda nada.
+ * @returns {boolean} false si el formato está incompleto; no pisa la sesión.
  */
 export const saveToken = (token) => {
   const value = String(token ?? '').trim();
-  if (!JWT.test(value)) return false;
+  if (!JWT.test(value) && !/^CH-[A-Za-z0-9_-]{22}-[0-9a-z]{6,8}$/.test(value)) return false;
 
   writeManual(value);
   localStorage.removeItem(TOKEN_KEY);

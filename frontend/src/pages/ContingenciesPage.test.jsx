@@ -29,7 +29,7 @@ beforeEach(() => {
 describe('Inundaciones', () => {
   it('muestra el estado vacio y requiere descripcion y zonas para simular', async () => {
     mount();
-    expect(await screen.findByText('No hay inundaciones registradas')).toBeInTheDocument();
+    expect(await screen.findByText('No hay suspensiones por eventos climáticos')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Simular inicio de inundación' })).toBeDisabled();
   });
 
@@ -98,7 +98,7 @@ describe('Inundaciones', () => {
     fetchFloods.mockRejectedValueOnce({ code: 'HTTP_500', message: 'No se pudo cargar' });
     const user = userEvent.setup(); mount(); await screen.findByText('[HTTP_500]');
     await user.click(screen.getByRole('button', { name: 'Actualizar' }));
-    expect(await screen.findByText('No hay inundaciones registradas')).toBeInTheDocument();
+    expect(await screen.findByText('No hay suspensiones por eventos climáticos')).toBeInTheDocument();
   });
 
   it('si falla una accion conserva la contingencia y muestra el error', async () => {
@@ -107,7 +107,7 @@ describe('Inundaciones', () => {
     const user = userEvent.setup(); mount();
     await user.click(await screen.findByRole('button', { name: 'Simular finalización' }));
     expect(await screen.findByText('[SIMULADOR_DESHABILITADO]')).toBeInTheDocument();
-    expect(screen.getByText('Inundación activa')).toBeInTheDocument();
+    expect(screen.getByText('Evento climático activo')).toBeInTheDocument();
   });
 
   it('explica si faltan zonas para el simulador', async () => {

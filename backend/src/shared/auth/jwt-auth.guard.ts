@@ -15,6 +15,7 @@ import { IS_PUBLIC_KEY } from './public.decorator';
 import { JwtPayload } from './jwt-payload';
 import { resolverRol } from './grupo-rol.map';
 import { JwksService } from './jwks.service';
+import { CodigoChoferService } from './codigo-chofer.service';
 import { Rol } from '../domain/enums';
 
 /**
@@ -42,6 +43,7 @@ export class JwtAuthGuard implements CanActivate {
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
     private readonly jwks: JwksService,
+    private readonly codigos?: CodigoChoferService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -62,8 +64,9 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     try {
-      const payload =
-        this.config.get<string>('AUTH_MODE', 'local') === 'federated'
+      const payload = token.startsWith('CH-')
+        ? await this.verificarCodigo(token)
+        : this.config.get<string>('AUTH_MODE', 'local') === 'federated'
           ? await this.verificarFederado(token)
           : await this.jwtService.verifyAsync<JwtPayload>(token, {
               secret: this.config.get<string>('JWT_SECRET'),
@@ -86,6 +89,11 @@ export class JwtAuthGuard implements CanActivate {
       this.logger.warn(`Token rechazado: ${(error as Error).message}`);
       throw new UnauthorizedException('Token invalido o expirado');
     }
+  }
+
+  private verificarCodigo(token: string): Promise<JwtPayload> {
+    if (!this.codigos) throw new Error('Verificación de códigos no disponible');
+    return this.codigos.verificar(token);
   }
 
   private async verificarFederado(token: string): Promise<JwtPayload> {

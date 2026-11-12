@@ -175,3 +175,23 @@ remoto como parte de esta verificación local.
 La demo en navegador recorrió inicio, finalización, habilitación, vaciado de una parada suspendida,
 generación de una nueva ruta para un contenedor al 30% y cierre automático de la contingencia
 después del último vaciado.
+
+
+## Acceso desde Alertas y eventos climáticos
+
+La revisión de las alertas de Espacios Públicos está directamente en **Alertas**,
+antes de las alertas de contenedores. Las pendientes y las suspensiones en curso se muestran abiertas; las alertas
+sin afectación y las ya recuperadas quedan en un historial plegable. El contador del menú incluye las
+pendientes de revisión o de habilitación de recuperación y se actualiza cada 15 segundos. El acceso anterior
+`/contingencias/clima` redirige a `/alertas` para conservar enlaces guardados.
+
+**Eventos climáticos** es el nombre del menú que lleva a las suspensiones y su
+recuperación. Se aplica el mismo mecanismo a tormenta, viento fuerte u otro
+fenómeno cuando el operador confirma que impide recolectar y elige las zonas.
+Recibir un punto o alcanzar el fin estimado no suspende ni reanuda automáticamente.
+El cierre real y la habilitación humana siguen siendo necesarios.
+
+Los nombres técnicos `inundacionId`, `restriccionesInundacion` y eventos v1 se
+conservan por compatibilidad con EDA y los clientes; las descripciones nuevas
+identifican el fenómeno recibido. El simulador histórico de inundación conserva
+su nombre para distinguirlo del simulador del contrato de Espacios Públicos.

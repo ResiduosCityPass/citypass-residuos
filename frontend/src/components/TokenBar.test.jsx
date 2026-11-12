@@ -39,7 +39,7 @@ describe('TokenBar', () => {
     await user.click(enviar());
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      /tres bloques separados por puntos/,
+      /código que empieza con CH-/,
     );
     expect(campo()).toHaveAttribute('aria-invalid', 'true');
     expect(readToken()).toBe('');

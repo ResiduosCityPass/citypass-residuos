@@ -45,7 +45,7 @@ describe('CU-02 zonas y umbrales', () => {
     setZoneBlocked.mockResolvedValue(zone());
     const user = userEvent.setup(); render(<ZonesPage />);
     await user.click(await screen.findByRole('button', { name: 'Desbloquear' }));
-    expect(await screen.findByText(/La restricción por inundación sigue vigente/)).toBeInTheDocument();
+    expect(await screen.findByText(/La restricción por evento climático sigue vigente/)).toBeInTheDocument();
     expect(screen.getByText('Inundación: Tormenta Centro')).toBeInTheDocument();
   });
 

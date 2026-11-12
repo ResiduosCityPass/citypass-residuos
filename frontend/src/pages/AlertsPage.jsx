@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Notice from '../components/ui/Notice.jsx';
 import Button from '../components/ui/Button.jsx';
+import ClimateEventsPage from './ClimateEventsPage.jsx';
 import AlertRow from '../components/alerts/AlertRow.jsx';
 import {
   fetchAlerts,
@@ -76,6 +77,10 @@ export default function AlertsPage({ onAlertsChanged }) {
 
   return (
     <div className="screen">
+      <section aria-label="Alertas climáticas">
+        <h2>Alertas climáticas de Espacios Públicos</h2>
+        <ClimateEventsPage embedded onAlertsChanged={onAlertsChanged} />
+      </section>
       <div className="filter-bar">
         <select value={filters.tipo} onChange={changeFilter('tipo')} aria-label="Filtrar por tipo">
           <option value="">Todo tipo de alerta</option>

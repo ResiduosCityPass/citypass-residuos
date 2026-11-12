@@ -62,7 +62,7 @@ export default function IssueCredentialModal({ driver, onDone, onClose }) {
       <OneTimeSecretModal
         title={`Credencial de ${credential.nombre}`}
         secret={credential.token}
-        warningTitle="Esta credencial se muestra una sola vez"
+        warningTitle="Este código se muestra una sola vez"
         warning={
           <>
             El backend no la guarda: si cerrás sin copiarla, hay que emitir otra. Quien la tenga

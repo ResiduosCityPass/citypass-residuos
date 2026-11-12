@@ -14,7 +14,7 @@ describe('Mapa: suspension independiente del llenado', () => {
     render(<ContainersMap containers={[{ id: 'c1', codigo: 'CT-0001', lat: -34.6, lng: -58.38, estado: 'CRITICO', nivelLlenadoPct: 90, ultimaLecturaEn: '2026-10-19', recoleccionSuspendida: true }]} onSelect={vi.fn()} />);
     expect(screen.getByTestId('halo')).toHaveAttribute('data-dash', '4 4');
     expect(screen.getByTestId('container-marker')).toHaveAttribute('data-fill', '#C83E4D');
-    expect(screen.getByText('Recolección suspendida por inundación')).toBeInTheDocument();
+    expect(screen.getByText('Recolección suspendida por evento climático')).toBeInTheDocument();
   });
   it('puede mostrar incendio e inundacion simultaneamente', () => {
     render(<ContainersMap containers={[{ id: 'c1', codigo: 'CT-0001', lat: -34.6, lng: -58.38, estado: 'NORMAL', nivelLlenadoPct: 8, ultimaLecturaEn: null, incendioActivo: true, recoleccionSuspendida: true }]} onSelect={vi.fn()} />);

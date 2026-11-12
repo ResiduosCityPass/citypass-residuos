@@ -139,8 +139,8 @@ export default function RouteDetailPage() {
   return (
     <div className="screen">
       <Link to="/rutas" className="back-link">← Rutas</Link>
-      {route.paradasSuspendidas > 0 && <Notice type="warning" title="Recolección suspendida por inundación">
-        {route.paradasSuspendidas} parada(s) siguen pendientes. Revisá la contingencia en <Link to="/contingencias">Inundaciones</Link>.
+      {route.paradasSuspendidas > 0 && <Notice type="warning" title="Recolección suspendida por evento climático">
+        {route.paradasSuspendidas} parada(s) siguen pendientes. Revisá la contingencia en <Link to="/contingencias">Eventos climáticos</Link>.
         Las propuestas afectadas deben esperar la habilitación o descartarse para generar otra.
       </Notice>}
 
@@ -210,7 +210,7 @@ export default function RouteDetailPage() {
                       rutear este contenedor hoy o si el problema es de la
                       calle sale de aca. */}
                   {stop.bloqueoManual && <p className="text-warning">Parada pendiente: zona bloqueada.</p>}
-                  {isStopSuspended(stop) && <p className="text-warning">Suspendida por inundación: {stop.restriccionesInundacion.map((r) => r.descripcion).join(', ')}</p>}
+                  {isStopSuspended(stop) && <p className="text-warning">Suspendida por evento climático: {stop.restriccionesInundacion.map((r) => r.descripcion).join(', ')}</p>}
                   {stop.estado === 'OMITIDA' && stop.motivo && (
                     <p className="stop-motivo">No se pudo vaciar: {stop.motivo}</p>
                   )}

@@ -30,7 +30,7 @@ describe('Eventos climaticos', () => {
     expect(screen.getByText('Simulacros de Residuos por EDA habilitados')).toBeInTheDocument();
     expect(screen.getByText('Puntos del simulacro:')).toBeInTheDocument();
     expect(screen.queryByText('Probar el contrato de Espacios Públicos')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Confirmar suspensión por inundación' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Confirmar suspensión del servicio' })).toBeDisabled();
   });
   it('informa el estado del consumidor real y los barrios del schema registrado', async () => {
     fetchClimateAlerts.mockResolvedValue({ alertas: [alert({ confirmacion: { ...alert().confirmacion, barrios: ['PALERMO'] } })], simuladorHabilitado: false, integracion: { estado: 'CONECTADO', ultimoError: null } });
@@ -42,14 +42,14 @@ describe('Eventos climaticos', () => {
     mount();
     expect(await screen.findByText('Latitud -34.6, longitud -58.38')).toBeInTheDocument();
     expect(screen.getByText(/Hasta confirmar, esta alerta no suspende/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Confirmar suspensión por inundación' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Confirmar suspensión del servicio' })).toBeDisabled();
     expect(resolveClimateAlert).not.toHaveBeenCalled();
   });
   it('envía las zonas elegidas y el fundamento al confirmar', async () => {
     const user = userEvent.setup(); mount();
     await user.click(await screen.findByLabelText('Centro'));
     await user.type(screen.getByLabelText(/Fundamento/), 'Inundación verificada en Centro');
-    await user.click(screen.getByRole('button', { name: 'Confirmar suspensión por inundación' }));
+    await user.click(screen.getByRole('button', { name: 'Confirmar suspensión del servicio' }));
     await waitFor(() => expect(resolveClimateAlert).toHaveBeenCalledWith('a1', { accion: 'SUSPENDER', motivo: 'Inundación verificada en Centro', zonaIds: ['z1'] }));
     expect(await screen.findByText('Suspensión registrada en las zonas seleccionadas.')).toBeInTheDocument();
   });
@@ -96,7 +96,19 @@ describe('Eventos climaticos', () => {
   });
   it('muestra alertas sin impacto ya revisadas', async () => {
     fetchClimateAlerts.mockResolvedValue({ alertas: [alert({ decision: 'SIN_AFECTACION' })], simuladorHabilitado: false });
-    mount(); expect(await screen.findByText('Sin afectación')).toBeInTheDocument();
+    mount(); await userEvent.click(await screen.findByText(/Alertas climáticas revisadas/)); expect(await screen.findByText('Sin afectación')).toBeInTheDocument();
     expect(within(screen.getByRole('article')).queryByRole('button')).not.toBeInTheDocument();
   });
+  it('mantiene el cierre pendiente de habilitación visible y archiva solo al recuperar', async () => {
+    fetchClimateAlerts.mockResolvedValue({ alertas: [alert({ decision: 'SUSPENDER', contingenciaId: 'f1', estadoContingencia: 'PENDIENTE_RECUPERACION', finalizacion: { finalizadaEn: 1793333220000 } })], simuladorHabilitado: false });
+    mount();
+    expect(await screen.findByRole('link', { name: 'Ver suspensión y recuperación' })).toBeVisible();
+    expect(screen.getByText('Pendiente de habilitación')).toBeVisible();
+    expect(screen.queryByText(/Alertas climáticas revisadas/)).not.toBeInTheDocument();
+    fetchClimateAlerts.mockResolvedValue({ alertas: [alert({ decision: 'SUSPENDER', contingenciaId: 'f1', estadoContingencia: 'RECUPERADA' })], simuladorHabilitado: false });
+    await userEvent.click(screen.getByRole('button', { name: 'Actualizar' }));
+    expect(await screen.findByText(/Alertas climáticas revisadas/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Ver suspensión y recuperación', hidden: true })).not.toBeVisible();
+  });
+
 });

@@ -31,7 +31,7 @@ const WASTE_SECTIONS = [
   { to: '/flota', icon: 'fleet', label: 'Flota' },
   { to: '/choferes', icon: 'profile', label: 'Choferes' },
   { to: '/rutas', icon: 'routes', label: 'Rutas' },
-  { to: '/contingencias', icon: 'spaces', label: 'Inundaciones' },
+  { to: '/contingencias', icon: 'spaces', label: 'Eventos climáticos' },
   { to: '/intervenciones', icon: 'alerts', label: 'Intervenciones' },
   { to: '/metricas', icon: 'analytics', label: 'Métricas' },
 ];
@@ -83,7 +83,7 @@ export default function Sidebar({ openAlerts = 0, open = false, onNavigate }) {
               >
                 <Icon />
                 <span>{section.label}</span>
-                {section.icon === 'alerts' && openAlerts > 0 && (
+                {section.to === '/alertas' && openAlerts > 0 && (
                   <span className="sidebar-badge">{openAlerts}</span>
                 )}
               </NavLink>
