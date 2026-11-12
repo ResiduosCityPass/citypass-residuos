@@ -209,11 +209,13 @@ export class ContingenciasService {
       }
       await this.repo.guardar(c);
       await this.repo.registrarEvento(evento.eventId, huella);
-      if (nueva)
+      if (nueva) {
         await this.publicar(c, EventTypes.SERVICIO_AFECTADO, {
           zonaIds: p.zonaIds,
           actorSub: p.actorSub ?? null,
         });
+        await this.publicarCuadrillasAfectadas(c, p.zonaIds);
+      }
       if (finaliza) {
         await this.publicar(c, EventTypes.RECUPERACION_PENDIENTE, {
           zonaIds: p.zonaIds,
@@ -338,6 +340,35 @@ export class ContingenciasService {
     c.recuperadaEn = new Date();
     await this.repo.guardar(c);
     await this.publicar(c, EventTypes.SERVICIO_RESTABLECIDO, { actorSub: actorSub ?? null });
+  }
+
+  /** Analítica cuenta camionId distintos por alerta; una intervención es una
+   * parada. Se informa la afectación sin omitirla ni cambiar su llenado/estado.
+   * Se ejecuta solo al crear la restricción, dentro de su transacción e inbox.
+   */
+  private async publicarCuadrillasAfectadas(c: Contingencia, zonaIds: string[]): Promise<void> {
+    // El simulador histórico no tiene identidad externa. No inventamos una
+    // alerta de Espacios: el simulador de su contrato sí trae alertaId.
+    if (!c.alertaId) return;
+    const paradas = await this.repo.paradasAsignadasEnZonas(zonaIds);
+    const updatedAt = new Date().toISOString();
+    for (const parada of paradas) {
+      await this.eventos.publish(
+        buildEvent(
+          EventTypes.INTERVENCION_ACTUALIZADA,
+          {
+            intervencionId: parada.id,
+            camionId: parada.camionId,
+            estadoAnterior: 'PROGRAMADA',
+            estadoNuevo: 'AFECTADA',
+            causaId: c.alertaId,
+            causaTipo: 'EVENTO_CLIMATICO',
+            updatedAt,
+          },
+          { correlationId: c.alertaId },
+        ),
+      );
+    }
   }
 
   private publicar(

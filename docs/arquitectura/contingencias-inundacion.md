@@ -195,3 +195,38 @@ Los nombres técnicos `inundacionId`, `restriccionesInundacion` y eventos v1 se
 conservan por compatibilidad con EDA y los clientes; las descripciones nuevas
 identifican el fenómeno recibido. El simulador histórico de inundación conserva
 su nombre para distinguirlo del simulador del contrato de Espacios Públicos.
+
+## Métrica de cuadrillas afectadas para Analítica
+
+Al crear una suspensión que conserva `alertaId` de Espacios Públicos, Residuos
+encola `IntervencionActualizada` por cada parada PENDIENTE en las zonas elegidas
+cuya ruta está ASIGNADA o EN_CURSO. No se incluyen propuestas, rutas canceladas
+ni completadas, paradas vaciadas/omitidas o zonas fuera de la selección.
+
+El payload conserva el contrato registrado: `intervencionId` es el ID de la
+parada; `camionId`, la patente; `estadoAnterior=PROGRAMADA`,
+`estadoNuevo=AFECTADA`, `causaTipo=EVENTO_CLIMATICO` y `causaId`/`correlationId`
+son el `alertaId` externo, sin sustituirlo por el UUID local de contingencia.
+`updatedAt` es ISO-8601 UTC del momento en que Residuos aplica la suspensión.
+
+Recibir CriticidadClimaticaConfirmada o elegir SIN_AFECTACION no genera esta
+métrica. El operador debe confirmar zonas. El simulador del contrato de
+Espacios usa la misma regla; el simulador histórico de inundaciones, sin
+alertaId externo, conserva únicamente sus eventos originales.
+
+La métrica se escribe en el outbox en la misma transacción que la restricción
+y el inbox. Un fallo revierte todo. La deduplicación existente evita volver a
+encolarla en reentregas, revisiones o finalización. No cambia el estado de la
+parada ni su llenado, y no publica otra afectación al habilitar o completar la
+recuperación. Tampoco se reprocesan las contingencias anteriores al despliegue.
+
+Analítica debe contar **camionId distintos por causaId** (o por el período que
+acuerden). Dos paradas del mismo camión no son dos cuadrillas. Dos alertas
+superpuestas conservan sus causas por separado. La entrega al bus puede
+reintentarse: para deduplicar hechos usar `(intervencionId, causaId,
+estadoNuevo)`; no calcular la métrica con COUNT de mensajes.
+
+No se agrega un tópico, una migración ni credenciales. Solo se amplía el uso del
+IntervencionActualizada existente, manteniendo sus nombres y tipos de campos.
+El dashboard y su URL siguen siendo responsabilidad de Analítica; esta entrega
+aporta los eventos del caso climático, sin cambiar las métricas de los otros casos.

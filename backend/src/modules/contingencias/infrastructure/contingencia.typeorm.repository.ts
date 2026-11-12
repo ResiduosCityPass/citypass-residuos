@@ -7,6 +7,7 @@ import { Contingencia, EstadoContingencia } from '../domain/contingencia.entity'
 import {
   ContingenciaRepository,
   ParadaAfectable,
+  ParadaClimaticaAsignada,
   RestriccionInundacion,
 } from '../domain/contingencia.repository';
 
@@ -145,6 +146,19 @@ export class ContingenciaTypeormRepository
       [id],
     );
     return Number(rows[0].cantidad);
+  }
+
+  async paradasAsignadasEnZonas(zonaIds: string[]): Promise<ParadaClimaticaAsignada[]> {
+    if (zonaIds.length === 0) return [];
+    return this.repo().query<ParadaClimaticaAsignada[]>(
+      `SELECT p.id, m.patente AS "camionId"
+      FROM parada p JOIN contenedor c ON c.id = p."contenedorId"
+      JOIN ruta r ON r.id = p."rutaId" JOIN camion m ON m.id = r."camionId"
+      WHERE c."zonaId" = ANY($1::uuid[]) AND p.estado = 'PENDIENTE'
+        AND r.estado IN ('ASIGNADA', 'EN_CURSO')
+      ORDER BY p.id`,
+      [zonaIds],
+    );
   }
 
   async paradasPendientes(rutaIds: string[]): Promise<ParadaAfectable[]> {
