@@ -49,11 +49,12 @@ que carguen el reclamo en vivo con las coordenadas del contenedor.
 ### El día anterior
 
 - [ ] Pedirle a Ramiro el `GATEWAY_WEBHOOK_TOKEN` vigente de Render: si lo cambió, el viejo da 401.
-- [ ] En **Contenedores**, que haya al menos **dos críticos del mismo tipo** que el camión y que
-      no estén en ninguna ruta.
-- [ ] Dos camiones de ese tipo libres, y un chofer. Los de la demo son el camión **FR123AN**
-      (Común, 10.000 L) y el chofer **Fran Isola** (`FRAN-001`); el segundo camión puede ser
-      cualquier otro Común disponible.
+- [ ] Los datos de la demo, ya creados en Render: la zona **Demo Fran** con los contenedores
+      **FRAN-01**, **FRAN-02** y **FRAN-03** (Común, críticos al 95 %), el camión **FR123AN**
+      (Común, 10.000 L) y el chofer **Fran Isola** (`FRAN-001`). El segundo camión del paso 5
+      puede ser cualquier otro Común disponible.
+- [ ] Que los tres FRAN sigan críticos y sin ruta: si se usaron en un ensayo, mandarles otra
+      lectura al 95 % con la clave de su sensor (`POST /lecturas` con el header `X-Sensor-Key`).
 - [ ] Ensayar el guion entero.
 
 ### Diez minutos antes
@@ -64,12 +65,11 @@ que carguen el reclamo en vivo con las coordenadas del contenedor.
    curl -s https://citypass-residuos-api.onrender.com/api/v1/health
    ```
 
-2. **Armar la ruta:** en **Rutas**, generar con el primer camión **sin elegir zona** y asignarla.
-   Tiene que tener **al menos dos paradas**: si tuviera una sola, al omitirla la ruta se cierra y el
-   reordenamiento no se ve. Copiar su id de la URL (`/rutas/<id>`).
+2. **Armar la ruta:** en **Rutas**, generar con el camión **FR123AN** y la zona **Demo Fran**, y
+   asignarla a **Fran Isola**. Sale con FRAN-01, FRAN-02 y FRAN-03, unos 1,5 km. Copiar su id de la
+   URL (`/rutas/<id>`). Si ya hay una asignada sin usar, sirve esa.
 
-   Si dice `RUTA_SIN_CONTENEDORES`, no hay críticos de ese tipo libres, o la zona elegida no tiene
-   ninguno: probar sin zona o con otro camión.
+   Si dice `RUTA_SIN_CONTENEDORES`, los FRAN no están críticos o ya están en otra ruta.
 
 3. **Cargar las variables** en una terminal de Git Bash, en `simulator/`:
 
