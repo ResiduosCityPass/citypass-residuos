@@ -203,6 +203,20 @@ describe('Recalculo de rutas por obstruccion (e2e)', () => {
           motivo: 'Acceso bloqueado por vehiculo (reclamo RC-E2E)',
         }),
       );
+
+      // Analitica: la parada se cancela por el reclamo.
+      const eventos = await ctx.dataSource
+        .getRepository(EventoPendiente)
+        .findBy({ eventType: EventTypes.INTERVENCION_ACTUALIZADA });
+      expect(eventos).toHaveLength(1);
+      expect(eventos[0].sobre.payload).toEqual(
+        expect.objectContaining({
+          estadoAnterior: 'PROGRAMADA',
+          estadoNuevo: 'CANCELADA',
+          causaId: 'RC-E2E',
+          causaTipo: 'INCIDENTE_VIAL',
+        }),
+      );
     });
 
     it('una emergencia que corta el camino afecta a la cuadrilla, una sola vez (CU-INT-01)', async () => {

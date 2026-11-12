@@ -16,6 +16,12 @@ export const OBSTRUCCION_RADIO_METROS_DEFAULT = 15;
 export const OBSTRUCCION_VIGENCIA_HORAS_DEFAULT = 4;
 
 /**
+ * Como le llega a Analitica la parada que un auto deja sin hacer, con causaId =
+ * reclamoId. Lo acordado con Analitica el 12/11; si cambia, se cambia aca.
+ */
+export const CAUSA_TIPO_RECLAMO = 'INCIDENTE_VIAL';
+
+/**
  * CU-INT-02 · Reclamo de un auto que bloquea la bicisenda.
  *
  * Residuos decide si ese auto le impide al camion llegar a algun contenedor. Si
@@ -113,6 +119,12 @@ export class ReclamosService {
             tapados.map(({ contenedor }) => contenedor.id),
             `Acceso bloqueado por vehiculo (reclamo ${reclamoId})`,
             reclamoId,
+            {
+              causaId: reclamoId,
+              causaTipo: CAUSA_TIPO_RECLAMO,
+              correlationId: correlationId ?? reclamoId,
+              estadoNuevo: 'CANCELADA',
+            },
           )
         : [];
 
