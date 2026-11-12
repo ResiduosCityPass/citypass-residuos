@@ -41,6 +41,8 @@ export class ReclamosService {
     // forwardRef: rutas ya depende de integracion por los refuerzos y las obstrucciones.
     @Inject(forwardRef(() => ParadasService))
     private readonly paradas: Pick<ParadasService, 'quitarContenedores'>,
+    // Explicito: con Pick<> la metadata queda como Object y Nest no lo resuelve.
+    @Inject(AlertasService)
     private readonly alertas: Pick<
       AlertasService,
       'registrarAccesoBloqueado' | 'resolverAccesosLiberados'
