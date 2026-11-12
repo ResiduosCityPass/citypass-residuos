@@ -479,6 +479,7 @@ describe('Ciclo de recoleccion (e2e)', () => {
         .set(auth(admin))
         .expect(201);
 
+      expect(primera.body.token).toMatch(/^CH-[A-Za-z0-9_-]{22}-[0-9a-z]{6}$/);
       expect(primera.body.advertencia).toMatch(/no se puede volver a consultar/i);
 
       // Con la credencial recien emitida ve su ruta.
@@ -505,11 +506,8 @@ describe('Ciclo de recoleccion (e2e)', () => {
 
       // ...y la vieja quedo muerta, aunque su firma siga siendo valida y le
       // falte un mes para vencer.
-      const conVieja = await http
-        .get('/api/v1/rutas/mias')
-        .set(auth(primera.body.token))
-        .expect(200);
-      expect(conVieja.body).toEqual({});
+      await http.get('/api/v1/rutas/mias').set(auth(primera.body.token)).expect(401);
+      await http.get('/api/v1/zonas').set(auth(segunda.body.token)).expect(403);
     });
 
     it('no se le emite credencial a un chofer dado de baja', async () => {

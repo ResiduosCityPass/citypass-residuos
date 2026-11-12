@@ -1,4 +1,5 @@
 import { Column, Entity, PrimaryColumn } from 'typeorm';
+import { EstadoContingencia } from './contingencia.entity';
 import {
   CriticidadConfirmadaDto,
   CriticidadFinalizadaDto,
@@ -6,6 +7,9 @@ import {
 
 @Entity('alerta_climatica_externa')
 export class AlertaClimaticaExterna {
+  /** Estado operativo proyectado al listar; no es una columna nueva. */
+  estadoContingencia?: EstadoContingencia | null;
+
   @PrimaryColumn({ type: 'varchar', length: 200 }) alertaId!: string;
   @Column({ type: 'jsonb', nullable: true }) confirmacion!: CriticidadConfirmadaDto | null;
   @Column({ type: 'jsonb', nullable: true }) finalizacion!: CriticidadFinalizadaDto | null;

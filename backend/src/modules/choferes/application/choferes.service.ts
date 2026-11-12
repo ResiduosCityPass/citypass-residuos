@@ -1,12 +1,9 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
 import { aplicarCambios } from '../../../shared/application/aplicar-cambios';
-import { EMISOR_CHOFERES_DEFAULT } from '../../../config/env.validation';
 import {
   CREDENCIAL_CHOFER_EXPIRA_EN,
-  generarSubDeChofer,
-  payloadDeCredencialChofer,
+  generarCodigoChofer,
+  subDeCodigoChofer,
 } from '../../../shared/auth/credencial-chofer';
 import { Chofer } from '../domain/chofer.entity';
 import { RUTA_REPOSITORY, RutaRepository } from '../../rutas/domain/ruta.repository';
@@ -37,8 +34,6 @@ export class ChoferesService {
     private readonly choferes: ChoferRepository,
     @Inject(RUTA_REPOSITORY)
     private readonly rutas: RutaRepository,
-    private readonly jwt: JwtService,
-    private readonly config: ConfigService,
   ) {}
 
   async crear(dto: CrearChoferDto): Promise<Chofer> {
@@ -107,40 +102,14 @@ export class ChoferesService {
     return this.choferes.guardar(chofer);
   }
 
-  /**
-   * Emite la credencial con la que el chofer entra a la pantalla de CU-10.
-   *
-   * Mismo trato que la API key del sensor: se muestra una sola vez y no se
-   * puede volver a consultar. La diferencia es que no hace falta guardarla, ni
-   * siquiera hasheada — un JWT se valida con su firma, asi que el backend no
-   * necesita recordar nada.
-   *
-   * Lo que se guarda es el `usuarioSub`, y ROTARLO ES LO QUE REVOCA. Emitir una
-   * credencial nueva genera un `sub` nuevo, y las credenciales anteriores de ese
-   * chofer dejan de resolver contra nadie: quedan muertas en el acto, aunque su
-   * firma siga siendo valida y falte un mes para que venzan.
-   *
-   * Eso da dos niveles de revocacion, que es justo lo que faltaba: perder el
-   * celular se resuelve emitiendo otra credencial, sin sacar al chofer de
-   * circulacion; que la persona deje de trabajar se resuelve dandola de baja.
-   *
-   * El precio: emitir dos veces por error deja al chofer afuera hasta que le
-   * pasen la nueva. Es el mismo precio que revincular un sensor, y se paga por
-   * la misma razon.
+  /** Emite un código corto; rotar su hash en usuarioSub revoca también los JWT
+   * anteriores. Solo se devuelve una vez y vence a los 30 días.
    */
   async emitirCredencial(id: string): Promise<CredencialEmitida> {
     const chofer = await this.obtenerActivo(id);
-
-    chofer.usuarioSub = generarSubDeChofer();
+    const token = generarCodigoChofer();
+    chofer.usuarioSub = subDeCodigoChofer(token);
     await this.choferes.guardar(chofer);
-
-    const token = this.jwt.sign(payloadDeCredencialChofer(chofer.usuarioSub, chofer.legajo), {
-      expiresIn: CREDENCIAL_CHOFER_EXPIRA_EN,
-      // Emisor propio, distinto del humano. El guard cruza `token_use` contra
-      // `iss`, asi que firmar con el emisor equivocado rechaza el token aunque
-      // todo lo demas este bien.
-      issuer: this.config.get<string>('JWT_ISSUER_CHOFERES', EMISOR_CHOFERES_DEFAULT),
-    });
 
     return {
       choferId: chofer.id,

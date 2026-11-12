@@ -36,7 +36,8 @@ export class Chofer {
   legajo!: string;
 
   /**
-   * `sub` del token con el que este chofer entra a la pantalla de CU-10.
+   * Identidad de acceso: sub del JWT anterior o hash del código corto (CH-).
+   * El código completo nunca se persiste.
    *
    * Es lo unico que une a la persona con su sesion: `GET /rutas/mias` resuelve
    * el chofer buscando por aca. Es nullable porque un chofer puede estar dado de

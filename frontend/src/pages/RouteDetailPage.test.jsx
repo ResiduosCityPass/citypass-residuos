@@ -83,10 +83,10 @@ describe('CU-08 / CU-09 · revisar y asignar una ruta', () => {
     suspended.paradas[0].restriccionesInundacion = [{ contingenciaId: 'f1', descripcion: 'Inundacion Centro' }];
     fetchRoute.mockResolvedValue(suspended);
     const user = userEvent.setup(); mount();
-    await screen.findByText('Recolección suspendida por inundación');
+    await screen.findByText('Recolección suspendida por evento climático');
     await user.selectOptions(await screen.findByLabelText(/Asignar a/), JUANA.id);
     expect(screen.getByRole('button', { name: 'Confirmar y asignar' })).toBeDisabled();
-    expect(screen.getByText(/Suspendida por inundación: Inundacion Centro/)).toBeInTheDocument();
+    expect(screen.getByText(/Suspendida por evento climático: Inundacion Centro/)).toBeInTheDocument();
     expect(assignRoute).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Descartar propuesta' })).toBeEnabled();
   });

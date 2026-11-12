@@ -90,9 +90,9 @@ export default function MapPage({ tokenVersion }) {
 
   return (
     <div className="screen screen-map">
-      {containers.some((c) => c.recoleccionSuspendida) && <Notice type="warning" title="Recolección suspendida por inundación">
+      {containers.some((c) => c.recoleccionSuspendida) && <Notice type="warning" title="Recolección suspendida por evento climático">
         {containers.filter((c) => c.recoleccionSuspendida).length} contenedor(es) afectados en esta vista.
-        El borde azul punteado indica suspensión; el color interior conserva el estado de llenado. <Link to="/contingencias">Ver inundaciones</Link>
+        El borde azul punteado indica suspensión; el color interior conserva el estado de llenado. <Link to="/contingencias">Ver eventos climáticos</Link>
       </Notice>}
       {/* Tarjetas de resumen: el conteo por estado se lee de un vistazo, sin
           tener que contar marcadores sobre el mapa. Las cinco son botones que

@@ -1,11 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import AlertsPage from './AlertsPage.jsx';
-import { fetchAlerts, fetchContainers, acknowledgeAlert } from '../api/waste.js';
+import { fetchAlerts, fetchContainers, acknowledgeAlert, fetchClimateAlerts, fetchZones, resolveClimateAlert } from '../api/waste.js';
 
 vi.mock('../api/waste.js', () => ({
   USING_MOCKS: false,
+  fetchClimateAlerts: vi.fn(), fetchZones: vi.fn(), resolveClimateAlert: vi.fn(), simulateClimateEvent: vi.fn(),
   fetchAlerts: vi.fn(),
   fetchContainers: vi.fn(),
   acknowledgeAlert: vi.fn(),
@@ -28,6 +30,8 @@ const alert = (extras = {}) => ({
 describe('CU-05 / CU-06 tablero de alertas', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    fetchClimateAlerts.mockResolvedValue({ alertas: [], simuladorHabilitado: false });
+    fetchZones.mockResolvedValue([]);
     fetchContainers.mockResolvedValue([{ id: 'ct-1', codigo: 'CT-0001' }]);
   });
 
@@ -41,7 +45,7 @@ describe('CU-05 / CU-06 tablero de alertas', () => {
       alert({ id: 'al-f', tipo: 'INCENDIO', severidad: 'CRITICA', detalle: 'Temperatura 91.4C' }),
       alert(),
     ]);
-    render(<AlertsPage />);
+    render(<MemoryRouter><AlertsPage /></MemoryRouter>);
 
     const block = (await screen.findByText(/Incendios sin resolver/)).closest('section');
     expect(within(block).getByText('Temperatura 91.4C')).toBeInTheDocument();
@@ -50,7 +54,7 @@ describe('CU-05 / CU-06 tablero de alertas', () => {
 
   it('un incendio ya resuelto no ocupa el bloque de maxima prioridad', async () => {
     fetchAlerts.mockResolvedValue([alert({ tipo: 'INCENDIO', estado: 'RESUELTA' })]);
-    render(<AlertsPage />);
+    render(<MemoryRouter><AlertsPage /></MemoryRouter>);
 
     await screen.findByText(/Alertas \(1\)/);
     expect(screen.queryByText(/Incendios sin resolver/)).not.toBeInTheDocument();
@@ -66,7 +70,7 @@ describe('CU-05 / CU-06 tablero de alertas', () => {
     // Sin contenedores cargados: el codigo tiene que salir igual, porque ya no
     // depende del cruce. Lo unico que llena `fetchContainers` es el filtro.
     fetchContainers.mockResolvedValue([]);
-    render(<AlertsPage />);
+    render(<MemoryRouter><AlertsPage /></MemoryRouter>);
 
     const row = (await screen.findByText(/Nivel 76%/)).closest('li');
     expect(within(row).getByText('CT-0001')).toBeInTheDocument();
@@ -78,7 +82,7 @@ describe('CU-05 / CU-06 tablero de alertas', () => {
     fetchAlerts.mockResolvedValue([alert()]);
     acknowledgeAlert.mockResolvedValue(alert({ estado: 'EN_ATENCION' }));
 
-    render(<AlertsPage onAlertsChanged={onAlertsChanged} />);
+    render(<MemoryRouter><AlertsPage onAlertsChanged={onAlertsChanged} /></MemoryRouter>);
     await user.click(await screen.findByRole('button', { name: 'Atender' }));
 
     await waitFor(() => expect(acknowledgeAlert).toHaveBeenCalledWith('al-1'));
@@ -90,7 +94,7 @@ describe('CU-05 / CU-06 tablero de alertas', () => {
   it('filtrar por estado se traduce en un query param', async () => {
     const user = userEvent.setup();
     fetchAlerts.mockResolvedValue([]);
-    render(<AlertsPage />);
+    render(<MemoryRouter><AlertsPage /></MemoryRouter>);
 
     await screen.findByText(/Alertas \(0\)/);
     await user.selectOptions(screen.getByLabelText('Filtrar por estado'), 'ABIERTA');
@@ -101,4 +105,20 @@ describe('CU-05 / CU-06 tablero de alertas', () => {
       ),
     );
   });
+  it('permite revisar un viento fuerte directamente en Alertas, sin navegar a otra pantalla', async () => {
+    const user = userEvent.setup();
+    fetchAlerts.mockResolvedValue([]);
+    fetchZones.mockResolvedValue([{ id: 'z1', nombre: 'Centro' }]);
+    fetchClimateAlerts.mockResolvedValue({ alertas: [{ alertaId: 'viento-1', decision: 'PENDIENTE_REVISION', origen: 'eda', confirmacion: { fenomeno: 'VIENTO_FUERTE', nivelCriticidad: 'ALTA', ubicaciones: [] } }], simuladorHabilitado: false });
+    resolveClimateAlert.mockResolvedValue({});
+    const changed = vi.fn();
+    render(<MemoryRouter><AlertsPage onAlertsChanged={changed} /></MemoryRouter>);
+    expect(await screen.findByRole('heading', { name: 'VIENTO FUERTE' })).toBeInTheDocument();
+    await user.click(screen.getByLabelText('Centro'));
+    await user.type(screen.getByLabelText(/Fundamento/), 'Riesgo por ráfagas en Centro');
+    await user.click(screen.getByRole('button', { name: 'Confirmar suspensión del servicio' }));
+    await waitFor(() => expect(resolveClimateAlert).toHaveBeenCalledWith('viento-1', { accion: 'SUSPENDER', motivo: 'Riesgo por ráfagas en Centro', zonaIds: ['z1'] }));
+    await waitFor(() => expect(changed).toHaveBeenCalled());
+  });
+
 });

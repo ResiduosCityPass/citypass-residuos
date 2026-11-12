@@ -1,5 +1,5 @@
 export const FLOOD_STATE_LABEL = {
-  ACTIVA: 'Inundación activa',
+  ACTIVA: 'Evento climático activo',
   PENDIENTE_RECUPERACION: 'Pendiente de habilitación',
   EN_RECUPERACION: 'En recuperación',
   RECUPERADA: 'Servicio recuperado',

@@ -584,3 +584,114 @@ Comparé el `.avsc` con lo que publica el traductor al gateway: tienen los mismo
 - Review del #83.
 - Que se registre la versión nueva de `IntervencionProgramada` en EDA. Hasta entonces, no hay release a `main`.
 - Un review nuevo del #78: las aprobaciones se descartaron con el último commit.
+
+**Noche del 05/11:**
+- **Adriel y Fran aprobaron el #78 y el #83, y entraron a `develop`.** Adriel marcó un detalle que no bloquea: `npm run plaza` no valida que la latitud esté entre -90 y 90, pero la API la rechaza igual.
+- **La sede de la demo es Recoleta.** Fran le pide a Santiago (Espacios) las coordenadas.
+
+**Falta:**
+- Con las coordenadas de Recoleta, correr `npm run plaza` en Render.
+- Que Rami registre la versión nueva de `IntervencionProgramada` en EDA. Después, el release a `main`.
+
+**Coordenadas de la sede de Recoleta**, que Espacios pasó por Fran: -34.5862976, -58.3925127.
+- **En local:** `npm run plaza` creó CT-0020, CT-0021 y CT-0022 en la zona "Sede Recoleta". Una actividad de 1.500 personas en esas coordenadas quedó con los 3 contenedores.
+- **El guion de la demo** ya usa la sede de Recoleta, en vez de Plaza Houssay.
+
+**Falta:** correr `npm run plaza` en Render, con un token de administrador.
+
+**Respuestas del 05/11 a la noche:**
+- **Nicolas Hernández (Login)** pasó por privado el `client_id` y el secreto de Residuos para el paso 5. Quedaron en `backend/.env`, fuera del repo.
+- **Francisco Csik (Analítica)** pasó los campos de `IntervencionProgramada`. Coinciden con el `.avsc`, salvo `alertaId` (uuid o null), que es para las intervenciones por una `AlertaGenerada` propia.
+- **`causaTipo`:** Analítica pide usar los mismos valores que Emergencias: `EVENTO_PUBLICO`, `RECLAMO`, `EVENTO_CLIMATICO`, `INCIDENTE_VIAL` y `RESERVA`. Nuestro `EVENTO_PUBLICO` ya coincide.
+- **Abrí el #85:** suma `alertaId` al `.avsc` y al evento, siempre en null por ahora, y documenta los valores de `causaTipo`. 819 unitarios en verde. Conviene que entre antes de que Rami registre el esquema, así se registra una sola vez.
+
+**Falta:**
+- Review del #85 (`alertaId`). Cuando entre, Rami registra esa versión del `.avsc`.
+- Probar el paso 5 con las credenciales.
+
+**Tachos de Recoleta en Render:** con un token de administrador, `npm run plaza -- --nombre "Sede Recoleta" --lat -34.5862976 --lng -58.3925127` creó CT-0022 (común), CT-0023 (reciclable) y CT-0024 (orgánico) en la zona "Sede Recoleta", a 43–46 m de la sede.
+- **Credenciales del bus:** el `client_id` de Nicolas saca token en el bus. Residuos todavía no tiene suscripciones.
+
+**Falta:**
+- Review del #85. Después, que Rami registre el esquema y haga el release a `main`.
+- Suscribir el webhook de Render a `ActividadCreada` (`npm run bus -- suscribir`).
+
+## Vie 06/11 · Revisé el #74 de Tomás
+
+Tomás subió las correcciones: guarda las cancelaciones aunque lleguen antes que la creación, escucha `EventoCancelado` y `ActividadModificada`, acepta `CANCELLED` y separa su caso del nuestro.
+- **Lo que toca a mi caso:** desde 1000 personas sigue todo igual (zona en el mapa, refuerzo `act-<id>` e `IntervencionProgramada` con `EVENTO_PUBLICO`). De 100 a 999 el refuerzo es `res-<id>` y la intervención sale con `causaTipo = RESERVA`. Con eso queda resuelta la duda del 04/11: Analítica ya puede separar los dos casos.
+- **Cancelación:** si Espacios cancela una actividad masiva, también se borra su zona del mapa.
+- **Cruce con el #85:** no tocan los mismos archivos. Los junté sobre `develop` en una rama temporal: 843 unitarios en verde y compila.
+
+## Vie 06/11 · Release a `main`
+
+- **Entraron a `develop`** el #85 (`alertaId`, aprobado por Rami) y el #74 de Tomás.
+- **Release:** Rami mergeó el #86 (`develop` → `main`), aprobado por Nicolas Damm, y desplegó en Render. La API responde en `/api/v1/health`.
+- **Token del webhook:** Rami confirmó que el de Render es distinto al que teníamos. Lo pasa por privado y va solo a `backend/.env`.
+
+**Falta:**
+- Probar con una actividad real de Espacios en Recoleta.
+
+**Webhook suscripto al bus:** con el token nuevo, el webhook de Render lo acepta (el viejo daba 401). `npm run bus -- suscribir` dio de alta `com.citypass.espacios.ActividadCreada`, activa, con id `db00c6de-c176-4b7e-b1c8-1f2dc3f5a19d` (sirve para darla de baja).
+
+## Vie 06/11 · Primera prueba completa en Render
+
+Con el script del plan B (`npm run actividad`), en vez de Espacios, mandé al webhook de Render una actividad de 1.500 personas en la sede de Recoleta que terminaba a los 2 minutos.
+- **Mapa:** apareció el aviso "Actividad masiva: Prueba sede Recoleta · 1.500 personas · 3 contenedores en la zona".
+- **Ruta:** generé una ruta para la zona "Sede Recoleta" y CT-0022 entró con 0% de llenado, por el refuerzo del evento. La asigné a AB123CD con Juana Perez (CH-001).
+- **Evento publicado:** en el bus (`GET /events?topic=com.citypass.residuos.IntervencionProgramada`) quedó la `IntervencionProgramada` con `causaTipo = EVENTO_PUBLICO`, `alertaId` en null, `camionId = AB123CD` y las coordenadas del tacho. Con `alertaId` incluido pasó, así que el esquema nuevo está andando en EDA.
+- **Bus:** no hay envíos fallidos.
+
+**Falta:**
+- Probar con una actividad real que cree Rodrigo desde Espacios (llega por la suscripción del webhook).
+- Del 13 al 18/11: ensayo completo de la demo en Render.
+
+## Vie 06/11 · Repaso del chat del squad
+
+Crucé lo que se habló en el grupo del squad con lo que hicimos en Residuos.
+- **Coincide:** el contrato de `ActividadCreada` (milisegundos, `ubicacion { lat, lng }`, `correlationId = act-<id>`), los cortes de 1.000 personas, 300 m y 6 h (los mismos que Reclamos y Movilidad), la salida de la escuadrilla con `fechaHoraFinalizacion` y los campos de `IntervencionProgramada` que pidió Analítica.
+- **Recepción:** Render está conectado al bus por Kafka, como recomendó Franco, y escucha todos los eventos de Espacios. El webhook queda como segunda vía; los repetidos se descartan por `eventId`.
+- **Guion corregido:** el Centro Cultural Recoleta admite hasta 1.200 personas, así que la demo pasa de 5.000 a 1.200, con 3 contenedores en la zona. Rodrigo confirmó que no hay duración mínima, pero el inicio tiene que ser futuro.
+- **Pedido de Analítica que no tomamos:** Francisco propuso publicar `IntervencionProgramada` también en los recorridos normales, para comparar. Nuestra métrica (cuadrillas por evento público) no lo necesita, así que quedó afuera.
+
+## Vie 06/11 · Guion de Recoleta mergeado
+
+- **#88 mergeado a `develop`:** guion con 1.200 personas y 3 contenedores, y el repaso del chat. Lo aprobó Tomás, que confirmó que CT-0022, CT-0023 y CT-0024 están a menos de 50 m de la sede.
+- **CI:** falló un test del frontend (`RouteDetailPage.test.jsx`, paradas suspendidas) que no tenía que ver con el PR, porque solo cambiaba docs y `develop` pasaba en el commit base. Al reintentar el job pasó: es un test que falla a veces.
+
+**Falta:**
+- Del 13 al 18/11: ensayo completo en Render, con una actividad real de Rodrigo en Recoleta.
+
+## Vie 06/11 · Ensayo en Render
+
+Ensayé la demo en Render con el plan B: 1.200 personas en la sede de Recoleta, terminando a los 2 minutos.
+- **Bus:** la suscripción sigue activa y no había envíos fallidos.
+- **Mapa:** apareció "Festival de Primavera · 1.200 personas · 3 contenedores en la zona".
+- **Primer intento de ruta:** salió `RUTA_SIN_CONTENEDORES`. CT-0022 seguía pendiente en la ruta de la prueba anterior y los contenedores de una ruta abierta no entran a otra. CT-0023 es de reciclables y CT-0024 orgánico, y los camiones libres eran de residuo común. Le emití una credencial a Juana Perez, entré como ella y omití la parada: la ruta vieja se cerró y AB123CD quedó libre.
+- **Ruta:** generé la ruta de AB123CD para la zona "Sede Recoleta". CT-0022 entró al 0 % y la asigné a Juana Perez.
+- **Evento publicado:** en el bus quedó la `IntervencionProgramada` de la ruta nueva, con `causaTipo = EVENTO_PUBLICO`, `camionId = AB123CD` y `alertaId` en null.
+
+**Para el 19/11:**
+- Antes de la demo, cerrar las rutas abiertas que tengan CT-0022: si no, la ruta sale vacía.
+- El único contenedor de la sede que entra a la ruta de un camión de residuo común es CT-0022.
+
+**Falta:**
+- Probar con una actividad real que cree Rodrigo desde Espacios.
+
+## Dom 08/11 · Ruta cerrada y zoom del mapa
+
+- **#89 mergeado a `develop`:** bitácora del ensayo en Render.
+- **#90 revisado:** menú "Eventos climáticos", alertas de Espacios Públicos en Alertas y credencial corta de chofer. Ya lo había aprobado Adriel; no toca la demo y la credencial vieja de Juana sigue andando.
+- **Ruta del ensayo cerrada:** entré a `/chofer` como Juana Perez y omití CT-0022. La ruta 31fb37eb se cerró y AB123CD quedó libre. Ninguna otra ruta abierta tiene CT-0022.
+- **Zoom del mapa:** en el celular, los botones + y − del mapa quedaban por encima del menú lateral abierto. Cada mapa ahora encierra sus capas y el menú queda arriba.
+
+**Falta:**
+- Del 13 al 18/11: ensayo con una actividad real de Rodrigo en Recoleta.
+
+## Mar 10/11 · Zoom del mapa mergeado y pregunta de Analítica
+
+- **#91 mergeado a `develop`:** arreglo del zoom del mapa sobre el menú lateral y la bitácora del 08/11. Lo aprobó Adriel. Llega a Render cuando se pase `develop` a `main`.
+- **Pregunta de Analítica:** Fran preguntó si los eventos de Residuos ya están modelados. Sí: Residuos publica `IntervencionProgramada` al asignar la ruta, con `causaTipo = EVENTO_PUBLICO` (actividad de 1.000 personas o más, squad 3) o `RESERVA` (evento comunitario chico, squad 6), más `causaId` y `camionId`. El esquema ya pasa en el bus desde el 06/11.
+
+**Falta:**
+- Del 13 al 18/11: ensayo con una actividad real de Rodrigo en Recoleta.
