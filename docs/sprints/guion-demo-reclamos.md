@@ -110,7 +110,8 @@ export TAPA=$(cat ultimo-reclamo.txt)
 pasa a `OMITIDA`, con el motivo "Acceso bloqueado por vehiculo (reclamo …)", y bajan los km.
 Recargar el detalle de la ruta en el front con F5. Después abrir **Alertas**: hay una
 **"Acceso bloqueado"** nueva sobre el contenedor tapado, con el id del reclamo en el detalle, y la
-campanita suma una. Las dos se actualizan solas en 15 s.
+campanita suma una. La campanita se actualiza sola cada 15 s; la lista de Alertas no, así que si ya
+estaba abierta hay que pulsar **Refrescar**.
 
 **Decir:**
 - "Reclamos publicó `ReclamoCreado` y nos llegó. Residuos decidió solo si el auto le impide al
@@ -154,7 +155,8 @@ npm run reclamo:resuelto -- "$TAPA"
 Con el id explícito: sin argumento resolvería el reclamo lejano del paso 4 y el contenedor seguiría
 tapado.
 
-**Mostrar:** en **Alertas**, la de acceso bloqueado pasa sola a **Resuelta**. Después generar una
+**Mostrar:** en **Alertas**, pulsar **Refrescar**: la de acceso bloqueado pasó sola a **Resuelta**
+y la campanita resta una. Después generar una
 ruta con el **segundo camión**. **La ruta incluye el contenedor** que estaba tapado, aunque la ruta
 original siga en curso: mientras duraba el bloqueo no entraba en ninguna.
 
@@ -176,7 +178,7 @@ original siga en curso: mientras duraba el bloqueo no entraba en ninguna.
 |---|---|---|
 | `webhook … -> 401` | `WEBHOOK_TOKEN` no coincide con el de Render | Pedirle el vigente a Ramiro |
 | `GET … -> 401` | Venció `TOKEN` | Copiarlo de nuevo del navegador |
-| La parada se omite pero no aparece la alerta | Render todavía no tiene el pase de #99 a `main`, o no pasaron los 15 s | Esperar y recargar; si sigue sin aparecer, contarla y mostrar la ruta |
+| La parada se omite pero no aparece la alerta | Render todavía no tiene el pase de #99 a `main`, o la lista no se refrescó | Pulsar **Refrescar** en Alertas; si sigue sin aparecer, contarla y mostrar la ruta |
 | Queda una "Acceso bloqueado" abierta de un ensayo | Se resolvió otro reclamo, no el que tapaba | `npm run reclamo:resuelto -- <id del detalle de la alerta>` |
 | El script tarda o da error de conexión | La API estaba dormida | Repetir el `curl` del health y volver a correrlo |
 | `RUTA_SIN_CONTENEDORES` al generar | No hay críticos libres de ese tipo, o la zona no tiene | Generar sin zona o con otro camión |
