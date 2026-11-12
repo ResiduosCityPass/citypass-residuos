@@ -358,6 +358,13 @@ describe('Recalculo de rutas por obstruccion (e2e)', () => {
 
       await reclamoCreado();
 
+      const accesos = async () =>
+        (await http.get('/api/v1/alertas?tipo=ACCESO_BLOQUEADO').set(auth(admin)).expect(200))
+          .body as Array<{ contenedorId: string; estado: string }>;
+      expect(await accesos()).toEqual([
+        expect.objectContaining({ contenedorId: tapado, estado: 'ABIERTA' }),
+      ]);
+
       // Los otros dos siguen pendientes en la ruta original y el tapado esta obstruido.
       const sinNada = await http
         .post('/api/v1/rutas/generar')
@@ -371,6 +378,9 @@ describe('Recalculo de rutas por obstruccion (e2e)', () => {
         estadoNuevo: 'RESUELTO',
       });
 
+      expect(await accesos()).toEqual([
+        expect.objectContaining({ contenedorId: tapado, estado: 'RESUELTA' }),
+      ]);
       expect(await generar(otroCamion.body.id)).toEqual([tapado]);
     });
 
