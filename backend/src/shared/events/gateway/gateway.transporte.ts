@@ -8,6 +8,15 @@ import { traducirAGateway } from './traductor-gateway';
 /** Margen para renovar el token antes de que venza (los tokens duran 15 minutos). */
 const MARGEN_RENOVACION_MS = 30_000;
 
+/**
+ * Cuanto se espera la respuesta del gateway. Casi siempre contesta en 1-5 s,
+ * pero a veces tarda ~30 s y publica igual (Emergencias lo midio el 13/11). Con
+ * menos, el despachador lo daba por fallido, lo reintentaba y el evento salia
+ * duplicado: el gateway le pone un eventId nuevo a cada POST, asi que nadie
+ * puede deduplicarlo.
+ */
+export const TIMEOUT_GATEWAY_MS = 45_000;
+
 /** El gateway rechazo el evento por contrato: reintentarlo daria lo mismo. */
 export class EventoRechazadoPorGateway extends Error {}
 
@@ -84,7 +93,7 @@ export class GatewayTransporte implements EventPublisher {
       fetch(`${this.urlGateway}/api/v1${path}`, {
         method,
         redirect: 'error',
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(TIMEOUT_GATEWAY_MS),
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${await this.obtenerToken()}`,
