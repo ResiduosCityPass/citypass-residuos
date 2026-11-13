@@ -17,6 +17,7 @@ contenedor, Residuos lo saca solo de la ruta del camión que está en marcha.
 | Radio de **15 m** | El largo de un auto más el espacio para que el camión maniobre frente al contenedor. Configurable |
 | La parada queda **`OMITIDA`**, no se borra | Queda a la vista el motivo, con el id del reclamo, y la ruta conserva lo que pasó |
 | Las pendientes **se reordenan** desde el último contenedor confirmado | El camión ya está en la calle: no vuelve al depósito para replanificar |
+| Se abre una alerta **"Acceso bloqueado"** y se cierra sola al liberarse | El operador se entera sin mirar la ruta, y no le queda una alerta vieja abierta |
 | El bloqueo **vence a las 4 h** | Si se pierde el aviso de Reclamos, el contenedor no queda afuera del ruteo para siempre |
 | Se publica **`ReclamoEvaluado` siempre**, afecte o no | Sin los "no", no hay contra qué calcular el porcentaje |
 | La métrica la definimos **nosotros** | Nos lo confirmó el profe: la muestra cada módulo y le tiene que servir |
@@ -107,14 +108,20 @@ export TAPA=$(cat ultimo-reclamo.txt)
 
 **Mostrar:** la salida del script, con la ruta antes y después. La parada del contenedor tapado
 pasa a `OMITIDA`, con el motivo "Acceso bloqueado por vehiculo (reclamo …)", y bajan los km.
-Recargar el detalle de la ruta en el front con F5.
+Recargar el detalle de la ruta en el front con F5. Después abrir **Alertas**: hay una
+**"Acceso bloqueado"** nueva sobre el contenedor tapado, con el id del reclamo en el detalle, y la
+campanita suma una. La campanita se actualiza sola cada 15 s; la lista de Alertas no, así que si ya
+estaba abierta hay que pulsar **Refrescar**.
 
 **Decir:**
 - "Reclamos publicó `ReclamoCreado` y nos llegó. Residuos decidió solo si el auto le impide al
   camión llegar a algún contenedor: busca contenedores a 15 metros o menos."
 - "Como tapa uno, lo saca de la ruta en marcha y reordena lo que queda desde donde está el
   camión. **Nadie tocó la pantalla.**"
-- "El contenedor sigue lleno y con su alerta abierta: nadie lo vació, solo no se puede llegar."
+- "Al operador le salta una alerta de acceso bloqueado: sabe por qué ese contenedor no se va a
+  vaciar sin tener que abrir la ruta."
+- "El contenedor sigue lleno y con su alerta de saturación abierta: nadie lo vació, solo no se
+  puede llegar."
 
 ### 3 · La decisión sale al bus (1 min)
 
@@ -133,7 +140,8 @@ EDA, contarlo con lo que se comprobó el 12/11.
 npm run reclamo -- --lejos --ruta <id>
 ```
 
-**Mostrar:** la ruta no cambia: las mismas paradas y los mismos km.
+**Mostrar:** la ruta no cambia: las mismas paradas y los mismos km. Tampoco aparece una alerta
+nueva.
 
 **Decir:** "Un auto mal estacionado a 100 metros no le cambia nada al camión. Igual publicamos la
 decisión, con `afectaRecoleccion` en false: sin los 'no', no hay contra qué calcular el porcentaje."
@@ -147,16 +155,18 @@ npm run reclamo:resuelto -- "$TAPA"
 Con el id explícito: sin argumento resolvería el reclamo lejano del paso 4 y el contenedor seguiría
 tapado.
 
-**Mostrar:** generar una ruta con el **segundo camión**. **La ruta incluye el contenedor** que
-estaba tapado, aunque la ruta original siga en curso: mientras duraba el bloqueo no entraba en
-ninguna.
+**Mostrar:** en **Alertas**, pulsar **Refrescar**: la de acceso bloqueado pasó sola a **Resuelta**
+y la campanita resta una. Después generar una
+ruta con el **segundo camión**. **La ruta incluye el contenedor** que estaba tapado, aunque la ruta
+original siga en curso: mientras duraba el bloqueo no entraba en ninguna.
 
 **Decir:**
 - "El reclamo no lo resolvemos nosotros: lo cierra Reclamos cuando el área que corresponde retira
   el auto, y nos llega `ReclamoActualizado` con estado `RESUELTO`."
 - "No hace falta esperar a que termine la ruta original: la parada omitida ya no la va a hacer
   nadie, así que otro camión puede levantarlo."
-- "Si ese aviso no llega nunca, el bloqueo vence solo a las 4 horas."
+- "Si ese aviso no llega nunca, el bloqueo vence solo a las 4 horas, y la alerta se cierra con el
+  próximo reclamo que llegue."
 
 **Al terminar:** `unset TOKEN WEBHOOK_TOKEN TAPA`.
 
@@ -168,6 +178,8 @@ ninguna.
 |---|---|---|
 | `webhook … -> 401` | `WEBHOOK_TOKEN` no coincide con el de Render | Pedirle el vigente a Ramiro |
 | `GET … -> 401` | Venció `TOKEN` | Copiarlo de nuevo del navegador |
+| La parada se omite pero no aparece la alerta | Render todavía no tiene el pase de #99 a `main`, o la lista no se refrescó | Pulsar **Refrescar** en Alertas; si sigue sin aparecer, contarla y mostrar la ruta |
+| Queda una "Acceso bloqueado" abierta de un ensayo | Se resolvió otro reclamo, no el que tapaba | `npm run reclamo:resuelto -- <id del detalle de la alerta>` |
 | El script tarda o da error de conexión | La API estaba dormida | Repetir el `curl` del health y volver a correrlo |
 | `RUTA_SIN_CONTENEDORES` al generar | No hay críticos libres de ese tipo, o la zona no tiene | Generar sin zona o con otro camión |
 | "La ruta no tiene paradas pendientes" | La ruta ya se usó en un ensayo | Armar una ruta nueva |
