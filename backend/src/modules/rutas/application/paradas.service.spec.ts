@@ -621,10 +621,30 @@ describe('ParadasService (CU-10)', () => {
         expect(eventos.getPublished(EventTypes.INTERVENCION_ACTUALIZADA)).toHaveLength(0);
       });
 
-      it('un auto que tapa un contenedor no cuenta como cuadrilla afectada', async () => {
+      it('sin causa no le avisa nada a Analitica', async () => {
         await sistema.quitarContenedores(['c-tapada'], MOTIVO_RECLAMO, 'RC-123');
 
         expect(eventos.getPublished(EventTypes.INTERVENCION_ACTUALIZADA)).toHaveLength(0);
+      });
+
+      it('CU-INT-02 · un auto que tapa el contenedor cancela la parada', async () => {
+        await sistema.quitarContenedores(['c-tapada'], MOTIVO_RECLAMO, 'RC-123', {
+          causaId: 'RC-123',
+          causaTipo: 'INCIDENTE_VIAL',
+          correlationId: 'req-1',
+          estadoNuevo: 'CANCELADA',
+        });
+
+        const [evento] = eventos.getPublished(EventTypes.INTERVENCION_ACTUALIZADA);
+        expect(evento.correlationId).toBe('req-1');
+        expect(evento.payload).toEqual(
+          expect.objectContaining({
+            intervencionId: 'tapada',
+            estadoAnterior: 'PROGRAMADA',
+            estadoNuevo: 'CANCELADA',
+            causaId: 'RC-123',
+          }),
+        );
       });
     });
 

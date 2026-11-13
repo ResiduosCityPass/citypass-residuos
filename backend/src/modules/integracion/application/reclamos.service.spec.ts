@@ -72,6 +72,24 @@ describe('ReclamosService (CU-INT-02)', () => {
         ['ct-tapado'],
         'Acceso bloqueado por vehiculo (reclamo RC-123)',
         'RC-123',
+        // Sin correlationId de Reclamos, el reclamoId deja seguirlo igual.
+        {
+          causaId: 'RC-123',
+          causaTipo: 'INCIDENTE_VIAL',
+          correlationId: 'RC-123',
+          estadoNuevo: 'CANCELADA',
+        },
+      );
+    });
+
+    it('a Analitica le avisa que la parada se cancela, con el correlationId de Reclamos', async () => {
+      await service.procesar(CREADO, reclamo({ correlationId: 'req-7c9e6679' }));
+
+      expect(paradas.quitarContenedores).toHaveBeenCalledWith(
+        ['ct-tapado'],
+        expect.any(String),
+        'RC-123',
+        expect.objectContaining({ correlationId: 'req-7c9e6679', estadoNuevo: 'CANCELADA' }),
       );
     });
 
@@ -108,6 +126,7 @@ describe('ReclamosService (CU-INT-02)', () => {
         ['ct-tapado'],
         expect.any(String),
         'RC-123',
+        expect.objectContaining({ causaId: 'RC-123' }),
       );
     });
 
