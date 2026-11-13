@@ -340,6 +340,35 @@ describe('IntegracionService (CU-INT-01)', () => {
       expect(bloqueada('z-palermo')).toBe(false);
     });
 
+    it('un EmergenciaCreada repetido despues del cierre no vuelve a bloquear', async () => {
+      await service.procesar(incendio);
+      await service.procesar(termina('em-1', 'ev-2'));
+
+      await service.procesar(
+        sobre('com.citypass.emergencias.EmergenciaCreada', incendio.data!, 'ev-duplicado'),
+      );
+
+      expect(bloqueada('z-palermo')).toBe(false);
+    });
+
+    it('si el cierre llega antes que la creacion, no bloquea', async () => {
+      await service.procesar(termina('em-1', 'ev-2'));
+      await service.procesar(incendio);
+
+      expect(bloqueada('z-palermo')).toBe(false);
+    });
+
+    it('un EmergenciaCreada repetido con la emergencia activa la deja bloqueada', async () => {
+      await service.procesar(incendio);
+      await service.procesar(
+        sobre('com.citypass.emergencias.EmergenciaCreada', incendio.data!, 'ev-duplicado'),
+      );
+
+      expect(bloqueada('z-palermo')).toBe(true);
+      await service.procesar(termina('em-1', 'ev-3'));
+      expect(bloqueada('z-palermo')).toBe(false);
+    });
+
     it('un cambio de estado intermedio no desbloquea', async () => {
       await service.procesar(incendio);
       await service.procesar(termina('em-1', 'ev-2', 'DESPACHADA'));

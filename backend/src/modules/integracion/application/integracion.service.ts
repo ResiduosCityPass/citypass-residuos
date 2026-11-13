@@ -282,11 +282,18 @@ export class IntegracionService {
       return;
     }
 
+    const emergenciaId = texto(data, 'emergenciaId');
+
+    // Ya termino: es un EmergenciaCreada repetido con otro eventId (Emergencias
+    // lo publico duplicado el 13/11) o el cierre llego antes, porque el bus no
+    // ordena entre topicos. Bloquear ahora dejaria la zona bloqueada para siempre.
+    if ((await this.integracion.buscarBloqueo(emergenciaId))?.activo === false) {
+      return;
+    }
+
     for (const zonaId of afectadas) {
       await this.zonas.cambiarBloqueoPorIncidente(zonaId, true);
     }
-
-    const emergenciaId = texto(data, 'emergenciaId');
 
     await this.integracion.guardarBloqueo({
       emergenciaId,
@@ -307,8 +314,17 @@ export class IntegracionService {
       return;
     }
 
-    const bloqueo = await this.integracion.buscarBloqueo(texto(data, 'emergenciaId'));
-    if (!bloqueo || !bloqueo.activo) {
+    const emergenciaId = texto(data, 'emergenciaId');
+    const bloqueo = await this.integracion.buscarBloqueo(emergenciaId);
+
+    // El cierre llego antes que la creacion: queda anotado como terminado para
+    // que el EmergenciaCreada que llegue despues no bloquee.
+    if (!bloqueo) {
+      await this.integracion.guardarBloqueo({ emergenciaId, zonaIds: [], activo: false });
+      return;
+    }
+
+    if (!bloqueo.activo) {
       return;
     }
 
