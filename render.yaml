@@ -90,6 +90,10 @@ services:
       # Alternativa de entrega HTTP del mismo bus.
       - key: GATEWAY_WEBHOOK_TOKEN
         sync: false
+      # Raiz del servicio de Analitica, sin /embed. Se habilita cuando entreguen
+      # su direccion. Vacia: el resto de la app sigue igual.
+      - key: ANALITICA_URL
+        sync: false
 
   - type: web
     name: citypass-residuos-frontend
@@ -118,8 +122,6 @@ services:
         value: "false"
       - key: VITE_SIMULAR_GPS
         value: "false"
-      - key: VITE_BI_DASHBOARD_URL
-        sync: false
     routes:
       - type: rewrite
         source: /*

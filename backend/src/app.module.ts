@@ -18,6 +18,7 @@ import { FlotaModule } from './modules/flota/flota.module';
 import { RutasModule } from './modules/rutas/rutas.module';
 import { ContingenciasModule } from './modules/contingencias/contingencias.module';
 import { IntegracionModule } from './modules/integracion/integracion.module';
+import { AnaliticaModule } from './modules/analitica/analitica.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { IntegracionModule } from './modules/integracion/integracion.module';
     RutasModule,
     ContingenciasModule,
     IntegracionModule,
+    AnaliticaModule,
     // Sprint 4: FlotaModule (CU-03), RutasModule (CU-08..CU-10), PublicoModule (CU-11)
   ],
 })

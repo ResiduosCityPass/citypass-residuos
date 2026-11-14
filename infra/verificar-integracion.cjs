@@ -20,7 +20,8 @@ const env = service => {
 const apiVars = env(api), webVars = env(web);
 const config = Object.fromEntries(Object.values(apiVars).map(v => [v.key,
   v.value ?? (v.fromDatabase ? 'postgresql://ci:ci@localhost:5432/residuos' :
-    v.fromService ? `https://${v.fromService.name}.onrender.com` : 'solo-validacion-ci')
+    v.fromService ? `https://${v.fromService.name}.onrender.com` :
+      v.key === 'ANALITICA_URL' ? '' : 'solo-validacion-ci')
 ]));
 const validated = validarEntorno(config);
 assert.equal(validated.NODE_ENV, 'production');
