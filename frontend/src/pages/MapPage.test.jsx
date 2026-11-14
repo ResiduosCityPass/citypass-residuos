@@ -53,6 +53,38 @@ describe('pantalla del mapa', () => {
     fetchMassEvents.mockResolvedValue([]);
   });
 
+  it('con muchas actividades muestra solo las dos que terminan antes, para que se vea el mapa', async () => {
+    saveToken('un.jwt.valido');
+    fetchMapContainers.mockResolvedValue([container()]);
+    const actividad = (id, horas) => ({
+      actividadId: id,
+      titulo: id,
+      capacidad: 1000,
+      lat: -34.6037,
+      lng: -58.3816,
+      radioMetros: 300,
+      inicio: new Date(Date.now() - 3_600_000).toISOString(),
+      fin: new Date(Date.now() + horas * 3_600_000).toISOString(),
+      contenedores: 0,
+    });
+    fetchMassEvents.mockResolvedValue([
+      actividad('Tango', 50),
+      actividad('Recoleta', 0.05),
+      actividad('Feria', 100),
+      actividad('Picnic', 10),
+    ]);
+
+    render(<MapPage />);
+
+    expect(await screen.findByText('Actividad masiva: Recoleta')).toBeInTheDocument();
+    expect(screen.getByText('Actividad masiva: Picnic')).toBeInTheDocument();
+    expect(screen.queryByText('Actividad masiva: Tango')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Ver las otras 2 actividades' }));
+    expect(screen.getByText('Actividad masiva: Tango')).toBeInTheDocument();
+    expect(screen.getByText('Actividad masiva: Feria')).toBeInTheDocument();
+  });
+
   it('avisa de una actividad masiva con su hora de fin y los contenedores de la zona', async () => {
     saveToken('un.jwt.valido');
     fetchMapContainers.mockResolvedValue([container()]);

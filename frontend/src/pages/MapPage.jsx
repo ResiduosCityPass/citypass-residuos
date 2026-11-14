@@ -16,6 +16,9 @@ import {
   timeAgo,
 } from '../domain/states.js';
 
+/** Avisos de actividades masivas que entran sin tapar el mapa. */
+const MASS_EVENTS_SHOWN = 2;
+
 /**
  * CU-07 · Mapa en tiempo real.
  *
@@ -55,6 +58,19 @@ export default function MapPage({ tokenVersion }) {
     if (!USING_MOCKS && !readToken()) return;
     fetchMassEvents().then(setMassEvents).catch(() => setMassEvents([]));
   }, [tokenVersion, updatedAt]);
+
+  // Con muchas actividades cargadas, un aviso por cada una empujaba el mapa
+  // fuera de la pantalla. Se muestran las que terminan antes, que son las que
+  // van a mandar una escuadrilla primero; el resto queda detras de un boton.
+  const [showAllMassEvents, setShowAllMassEvents] = useState(false);
+  const sortedMassEvents = useMemo(
+    () => [...massEvents].sort((a, b) => Date.parse(a.fin) - Date.parse(b.fin)),
+    [massEvents],
+  );
+  const shownMassEvents = showAllMassEvents
+    ? sortedMassEvents
+    : sortedMassEvents.slice(0, MASS_EVENTS_SHOWN);
+  const hiddenMassEvents = sortedMassEvents.length - shownMassEvents.length;
 
   // Las tarjetas siempre cuentan sobre todo lo que hay en la zona y el tipo
   // elegidos. Apretar una filtra el mapa, no los numeros: el resumen tiene que
@@ -176,7 +192,7 @@ export default function MapPage({ tokenVersion }) {
         </Notice>
       )}
 
-      {massEvents.map((event) => (
+      {shownMassEvents.map((event) => (
         <Notice
           key={event.actividadId}
           type="info"
@@ -188,6 +204,17 @@ export default function MapPage({ tokenVersion }) {
             : `${event.contenedores} contenedores en la zona`}
         </Notice>
       ))}
+
+      {hiddenMassEvents > 0 && (
+        <Button variant="secondary" size="sm" onClick={() => setShowAllMassEvents(true)}>
+          Ver {hiddenMassEvents === 1 ? 'la otra actividad' : `las otras ${hiddenMassEvents} actividades`}
+        </Button>
+      )}
+      {showAllMassEvents && massEvents.length > MASS_EVENTS_SHOWN && (
+        <Button variant="secondary" size="sm" onClick={() => setShowAllMassEvents(false)}>
+          Ocultar actividades
+        </Button>
+      )}
 
       <div className="map-and-panel">
         <ContainersMap
