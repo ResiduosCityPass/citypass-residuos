@@ -273,6 +273,30 @@ describe('IntegracionService (CU-INT-01)', () => {
         });
       });
 
+      it('con causa climatica la manda tal cual: es la otra que lee Analitica', async () => {
+        await conRutas().procesar(
+          incidente({ causaId: 'ac-1', causaTipo: 'EVENTO_CLIMATICO', correlationId: 'c-1' }),
+        );
+
+        expect(paradas.quitarContenedores.mock.calls[0][3]).toEqual({
+          causaId: 'ac-1',
+          causaTipo: 'EVENTO_CLIMATICO',
+          correlationId: 'c-1',
+        });
+      });
+
+      it('otra causa, como la de una cobertura preventiva, bloquea pero sale en null', async () => {
+        await conRutas().procesar(
+          incidente({ causaId: 'ev-104', causaTipo: 'EVENTO_PUBLICO', correlationId: 'c-2' }),
+        );
+
+        expect(paradas.quitarContenedores.mock.calls[0][3]).toEqual({
+          causaId: null,
+          causaTipo: null,
+          correlationId: 'c-2',
+        });
+      });
+
       it('una emergencia que no corta la circulacion no toca las rutas', async () => {
         await conRutas().procesar(incidente({ afectaCirculacion: false }));
 
