@@ -31,6 +31,8 @@ export enum TipoAlerta {
   INCENDIO = 'INCENDIO',
   SENSOR_CAIDO = 'SENSOR_CAIDO',
   BATERIA_BAJA = 'BATERIA_BAJA',
+  /** CU-INT-02: un auto denunciado en un reclamo tapa el contenedor. */
+  ACCESO_BLOQUEADO = 'ACCESO_BLOQUEADO',
 }
 
 export enum Severidad {

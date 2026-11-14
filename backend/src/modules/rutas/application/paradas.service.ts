@@ -70,6 +70,8 @@ export interface CausaAfectacion {
   causaId: string | null;
   causaTipo: string | null;
   correlationId: string;
+  /** AFECTADA si no se dice: el corte puede pasar. CANCELADA: esa parada no se hace (CU-INT-02). */
+  estadoNuevo?: 'AFECTADA' | 'CANCELADA';
 }
 
 /**
@@ -268,8 +270,9 @@ export class ParadasService {
    * El contenedor no se toca: sigue lleno y con su alerta abierta. Devuelve las
    * rutas que cambiaron.
    *
-   * Con `afectacion` (una emergencia corto el camino, CU-INT-01), cada parada
-   * omitida ademas publica que la cuadrilla quedo afectada. Las de una PROPUESTA
+   * Con `afectacion` (una emergencia corto el camino, CU-INT-01, o un auto tapa
+   * el contenedor, CU-INT-02), cada parada omitida ademas publica
+   * `IntervencionActualizada` para Analitica. Las de una PROPUESTA
    * no: el camion todavia no salio, asi que no se afecto a nadie.
    */
   async quitarContenedores(
@@ -319,7 +322,7 @@ export class ParadasService {
                 intervencionId: parada.id,
                 camionId: antes?.camion?.patente ?? antes?.camionId,
                 estadoAnterior: 'PROGRAMADA',
-                estadoNuevo: 'AFECTADA',
+                estadoNuevo: afectacion.estadoNuevo ?? 'AFECTADA',
                 causaId: afectacion.causaId,
                 causaTipo: afectacion.causaTipo,
                 updatedAt: new Date().toISOString(),

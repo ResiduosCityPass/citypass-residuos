@@ -203,6 +203,20 @@ describe('Recalculo de rutas por obstruccion (e2e)', () => {
           motivo: 'Acceso bloqueado por vehiculo (reclamo RC-E2E)',
         }),
       );
+
+      // Analitica: la parada se cancela por el reclamo.
+      const eventos = await ctx.dataSource
+        .getRepository(EventoPendiente)
+        .findBy({ eventType: EventTypes.INTERVENCION_ACTUALIZADA });
+      expect(eventos).toHaveLength(1);
+      expect(eventos[0].sobre.payload).toEqual(
+        expect.objectContaining({
+          estadoAnterior: 'PROGRAMADA',
+          estadoNuevo: 'CANCELADA',
+          causaId: 'RC-E2E',
+          causaTipo: 'INCIDENTE_VIAL',
+        }),
+      );
     });
 
     it('una emergencia que corta el camino afecta a la cuadrilla, una sola vez (CU-INT-01)', async () => {
@@ -358,6 +372,13 @@ describe('Recalculo de rutas por obstruccion (e2e)', () => {
 
       await reclamoCreado();
 
+      const accesos = async () =>
+        (await http.get('/api/v1/alertas?tipo=ACCESO_BLOQUEADO').set(auth(admin)).expect(200))
+          .body as Array<{ contenedorId: string; estado: string }>;
+      expect(await accesos()).toEqual([
+        expect.objectContaining({ contenedorId: tapado, estado: 'ABIERTA' }),
+      ]);
+
       // Los otros dos siguen pendientes en la ruta original y el tapado esta obstruido.
       const sinNada = await http
         .post('/api/v1/rutas/generar')
@@ -371,6 +392,9 @@ describe('Recalculo de rutas por obstruccion (e2e)', () => {
         estadoNuevo: 'RESUELTO',
       });
 
+      expect(await accesos()).toEqual([
+        expect.objectContaining({ contenedorId: tapado, estado: 'RESUELTA' }),
+      ]);
       expect(await generar(otroCamion.body.id)).toEqual([tapado]);
     });
 

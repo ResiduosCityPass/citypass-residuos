@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { EventTypes, buildEvent } from '../../../shared/domain/domain-event';
 import { Punto, dentroDelRadio } from '../../../shared/domain/geo';
 import { EVENT_PUBLISHER, EventPublisher } from '../../../shared/events/event-publisher';
+import { AlertasService } from '../../alertas/application/alertas.service';
 import {
   CONTENEDOR_REPOSITORY,
   ContenedorRepository,
@@ -15,10 +16,17 @@ export const OBSTRUCCION_RADIO_METROS_DEFAULT = 15;
 export const OBSTRUCCION_VIGENCIA_HORAS_DEFAULT = 4;
 
 /**
+ * Como le llega a Analitica la parada que un auto deja sin hacer, con causaId =
+ * reclamoId. Lo acordado con Analitica el 12/11; si cambia, se cambia aca.
+ */
+export const CAUSA_TIPO_RECLAMO = 'INCIDENTE_VIAL';
+
+/**
  * CU-INT-02 · Reclamo de un auto que bloquea la bicisenda.
  *
  * Residuos decide si ese auto le impide al camion llegar a algun contenedor. Si
- * se lo impide, el contenedor sale del ruteo y las rutas vivas se recalculan.
+ * se lo impide, el contenedor sale del ruteo, las rutas vivas se recalculan y el
+ * operador ve una alerta de acceso bloqueado, que se cierra cuando se libera.
  * El reclamo lo resuelve otro squad: aca solo se escucha el aviso.
  *
  * Corre dentro de la transaccion de `IntegracionService.procesar`, junto con el
@@ -39,6 +47,12 @@ export class ReclamosService {
     // forwardRef: rutas ya depende de integracion por los refuerzos y las obstrucciones.
     @Inject(forwardRef(() => ParadasService))
     private readonly paradas: Pick<ParadasService, 'quitarContenedores'>,
+    // Explicito: con Pick<> la metadata queda como Object y Nest no lo resuelve.
+    @Inject(AlertasService)
+    private readonly alertas: Pick<
+      AlertasService,
+      'registrarAccesoBloqueado' | 'resolverAccesosLiberados'
+    >,
     config: ConfigService,
   ) {
     this.radioMetros = Number(
@@ -60,10 +74,15 @@ export class ReclamosService {
     if (reclamo.tipo === 'resuelto') {
       // Si no tapaba nada, o ya habia vencido, no hay nada que destapar: no es un error.
       await this.obstrucciones.resolverReclamo(reclamo.reclamoId, new Date());
-      return true;
+    } else {
+      await this.evaluar(reclamo.reclamoId, reclamo.ubicacion, reclamo.correlationId);
     }
 
-    await this.evaluar(reclamo.reclamoId, reclamo.ubicacion, reclamo.correlationId);
+    // ponytail: un bloqueo que vence a las 4 h cierra su alerta recien con el
+    // proximo reclamo que llegue. Si hiciera falta en hora, un cron que llame a esto.
+    await this.alertas.resolverAccesosLiberados(
+      await this.obstrucciones.contenedoresObstruidos(new Date()),
+    );
     return true;
   }
 
@@ -90,12 +109,22 @@ export class ReclamosService {
       })),
     );
 
+    for (const { contenedor } of tapados) {
+      await this.alertas.registrarAccesoBloqueado(contenedor.id, reclamoId);
+    }
+
     const rutasRecalculadas =
       tapados.length > 0
         ? await this.paradas.quitarContenedores(
             tapados.map(({ contenedor }) => contenedor.id),
             `Acceso bloqueado por vehiculo (reclamo ${reclamoId})`,
             reclamoId,
+            {
+              causaId: reclamoId,
+              causaTipo: CAUSA_TIPO_RECLAMO,
+              correlationId: correlationId ?? reclamoId,
+              estadoNuevo: 'CANCELADA',
+            },
           )
         : [];
 

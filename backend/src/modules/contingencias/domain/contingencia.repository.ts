@@ -13,6 +13,12 @@ export interface ParadaAfectable {
   zonaId: string;
 }
 
+/** Una parada pendiente con una cuadrilla ya comprometida (no una propuesta). */
+export interface ParadaClimaticaAsignada {
+  id: string;
+  camionId: string;
+}
+
 export interface ContingenciaRepository {
   /** Lock transaccional compartido con generar/asignar/confirmar/omitir. */
   bloquearOperacion(): Promise<void>;
@@ -30,6 +36,7 @@ export interface ContingenciaRepository {
   pendientesDeRecuperacion(): Promise<string[]>;
   marcarVaciado(contenedorId: string, fecha: Date): Promise<string[]>;
   contarPendientes(id: string): Promise<number>;
+  paradasAsignadasEnZonas(zonaIds: string[]): Promise<ParadaClimaticaAsignada[]>;
   paradasPendientes(rutaIds: string[]): Promise<ParadaAfectable[]>;
 }
 

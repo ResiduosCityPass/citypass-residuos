@@ -326,4 +326,24 @@ describe('Integracion CityPass+ (e2e)', () => {
 
     expect(await bloqueada(zonaId)).toBe(false);
   });
+
+  // Emergencias publico EmergenciaCreada duplicado, con otro eventId (13/11).
+  it('la misma emergencia con otro eventId despues del cierre no vuelve a bloquear la zona', async () => {
+    const zonaId = await zonaConContenedor();
+
+    await emergenciaCreada('em-1', 'ev-1');
+    await emergenciaResuelta('em-1', 'ev-2');
+    await emergenciaCreada('em-1', 'ev-duplicado');
+
+    expect(await bloqueada(zonaId)).toBe(false);
+  });
+
+  it('si el cierre llega antes que la creacion, la zona no queda bloqueada', async () => {
+    const zonaId = await zonaConContenedor();
+
+    await emergenciaResuelta('em-1', 'ev-1');
+    await emergenciaCreada('em-1', 'ev-2');
+
+    expect(await bloqueada(zonaId)).toBe(false);
+  });
 });

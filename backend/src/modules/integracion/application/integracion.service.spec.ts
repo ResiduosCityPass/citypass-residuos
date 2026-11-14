@@ -273,6 +273,30 @@ describe('IntegracionService (CU-INT-01)', () => {
         });
       });
 
+      it('con causa climatica la manda tal cual: es la otra que lee Analitica', async () => {
+        await conRutas().procesar(
+          incidente({ causaId: 'ac-1', causaTipo: 'EVENTO_CLIMATICO', correlationId: 'c-1' }),
+        );
+
+        expect(paradas.quitarContenedores.mock.calls[0][3]).toEqual({
+          causaId: 'ac-1',
+          causaTipo: 'EVENTO_CLIMATICO',
+          correlationId: 'c-1',
+        });
+      });
+
+      it('otra causa, como la de una cobertura preventiva, bloquea pero sale en null', async () => {
+        await conRutas().procesar(
+          incidente({ causaId: 'ev-104', causaTipo: 'EVENTO_PUBLICO', correlationId: 'c-2' }),
+        );
+
+        expect(paradas.quitarContenedores.mock.calls[0][3]).toEqual({
+          causaId: null,
+          causaTipo: null,
+          correlationId: 'c-2',
+        });
+      });
+
       it('una emergencia que no corta la circulacion no toca las rutas', async () => {
         await conRutas().procesar(incidente({ afectaCirculacion: false }));
 
@@ -337,6 +361,35 @@ describe('IntegracionService (CU-INT-01)', () => {
       await service.procesar(incendio);
       await service.procesar(termina('em-1', 'ev-2'));
 
+      expect(bloqueada('z-palermo')).toBe(false);
+    });
+
+    it('un EmergenciaCreada repetido despues del cierre no vuelve a bloquear', async () => {
+      await service.procesar(incendio);
+      await service.procesar(termina('em-1', 'ev-2'));
+
+      await service.procesar(
+        sobre('com.citypass.emergencias.EmergenciaCreada', incendio.data!, 'ev-duplicado'),
+      );
+
+      expect(bloqueada('z-palermo')).toBe(false);
+    });
+
+    it('si el cierre llega antes que la creacion, no bloquea', async () => {
+      await service.procesar(termina('em-1', 'ev-2'));
+      await service.procesar(incendio);
+
+      expect(bloqueada('z-palermo')).toBe(false);
+    });
+
+    it('un EmergenciaCreada repetido con la emergencia activa la deja bloqueada', async () => {
+      await service.procesar(incendio);
+      await service.procesar(
+        sobre('com.citypass.emergencias.EmergenciaCreada', incendio.data!, 'ev-duplicado'),
+      );
+
+      expect(bloqueada('z-palermo')).toBe(true);
+      await service.procesar(termina('em-1', 'ev-3'));
       expect(bloqueada('z-palermo')).toBe(false);
     });
 

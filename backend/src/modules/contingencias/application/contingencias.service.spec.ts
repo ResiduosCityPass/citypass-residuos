@@ -94,6 +94,7 @@ describe('ContingenciasService', () => {
           async (id) => registros.get(id)!.contenedores!.filter((cc) => !cc.vaciadoEn).length,
         ),
       paradasPendientes: jest.fn().mockResolvedValue([]),
+      paradasAsignadasEnZonas: jest.fn().mockResolvedValue([]),
     };
     eventos = new InMemoryEventPublisher();
     service = new ContingenciasService(
@@ -122,6 +123,66 @@ describe('ContingenciasService', () => {
     expect((await service.procesarEvento(e)).duplicado).toBe(true);
     expect(repo.registrarImpactos).toHaveBeenCalledTimes(1);
     expect(eventos.getPublished(EventTypes.SERVICIO_AFECTADO)).toHaveLength(1);
+  });
+
+  describe('métrica climática para Analítica', () => {
+    const alertaId = 'Alerta-ESP-viento-01';
+    const conAlerta = (e = evento()) => ({ ...e, payload: { ...e.payload, alertaId } });
+
+    it('publica por parada, con el ID externo y la misma patente para dos paradas del camión', async () => {
+      repo.paradasAsignadasEnZonas.mockResolvedValue([
+        { id: 'p1', camionId: 'AB123CD' },
+        { id: 'p2', camionId: 'AB123CD' },
+      ]);
+      await service.procesarEvento(conAlerta());
+      const emitidos = eventos.getPublished(EventTypes.INTERVENCION_ACTUALIZADA);
+      expect(repo.paradasAsignadasEnZonas).toHaveBeenCalledWith([ZONA]);
+      expect(emitidos).toHaveLength(2);
+      expect(emitidos.map((e) => e.payload.intervencionId)).toEqual(['p1', 'p2']);
+      for (const e of emitidos) {
+        expect(e.correlationId).toBe(alertaId);
+        expect(e.payload).toMatchObject({
+          camionId: 'AB123CD',
+          estadoAnterior: 'PROGRAMADA',
+          estadoNuevo: 'AFECTADA',
+          causaId: alertaId,
+          causaTipo: 'EVENTO_CLIMATICO',
+        });
+        expect(new Date(String(e.payload.updatedAt)).toISOString()).toBe(e.payload.updatedAt);
+      }
+    });
+
+    it('no inventa una alerta externa para el simulador histórico ni cuadrillas sin paradas', async () => {
+      await service.procesarEvento(evento());
+      expect(repo.paradasAsignadasEnZonas).not.toHaveBeenCalled();
+      await service.procesarEvento(conAlerta());
+      expect(eventos.getPublished(EventTypes.INTERVENCION_ACTUALIZADA)).toHaveLength(0);
+    });
+
+    it('reentregas, revisiones y finalización no vuelven a contar la misma afectación', async () => {
+      repo.paradasAsignadasEnZonas.mockResolvedValue([{ id: 'p1', camionId: 'AB123CD' }]);
+      const e = conAlerta();
+      await service.procesarEvento(e);
+      await service.procesarEvento(e);
+      await service.procesarEvento({ ...e, eventId: randomUUID() });
+      await service.procesarEvento(conAlerta(evento(e.payload.inundacionId, 2)));
+      await service.procesarEvento(conAlerta(evento(e.payload.inundacionId, 3, EVENTO_FIN)));
+      await service.habilitarRecuperacion(e.payload.inundacionId);
+      expect(repo.paradasAsignadasEnZonas).toHaveBeenCalledTimes(1);
+      expect(eventos.getPublished(EventTypes.INTERVENCION_ACTUALIZADA)).toHaveLength(1);
+    });
+
+    it('dos alertas superpuestas conservan cada causa, sin duplicados dentro de una alerta', async () => {
+      repo.paradasAsignadasEnZonas.mockResolvedValue([{ id: 'p1', camionId: 'AB123CD' }]);
+      await service.procesarEvento(conAlerta());
+      const otra = conAlerta();
+      otra.payload.alertaId = 'Otra-alerta-ESP';
+      await service.procesarEvento(otra);
+      expect(
+        eventos.getPublished(EventTypes.INTERVENCION_ACTUALIZADA).map((e) => e.payload.causaId),
+      ).toEqual([alertaId, 'Otra-alerta-ESP']);
+      expect(await service.restricciones()).toHaveLength(2);
+    });
   });
 
   it('rechaza reutilizar un eventId con distinto contenido', async () => {

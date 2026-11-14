@@ -1,6 +1,10 @@
 import { ConfigService } from '@nestjs/config';
 import { EventTypes, buildEvent } from '../../domain/domain-event';
-import { EventoRechazadoPorGateway, GatewayTransporte } from './gateway.transporte';
+import {
+  EventoRechazadoPorGateway,
+  GatewayTransporte,
+  TIMEOUT_GATEWAY_MS,
+} from './gateway.transporte';
 
 const respuesta = (status: number, cuerpo: unknown = {}): Response =>
   new Response(JSON.stringify(cuerpo), { status, headers: { 'Content-Type': 'application/json' } });
@@ -80,6 +84,21 @@ describe('GatewayTransporte (CU-INT-01)', () => {
     await transporte.publish(buildEvent(EventTypes.RUTA_GENERADA, { rutaId: 'rt-1' }));
 
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('espera al gateway hasta 45 s: un corte antes reintenta algo que ya se publico', async () => {
+    const timeout = jest.spyOn(AbortSignal, 'timeout');
+    fetchMock.mockImplementation(async (url: string) =>
+      url.endsWith('/oauth/token')
+        ? respuesta(200, { access_token: 'tok', expires_in: 900 })
+        : respuesta(202),
+    );
+
+    await transporte.publish(alerta);
+
+    expect(TIMEOUT_GATEWAY_MS).toBe(45_000);
+    expect(timeout).toHaveBeenCalledWith(TIMEOUT_GATEWAY_MS);
+    timeout.mockRestore();
   });
 });
 

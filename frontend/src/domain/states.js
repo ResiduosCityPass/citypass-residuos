@@ -80,6 +80,7 @@ export const ALERT_TYPE_LABEL = {
   INCENDIO: 'Incendio',
   BATERIA_BAJA: 'Bateria baja',
   SENSOR_CAIDO: 'Sensor caido',
+  ACCESO_BLOQUEADO: 'Acceso bloqueado',
 };
 
 export const ALERT_STATE_LABEL = {

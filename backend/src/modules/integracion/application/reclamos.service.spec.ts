@@ -25,6 +25,7 @@ describe('ReclamosService (CU-INT-02)', () => {
   let obstrucciones: jest.Mocked<ObstruccionRepository>;
   let contenedores: jest.Mocked<Pick<ContenedorRepository, 'listar'>>;
   let paradas: { quitarContenedores: jest.Mock };
+  let alertas: { registrarAccesoBloqueado: jest.Mock; resolverAccesosLiberados: jest.Mock };
   let eventos: InMemoryEventPublisher;
   let service: ReclamosService;
 
@@ -32,10 +33,11 @@ describe('ReclamosService (CU-INT-02)', () => {
     obstrucciones = {
       guardarObstrucciones: jest.fn(),
       resolverReclamo: jest.fn().mockResolvedValue(1),
-      contenedoresObstruidos: jest.fn(),
+      contenedoresObstruidos: jest.fn().mockResolvedValue([]),
     };
     contenedores = { listar: jest.fn().mockResolvedValue([TAPADO, LEJOS]) };
     paradas = { quitarContenedores: jest.fn().mockResolvedValue(['rt-1']) };
+    alertas = { registrarAccesoBloqueado: jest.fn(), resolverAccesosLiberados: jest.fn() };
     eventos = new InMemoryEventPublisher();
 
     service = new ReclamosService(
@@ -43,6 +45,7 @@ describe('ReclamosService (CU-INT-02)', () => {
       contenedores as unknown as ContenedorRepository,
       eventos,
       paradas,
+      alertas,
       new ConfigService({}),
     );
   });
@@ -69,6 +72,24 @@ describe('ReclamosService (CU-INT-02)', () => {
         ['ct-tapado'],
         'Acceso bloqueado por vehiculo (reclamo RC-123)',
         'RC-123',
+        // Sin correlationId de Reclamos, el reclamoId deja seguirlo igual.
+        {
+          causaId: 'RC-123',
+          causaTipo: 'INCIDENTE_VIAL',
+          correlationId: 'RC-123',
+          estadoNuevo: 'CANCELADA',
+        },
+      );
+    });
+
+    it('a Analitica le avisa que la parada se cancela, con el correlationId de Reclamos', async () => {
+      await service.procesar(CREADO, reclamo({ correlationId: 'req-7c9e6679' }));
+
+      expect(paradas.quitarContenedores).toHaveBeenCalledWith(
+        ['ct-tapado'],
+        expect.any(String),
+        'RC-123',
+        expect.objectContaining({ correlationId: 'req-7c9e6679', estadoNuevo: 'CANCELADA' }),
       );
     });
 
@@ -105,6 +126,7 @@ describe('ReclamosService (CU-INT-02)', () => {
         ['ct-tapado'],
         expect.any(String),
         'RC-123',
+        expect.objectContaining({ causaId: 'RC-123' }),
       );
     });
 
@@ -114,6 +136,7 @@ describe('ReclamosService (CU-INT-02)', () => {
         contenedores as unknown as ContenedorRepository,
         eventos,
         paradas,
+        alertas,
         new ConfigService({ OBSTRUCCION_VIGENCIA_HORAS: 2 }),
       );
       const antes = Date.now();
@@ -147,6 +170,7 @@ describe('ReclamosService (CU-INT-02)', () => {
         contenedores as unknown as ContenedorRepository,
         eventos,
         paradas,
+        alertas,
         new ConfigService({ OBSTRUCCION_RADIO_METROS: 200 }),
       );
 
@@ -154,6 +178,23 @@ describe('ReclamosService (CU-INT-02)', () => {
 
       expect(paradas.quitarContenedores.mock.calls[0][0]).toEqual(['ct-tapado', 'ct-lejos']);
     });
+  });
+
+  it('un auto que tapa un contenedor le abre una alerta al operador, solo a ese', async () => {
+    await service.procesar(CREADO, reclamo());
+
+    expect(alertas.registrarAccesoBloqueado).toHaveBeenCalledTimes(1);
+    expect(alertas.registrarAccesoBloqueado).toHaveBeenCalledWith('ct-tapado', 'RC-123');
+  });
+
+  it('al resolverse cierra las alertas de los contenedores que ya no estan tapados', async () => {
+    obstrucciones.contenedoresObstruidos.mockResolvedValue(['ct-otro-reclamo']);
+
+    await service.procesar('com.citypass.emergencias.IntervencionFinalizada', {
+      reclamoId: 'RC-123',
+    });
+
+    expect(alertas.resolverAccesosLiberados).toHaveBeenCalledWith(['ct-otro-reclamo']);
   });
 
   it('el aviso de resolucion destapa los contenedores del reclamo', async () => {

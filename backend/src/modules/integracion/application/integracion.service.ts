@@ -282,11 +282,18 @@ export class IntegracionService {
       return;
     }
 
+    const emergenciaId = texto(data, 'emergenciaId');
+
+    // Ya termino: es un EmergenciaCreada repetido con otro eventId (Emergencias
+    // lo publico duplicado el 13/11) o el cierre llego antes, porque el bus no
+    // ordena entre topicos. Bloquear ahora dejaria la zona bloqueada para siempre.
+    if ((await this.integracion.buscarBloqueo(emergenciaId))?.activo === false) {
+      return;
+    }
+
     for (const zonaId of afectadas) {
       await this.zonas.cambiarBloqueoPorIncidente(zonaId, true);
     }
-
-    const emergenciaId = texto(data, 'emergenciaId');
 
     await this.integracion.guardarBloqueo({
       emergenciaId,
@@ -307,8 +314,17 @@ export class IntegracionService {
       return;
     }
 
-    const bloqueo = await this.integracion.buscarBloqueo(texto(data, 'emergenciaId'));
-    if (!bloqueo || !bloqueo.activo) {
+    const emergenciaId = texto(data, 'emergenciaId');
+    const bloqueo = await this.integracion.buscarBloqueo(emergenciaId);
+
+    // El cierre llego antes que la creacion: queda anotado como terminado para
+    // que el EmergenciaCreada que llegue despues no bloquee.
+    if (!bloqueo) {
+      await this.integracion.guardarBloqueo({ emergenciaId, zonaIds: [], activo: false });
+      return;
+    }
+
+    if (!bloqueo.activo) {
       return;
     }
 
@@ -372,9 +388,20 @@ function afectaLaCirculacion(data: Record<string, unknown>): boolean {
   return data.causaTipo === 'INCIDENTE_VIAL';
 }
 
+/**
+ * Las unicas causas que Analitica lee en IntervencionActualizada (contrato del
+ * 29/10, confirmado con Valen el 05/11). Cualquier otra, como la EVENTO_PUBLICO
+ * de una cobertura preventiva, sale en null: corta el camino igual, pero no
+ * suma a una metrica que no es la suya.
+ */
+const CAUSAS_DE_AFECTACION = new Set(['INCIDENTE_VIAL', 'EVENTO_CLIMATICO']);
+
 function causaDeLaEmergencia(data: Record<string, unknown>, emergenciaId: string): CausaAfectacion {
   const { causaId, causaTipo, correlationId } = data;
-  const completa = typeof causaId === 'string' && typeof causaTipo === 'string';
+  const completa =
+    typeof causaId === 'string' &&
+    typeof causaTipo === 'string' &&
+    CAUSAS_DE_AFECTACION.has(causaTipo);
 
   return {
     causaId: completa ? causaId : null,

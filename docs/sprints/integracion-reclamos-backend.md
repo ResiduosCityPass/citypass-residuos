@@ -2,7 +2,7 @@
 
 > **Responsable:** Francisco (backend) · **Branch:** `feat/CU-INT-02-reclamo-obstruccion`
 > **Caso de uso integrador:** *"Reclamo ciudadano que desencadena una intervención urbana"*
-> **Estado:** en producción y consumiendo por Kafka. `ReclamoEvaluado` ya está en el catálogo. Falta que Reclamos registre `ReclamoCreado` para probarlo de punta a punta (sección 5).
+> **Estado:** en producción y probado en Render el 12/11: el reclamo bloqueó el contenedor, la ruta se recalculó y `ReclamoEvaluado` llegó a EDA (sección 5). Falta solo que Reclamos registre `ReclamoCreado` para recibir uno real por Kafka.
 
 Este documento separa **qué hago yo** de qué hace cada uno, para que no nos pisemos. Si algo de
 acá te toca y no estás de acuerdo, avisame antes de arrancar.
@@ -202,8 +202,8 @@ Los tres pasan por el outbox, pero **solo sale al bus lo que traduce `traducirAG
 | `residuos.ruta.recalculada` | No: lo usa solo nuestro front, por la API |
 | `residuos.parada.omitida` | No (ya era así antes de este caso) |
 
-**Pendiente del Squad 1:** registrar `ReclamoEvaluado` en el catálogo del gateway. Mientras no
-esté, el gateway responde 404 y el evento queda `FALLIDO` en el outbox, sin romper nada más.
+`ReclamoEvaluado` está registrado en el catálogo del gateway y el 12/11 se confirmó en EDA uno
+publicado desde Render (sección 5).
 
 ### 3.6 Configuración
 
@@ -281,9 +281,25 @@ frente al contenedor.
 | `correlationId` | Lo mandan en cada evento | ✅ Se copia en `ReclamoEvaluado`, para seguir el reclamo de punta a punta |
 | Reclasificación | `ReclamoReclasificado` implementado de su lado (24/10), falta registrarlo en el catálogo. Mandan `objetoAfectadoAnterior`/`Nuevo` y `afectaCirculacionAnterior`/`Nueva` | ✅ Ya se acepta: si pasa a ser un auto, se evalúa; si deja de serlo, se libera |
 
+### Prueba en producción (12/11)
+
+Mientras Reclamos no puede publicar, se probó en Render con `simulator/reclamo.js`, que manda al
+webhook el mismo `ReclamoCreado` del contrato (`TRANSITO`, auto a ~5 m del contenedor). Ruta
+`2a9c818e`, asignada al camión AB1234D:
+
+| Paso | Resultado |
+|---|---|
+| Reclamo `cf28ab9c` frente a CT-0013 | CT-0013 pasó a `OMITIDA` con el motivo del reclamo y la ruta bajó de 1,8 a 1,4 km. CT-0016 siguió pendiente |
+| `ReclamoEvaluado` en el bus | Lo encontró Ramiro en EDA: `afectaRecoleccion: true`, CT-0013 a 5 m y la ruta en `rutasRecalculadas` |
+| Reclamo `b94177a0` frente a CT-0016 | CT-0016 pasó a `OMITIDA`. Sin paradas pendientes, la ruta quedó `COMPLETADA` |
+| `ReclamoActualizado` con `RESUELTO` para los dos | Se liberaron: los contenedores vuelven a entrar en la próxima ruta |
+
+Lo único que no cubre es la recepción por Kafka de un evento de Reclamos.
+
 Sigue pendiente:
-1. **Reclamos:** registrar `ReclamoCreado` en el catálogo (al 05/11 faltaba). Hay que reiniciar la
-   API antes del primer reclamo: si no, ese evento se pierde.
+1. **Reclamos:** registrar `ReclamoCreado` en el catálogo. Al 12/11 el nombre sigue ocupado por un
+   schema de otro equipo, y Reclamos lo está gestionando con EDA. Hay que reiniciar la API antes
+   del primer reclamo: si no, ese evento se pierde.
 2. **Espacios:** registrar `IntervencionFinalizada`.
 ---
 
