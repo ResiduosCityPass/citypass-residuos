@@ -4,6 +4,7 @@ import ContainersMap from '../components/ContainersMap.jsx';
 import ContainerPanel from '../components/ContainerPanel.jsx';
 import Button from '../components/ui/Button.jsx';
 import Notice from '../components/ui/Notice.jsx';
+import Modal from '../components/ui/Modal.jsx';
 import { useLiveMap, POLLING_INTERVAL_MS } from '../hooks/useLiveMap.js';
 import { fetchMassEvents, fetchZones, USING_MOCKS } from '../api/waste.js';
 import { endLabel } from '../domain/massEvents.js';
@@ -15,9 +16,6 @@ import {
   WASTE_TYPE_LABEL,
   timeAgo,
 } from '../domain/states.js';
-
-/** Avisos de actividades masivas que entran sin tapar el mapa. */
-const MASS_EVENTS_SHOWN = 2;
 
 /**
  * CU-07 · Mapa en tiempo real.
@@ -60,17 +58,14 @@ export default function MapPage({ tokenVersion }) {
   }, [tokenVersion, updatedAt]);
 
   // Con muchas actividades cargadas, un aviso por cada una empujaba el mapa
-  // fuera de la pantalla. Se muestran las que terminan antes, que son las que
-  // van a mandar una escuadrilla primero; el resto queda detras de un boton.
+  // fuera de la pantalla. Arriba queda solo la que termina antes, que es la que
+  // va a mandar una escuadrilla primero; las demas se ven en un modal.
   const [showAllMassEvents, setShowAllMassEvents] = useState(false);
   const sortedMassEvents = useMemo(
     () => [...massEvents].sort((a, b) => Date.parse(a.fin) - Date.parse(b.fin)),
     [massEvents],
   );
-  const shownMassEvents = showAllMassEvents
-    ? sortedMassEvents
-    : sortedMassEvents.slice(0, MASS_EVENTS_SHOWN);
-  const hiddenMassEvents = sortedMassEvents.length - shownMassEvents.length;
+  const nextMassEvent = sortedMassEvents[0];
 
   // Las tarjetas siempre cuentan sobre todo lo que hay en la zona y el tipo
   // elegidos. Apretar una filtra el mapa, no los numeros: el resumen tiene que
@@ -192,28 +187,26 @@ export default function MapPage({ tokenVersion }) {
         </Notice>
       )}
 
-      {shownMassEvents.map((event) => (
-        <Notice
-          key={event.actividadId}
-          type="info"
-          title={`Actividad masiva: ${event.titulo ?? 'sin título'}`}
-        >
-          {event.capacidad.toLocaleString('es-AR')} personas · {endLabel(event.fin)} ·{' '}
-          {event.contenedores === 1
-            ? '1 contenedor en la zona'
-            : `${event.contenedores} contenedores en la zona`}
-        </Notice>
-      ))}
-
-      {hiddenMassEvents > 0 && (
-        <Button variant="secondary" size="sm" onClick={() => setShowAllMassEvents(true)}>
-          Ver {hiddenMassEvents === 1 ? 'la otra actividad' : `las otras ${hiddenMassEvents} actividades`}
-        </Button>
+      {nextMassEvent && (
+        <MassEventNotice event={nextMassEvent}>
+          {sortedMassEvents.length > 1 && (
+            <Button variant="secondary" size="sm" onClick={() => setShowAllMassEvents(true)}>
+              Ver todas ({sortedMassEvents.length})
+            </Button>
+          )}
+        </MassEventNotice>
       )}
-      {showAllMassEvents && massEvents.length > MASS_EVENTS_SHOWN && (
-        <Button variant="secondary" size="sm" onClick={() => setShowAllMassEvents(false)}>
-          Ocultar actividades
-        </Button>
+
+      {showAllMassEvents && (
+        <Modal
+          title="Actividades masivas"
+          width={640}
+          onClose={() => setShowAllMassEvents(false)}
+        >
+          {sortedMassEvents.map((event) => (
+            <MassEventNotice key={event.actividadId} event={event} />
+          ))}
+        </Modal>
       )}
 
       <div className="map-and-panel">
@@ -240,5 +233,18 @@ export default function MapPage({ tokenVersion }) {
         </Notice>
       )}
     </div>
+  );
+}
+
+/** Un aviso por actividad: cuanta gente, cuando termina y que contenedores toca. */
+function MassEventNotice({ event, children }) {
+  return (
+    <Notice type="info" title={`Actividad masiva: ${event.titulo ?? 'sin título'}`}>
+      {event.capacidad.toLocaleString('es-AR')} personas · {endLabel(event.fin)} ·{' '}
+      {event.contenedores === 1
+        ? '1 contenedor en la zona'
+        : `${event.contenedores} contenedores en la zona`}
+      {children && <div>{children}</div>}
+    </Notice>
   );
 }

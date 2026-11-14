@@ -53,7 +53,7 @@ describe('pantalla del mapa', () => {
     fetchMassEvents.mockResolvedValue([]);
   });
 
-  it('con muchas actividades muestra solo las dos que terminan antes, para que se vea el mapa', async () => {
+  it('con muchas actividades muestra solo la que termina antes y el resto en un modal', async () => {
     saveToken('un.jwt.valido');
     fetchMapContainers.mockResolvedValue([container()]);
     const actividad = (id, horas) => ({
@@ -77,12 +77,13 @@ describe('pantalla del mapa', () => {
     render(<MapPage />);
 
     expect(await screen.findByText('Actividad masiva: Recoleta')).toBeInTheDocument();
-    expect(screen.getByText('Actividad masiva: Picnic')).toBeInTheDocument();
-    expect(screen.queryByText('Actividad masiva: Tango')).not.toBeInTheDocument();
+    expect(screen.queryByText('Actividad masiva: Picnic')).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Ver las otras 2 actividades' }));
-    expect(screen.getByText('Actividad masiva: Tango')).toBeInTheDocument();
-    expect(screen.getByText('Actividad masiva: Feria')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Ver todas (4)' }));
+    const modal = within(screen.getByRole('dialog', { name: 'Actividades masivas' }));
+    for (const titulo of ['Recoleta', 'Picnic', 'Tango', 'Feria']) {
+      expect(modal.getByText(`Actividad masiva: ${titulo}`)).toBeInTheDocument();
+    }
   });
 
   it('avisa de una actividad masiva con su hora de fin y los contenedores de la zona', async () => {
