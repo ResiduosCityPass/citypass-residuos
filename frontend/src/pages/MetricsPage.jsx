@@ -46,6 +46,9 @@ function Tablero({ user, retry }) {
 
   useEffect(() => {
     const resize = (event) => {
+      // El sandbox sin allow-same-origin hace que srcdoc emita desde "null".
+      // Ese origen solo no autentica al emisor: se exige ademas nuestro iframe.
+      if (event.origin !== 'null') return;
       const source = frame.current?.contentWindow;
       // srcdoc + sandbox tiene origen opaco: se verifica la ventana emisora.
       if (!source || event.source !== source || event.data?.tipo !== 'citypass-tablero-altura') return;

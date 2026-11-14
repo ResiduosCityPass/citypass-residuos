@@ -108,7 +108,8 @@ describe('Tablero autenticado de Analitica', () => {
   });
   it('solo toma alturas finitas de su propio iframe y limita el tamaño', async () => {
     render(view()); await screen.findByTitle('Dashboard de métricas de Residuos');
-    const send = (data, source = frame().contentWindow) => act(() => window.dispatchEvent(new MessageEvent('message', { source, data })));
+    const send = (data, source = frame().contentWindow, origin = 'null') => act(() => window.dispatchEvent(new MessageEvent('message', { source, data, origin })));
+    send({ tipo: 'citypass-tablero-altura', altura: 750 }, frame().contentWindow, 'https://otro.example');
     send({ tipo: 'citypass-tablero-altura', altura: 750 }, window);
     send({ tipo: 'otra', altura: 750 });
     for (const altura of [NaN, Infinity, -1, 0, '750']) send({ tipo: 'citypass-tablero-altura', altura });
@@ -123,7 +124,7 @@ describe('Tablero autenticado de Analitica', () => {
   it('un mensaje sin iframe montado no cambia el estado', async () => {
     get.mockRejectedValueOnce({ status: 503 }); render(view());
     await screen.findByRole('alert');
-    act(() => window.dispatchEvent(new MessageEvent('message', { data: { tipo: 'citypass-tablero-altura', altura: 400 } })));
+    act(() => window.dispatchEvent(new MessageEvent('message', { origin: 'null', data: { tipo: 'citypass-tablero-altura', altura: 400 } })));
     await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
   });
 });

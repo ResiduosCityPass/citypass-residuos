@@ -15,7 +15,7 @@ El intermediario permite usar el contrato aunque Analítica todavía no configur
 
 Ante `401`, el cliente existente renueva la sesión contra Login y reintenta **una** vez con el nuevo token. Un segundo `401` invalida la sesión local. `400`/`403` no disparan refresh; `503`, timeout o falta de conexión muestran “Analítica no disponible” y permiten reintentar. Sin URL configurada, se informa que falta conectar el tablero y el resto de la aplicación sigue funcionando.
 
-El proveedor puede enviar `{ tipo: 'citypass-tablero-altura', altura: 1200 }` por `postMessage`. Solo se aceptan mensajes de la ventana del propio iframe y alturas numéricas finitas entre 320 y 10.000 píxeles (se acotan valores fuera del rango). El origen del iframe es opaco por el sandbox.
+El proveedor puede enviar `{ tipo: 'citypass-tablero-altura', altura: 1200 }` por `postMessage`. Solo se aceptan mensajes con origen opaco `"null"` **y** ventana emisora igual a la del propio iframe, con alturas numéricas finitas entre 320 y 10.000 píxeles (se acotan valores fuera del rango). Verificar únicamente `"null"` no alcanza: ese origen lo comparten otros documentos aislados.
 
 ## Configuración y alta
 

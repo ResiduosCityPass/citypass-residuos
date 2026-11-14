@@ -20,7 +20,10 @@ export function urlTableroAnalitica(value: string | undefined, entorno: string):
       'ANALITICA_URL requiere HTTPS sin credenciales ni query (HTTP solo en localhost)',
     );
   }
-  url.pathname = `${url.pathname.replace(/\/+$/, '')}/embed`;
+  const pathname = url.pathname;
+  let end = pathname.length;
+  while (end > 0 && pathname[end - 1] === '/') end -= 1;
+  url.pathname = `${pathname.slice(0, end)}/embed`;
   url.searchParams.set('dashboard', 'residuos');
   return url;
 }
