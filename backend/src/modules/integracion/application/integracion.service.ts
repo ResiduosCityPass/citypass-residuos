@@ -162,7 +162,9 @@ export class IntegracionService {
         return 'duplicado';
       }
 
-      switch (eventType) {
+      // El topico de una version nueva termina en .vN (ActividadCreada.v3); si el
+      // tipo llega asi, se maneja igual que el de la v1.
+      switch (eventType.replace(/\.v\d+$/, '')) {
         case `${ESPACIOS}EventoComunitarioPublicado`:
           await this.programarRefuerzo(data);
           return 'procesado';

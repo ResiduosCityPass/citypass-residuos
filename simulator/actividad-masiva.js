@@ -84,6 +84,8 @@ const data = {
   direccion: 'Direccion de prueba',
   espacioNombre: 'Espacio de prueba',
   actorSub: null,
+  // Campo obligatorio desde la v3. Hoy solo crean eventos los administradores.
+  organizadorTipo: 'CIUDAD',
 };
 
 const respuesta = await fetch(`${API}/webhooks/citypass?token=${encodeURIComponent(TOKEN)}`, {

@@ -101,7 +101,8 @@ BUS_URL=<url-del-bus> CLIENT_ID=<id> CLIENT_SECRET=<secreto> WEBHOOK_TOKEN=<el-d
 | `fallidos` | Los eventos que el bus no pudo entregar, con el error |
 | `baja <id>` | Da de baja una suscripción |
 
-`--topico` cambia el tipo de evento (default `com.citypass.espacios.ActividadCreada`). En vez de
+`--topico` cambia el tipo de evento (default `com.citypass.espacios.ActividadCreada.v3`: desde el
+14/11 Espacios publica solo por la v3, que suma `organizadorTipo`). En vez de
 `CLIENT_ID` y `CLIENT_SECRET` se puede pasar un token ya emitido en `BUS_TOKEN`. Los pasos completos
 para Render están en `docs/sprints/plan-maximo-residuos.md`.
 ## Reclamo por un auto que bloquea la bicisenda (CU-INT-02)
