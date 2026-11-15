@@ -3,7 +3,8 @@
  *
  * El bus no busca a nadie: cada modulo da de alta la URL publica de su webhook
  * para un tipo de evento, y desde ahi el bus le hace un POST por cada evento.
- * Residuos solo recibe `com.citypass.espacios.ActividadCreada`.
+ * Residuos solo recibe `com.citypass.espacios.ActividadCreada` (desde el 14/11, la v3:
+ * su topico es `com.citypass.espacios.ActividadCreada.v3`).
  *
  * La URL que se registra es la del backend en Render con el secreto del webhook
  * (`?token=`): tiene que ser publica, `localhost` no le sirve al bus.
@@ -25,7 +26,7 @@
  *   WEBHOOK_TOKEN   el GATEWAY_WEBHOOK_TOKEN configurado en Render (solo para suscribir)
  */
 
-const TOPICO = 'com.citypass.espacios.ActividadCreada';
+const TOPICO = 'com.citypass.espacios.ActividadCreada.v3';
 const BUS = process.env.BUS_URL;
 const TOKEN_URL = process.env.TOKEN_URL ?? 'https://api.citypass-login.pp.ua/oauth/token';
 const API = process.env.API_URL ?? 'https://citypass-residuos-api.onrender.com/api/v1';

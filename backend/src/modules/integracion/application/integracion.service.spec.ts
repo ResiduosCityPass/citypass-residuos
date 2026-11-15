@@ -176,6 +176,16 @@ describe('IntegracionService (CU-INT-01)', () => {
     expect(actividades.registrar).toHaveBeenCalledWith(data);
   });
 
+  it('una ActividadCreada con la version en el tipo (.v3) tambien se maneja', async () => {
+    const data = { actividadId: 'act-1', capacidad: 5000, organizadorTipo: 'CIUDAD' };
+
+    await expect(
+      service.procesar(sobre('com.citypass.espacios.ActividadCreada.v3', data)),
+    ).resolves.toBe('procesado');
+
+    expect(actividades.registrar).toHaveBeenCalledWith(data);
+  });
+
   it.each(['EventoCancelado', 'ReservaCancelada'])(
     'una %s la cancela ActividadesMasivasService (squad 6)',
     async (tipo) => {
