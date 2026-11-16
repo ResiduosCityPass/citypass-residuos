@@ -90,10 +90,9 @@ services:
       # Alternativa de entrega HTTP del mismo bus.
       - key: GATEWAY_WEBHOOK_TOKEN
         sync: false
-      # Raiz del servicio de Analitica, sin /embed. Se habilita cuando entreguen
-      # su direccion. Vacia: el resto de la app sigue igual.
+      # Raiz de produccion confirmada por Analitica el 16/11.
       - key: ANALITICA_URL
-        sync: false
+        value: https://citypass-backend-prod-becqetepcjbqa8c7.brazilsouth-01.azurewebsites.net
 
   - type: web
     name: citypass-residuos-frontend
@@ -123,6 +122,11 @@ services:
       - key: VITE_SIMULAR_GPS
         value: "false"
     routes:
+      # Antes del fallback SPA. Conserva HTML, CSP, no-store y Set-Cookie en el
+      # mismo origen del frontend; el iframe nunca recibe tokens en su URL.
+      - type: rewrite
+        source: /api/v1/metricas/*
+        destination: https://citypass-residuos-api.onrender.com/api/v1/metricas/*
       - type: rewrite
         source: /*
         destination: /index.html

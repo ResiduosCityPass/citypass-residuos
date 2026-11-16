@@ -11,7 +11,7 @@ describe('Destino del tablero de Analitica', () => {
   });
   it('arma solo el tablero de residuos conservando el prefijo del proveedor', () => {
     expect(urlTableroAnalitica(' https://analitica.example/api/ ', 'production')?.href).toBe(
-      'https://analitica.example/api/embed?dashboard=residuos',
+      'https://analitica.example/api/embed/residuos',
     );
   });
   it.each([
@@ -25,9 +25,7 @@ describe('Destino del tablero de Analitica', () => {
     expect(() => urlTableroAnalitica(url, 'production')).toThrow('ANALITICA_URL');
   });
   it('solo admite HTTP en loopback de desarrollo y test', () => {
-    expect(urlTableroAnalitica('http://localhost:8080', 'test')?.href).toContain(
-      '/embed?dashboard=residuos',
-    );
+    expect(urlTableroAnalitica('http://localhost:8080', 'test')?.href).toContain('/embed/residuos');
     expect(() => urlTableroAnalitica('http://localhost:8080', 'production')).toThrow('HTTPS');
     expect(() => urlTableroAnalitica('http://otro-host:8080', 'test')).toThrow('HTTPS');
   });

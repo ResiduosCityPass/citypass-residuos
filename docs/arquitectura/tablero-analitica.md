@@ -1,48 +1,56 @@
 # Tablero de Analítica de Residuos
 
-Contrato de referencia: `guia-para-equipos.md` entregada por el Grupo 8.
+Contrato vigente: `integración-analitica.md`, recibido del Grupo 8 el 16/11/2026. Reemplaza la ruta y el mecanismo de embed de la guía anterior.
 
-## Acceso y entrega del HTML
+## Proveedor y prueba real
 
-1. El usuario inicia sesión con Login Federado.
-2. Residuos permite ver Métricas a `ADMINISTRADOR` y `OPERADOR`, incluido el delegado. La pantalla verifica el rol antes de pedir el tablero; la API vuelve a exigir identidad humana, módulo Residuos y rol autorizado con los guards globales. Choferes, ciudadanos y cuentas sin rol no consultan Analítica.
-3. El frontend llama `GET /api/v1/metricas/tablero` con su sesión habitual. No envía destinos ni identificadores de otros tableros.
-4. La API solicita `GET {ANALITICA_URL}/embed?dashboard=residuos` reenviando **el mismo** `Authorization: Bearer <access_token>` del usuario. No usa el token de EDA, no crea un token nuevo y no reenvía cookies. El destino está fijado por configuración; no se siguen redirecciones que pudieran recibir la credencial.
-5. Analítica valida el token y su módulo y devuelve HTML. Residuos lo entrega como JSON `{ html }` con `Cache-Control: private, no-store` y `Vary: Authorization`. Así nunca se sirve código de otro equipo como una página del origen de la API.
-6. El frontend asigna el HTML a `iframe.srcdoc` con `sandbox="allow-scripts"`, sin `allow-same-origin`, sin `src`, sin enlaces de apertura sin autorización y sin guardar el HTML en storage. Cambiar de cuenta, rol, salir de la pantalla o actualizar desmonta el HTML anterior. Las respuestas tardías no vuelven a mostrarlo.
+- Base de producción: `https://citypass-backend-prod-becqetepcjbqa8c7.brazilsouth-01.azurewebsites.net`.
+- Endpoint: **GET `/embed/residuos`**, sin body, con `Authorization: Bearer <access_token human>` y `Accept: text/html`.
+- Login: `clientId=citypass-residuos-web`, audiencia `citypass-residuos-api`, namespace firmado `com.citypass.residuos`.
+- El 16/11 se obtuvo un **200** con la cuenta de prueba existente y el token original de Login. La respuesta contenía 1.059.600 bytes, título “Analítica CityPass+”, el bloque `citypass-datos` y las cinco cabeceras de seguridad. El token real trae `module=residuos`, `namespace=com.citypass.residuos` y `aud` escalar; el proveedor lo aceptó. No se alteran ni se vuelven a firmar claims.
+- El tablero y el informe ya vienen incorporados en el HTML. No se llama a `/analytics/*`, no se insertan datos y no se accede a Blob desde Residuos.
+- Prueba de navegador: el HTML real descargado se sirvió intacto desde un proveedor local con las cabeceras originales, detrás de la API con sus guards y el proxy de Vite. Se verificaron filtros (Palermo: 46 alertas frente a 432 totales), ajuste de altura, actualización de vista y limpieza de las dos cookies con DELETE 204 al actualizar y salir. Esta prueba no reemplaza la comprobación del rewrite en Render tras el despliegue.
 
-El intermediario permite usar el contrato aunque Analítica todavía no configure CORS para navegadores. Si luego habilitan CORS, no hace falta cambiar el flujo.
+## Sesión del iframe y autorización
 
-Ante `401`, el cliente existente renueva la sesión contra Login y reintenta **una** vez con el nuevo token. Un segundo `401` invalida la sesión local. `400`/`403` no disparan refresh; `503`, timeout o falta de conexión muestran “Analítica no disponible” y permiten reintentar. Sin URL configurada, se informa que falta conectar el tablero y el resto de la aplicación sigue funcionando.
+El Login existente guarda su sesión en el frontend. Un iframe con `src` no puede agregar un Bearer, por lo que se crea una cookie temporal y acotada **solo para la vista del tablero**, sin cambiar el inicio de sesión de la aplicación.
 
-El proveedor puede enviar `{ tipo: 'citypass-tablero-altura', altura: 1200 }` por `postMessage`. Solo se aceptan mensajes con origen opaco `"null"` **y** ventana emisora igual a la del propio iframe, con alturas numéricas finitas entre 320 y 10.000 píxeles (se acotan valores fuera del rango). Verificar únicamente `"null"` no alcanza: ese origen lo comparten otros documentos aislados.
+1. La pantalla verifica el rol autenticado: solo `ADMINISTRADOR` y `OPERADOR`, incluido el delegado, pueden solicitar una vista. En desarrollo sin contexto de sesión se consulta `/auth/sesion`; no se autoriza con un JWT sin verificar.
+2. El frontend hace **POST `/api/v1/metricas/tableros` desde su propio origen** con el Bearer vigente. Los guards de la API verifican firma, emisor, audiencia, vigencia y rol; el controller exige además identidad humana y módulo Residuos.
+3. La API devuelve un id de vista y una ruta propia, y establece una cookie `HttpOnly`, `Secure` en producción y `SameSite=Strict`, sin `Domain`. Su `Path` es la ruta de **esa vista**, y dura como máximo dos minutos y nunca más que el access token. No hay sesión global nueva, refresh token ni HTML almacenado en el servidor.
+4. El iframe usa esa ruta en `src`, con `sandbox="allow-scripts"` **sin** `allow-same-origin`. El middleware de esa ruta convierte la cookie en el Bearer que verifican los guards habituales. La cookie no autentica ninguna otra API.
+5. La API pide el tablero al proveedor con **el mismo token humano**, sin reenviar cookies ni seguir redirecciones. Devuelve sus bytes sin modificar y conserva `Content-Type`, `Cache-Control`, `Content-Security-Policy`, `X-Content-Type-Options` y `Referrer-Policy`. Agrega `Vary: Cookie, Authorization`. Exige contenido HTML, las cabeceras del contrato y `no-store`.
+6. El navegador aplica la CSP original a la respuesta del iframe. No se transforma a JSON, `srcdoc` ni Blob, mecanismos que perderían esas cabeceras. El padre no puede leer el documento aislado.
+7. Al actualizar, salir de Métricas, cerrar sesión o cambiar de cuenta/rol, el componente desmonta el iframe y hace **DELETE de la ruta de esa vista** para limpiar su cookie. La limpieza no requiere una sesión vigente y nunca devuelve datos. Las vistas usan paths distintos para no pisar cookies de otras pestañas. Una respuesta tardía también se limpia y nunca vuelve a montar el tablero.
 
-## Configuración y alta
+El id de vista **no es una credencial**: conocer la ruta no permite obtener el HTML sin una cookie o Bearer válidos y el rol autorizado. Ni el token de usuario ni tokens de servicio viajan en URLs.
 
-- **Backend:** `ANALITICA_URL=https://<direccion-confirmada-del-equipo>` (raíz del servicio, sin `/embed`, query, fragmento ni credenciales). Admite un prefijo si el servicio está publicado bajo `/api`, por ejemplo. En producción exige HTTPS; HTTP solo se admite en loopback de desarrollo/test.
-- **Frontend:** no requiere `VITE_BI_DASHBOARD_URL`. La ruta Métricas consulta nuestra API y no necesita recompilarse para cambiar la URL del proveedor.
-- **Render:** configurar `ANALITICA_URL` en `citypass-residuos-api` y aplicar la configuración con un deploy. El Blueprint declara esta variable como externa (`sync: false`), sin afectar Login, EDA ni la base de datos.
-- El token real comprobado el 14/11 contiene `module=residuos`, `token_use=human` y **no** contiene `department`. El identificador del tablero es `residuos`. Se debe validar con Analítica que su alta acepte el claim `module` de Login; el intermediario no altera claims ni vuelve a firmar el token.
-- Para el alta, coordinar una cuenta de prueba de Residuos por un canal privado; no poner contraseñas ni tokens en documentación, PRs o variables `VITE_*`.
-- La dirección real de Analítica y la prueba contra ese servicio quedan pendientes hasta que el Grupo 8 entregue la URL. Las pruebas automatizadas usan un proveedor controlado, no simulan que los números sean de producción.
+## Errores, renovación y actualización
+
+- El POST comparte el cliente HTTP de Login: ante `401`, renueva el access token y reintenta **una** vez; un segundo `401` invalida la sesión local.
+- Si el proveedor devuelve un error durante el GET del iframe, el filtro emite una página local sin detalles del proveedor, con CSP y `no-store`. Solo avisa al padre el estado HTTP mediante `postMessage`.
+- El padre exige origen opaco `"null"` y que la ventana emisora sea exactamente la del iframe actual. Un `401` permite un único POST con `{ verificar: true }`: comprueba al proveedor, usa el refresh compartido y prepara otra vista. Esa comprobación descarta los bytes; no cachea HTML.
+- `403` muestra falta de acceso; `400`, `404`, `503`, timeout y errores de conexión permiten reintentar. Sin `ANALITICA_URL` se informa que falta conectar el tablero. El resto de la aplicación funciona independientemente del proveedor.
+- Se mantiene el ajuste opcional de altura mediante `{ tipo: 'citypass-tablero-altura', altura }`, también verificando origen y ventana. Solo se aceptan números finitos positivos, acotados a 320–10.000 píxeles.
+- Según la guía inicial del equipo, los indicadores se recalculan diariamente y el informe semanalmente. Actualizar el iframe recarga el HTML disponible; no fuerza el procesamiento de métricas.
+
+## Mismo origen en cada entorno
+
+- **Render:** `render.yaml` fija la URL pública confirmada en `ANALITICA_URL` de la API. En el frontend, el rewrite `/api/v1/metricas/*` apunta a la misma ruta de `citypass-residuos-api`, **antes** del fallback SPA. Debe conservar respuesta y `Set-Cookie`; verificarlo tras el deploy. La referencia oficial admite destinos URL para las reglas: https://render.com/docs/redirects-rewrites.
+- **Vite local:** el proxy de `vite.config.js` toma el origen de `VITE_API_URL` o `VITE_API_ORIGIN` para las rutas de Métricas. El navegador siempre llama a su propio origen.
+- **Docker Compose:** nginx reenvía `/api/v1/metricas/` hacia `api:3000`, sin caché y conservando las cabeceras. El resto de las rutas de la SPA y la API no cambia.
+- El cambio requiere desplegar **back y front y aplicar el rewrite**. El job de CI dispara los builds con hooks; si no se sincroniza el Blueprint, se debe aplicar la misma regla en Redirects/Rewrites de Render. Un deploy de la SPA por sí solo no configura esa regla.
+- No se necesita `VITE_BI_DASHBOARD_URL`, configurar CORS en Analítica ni cargar secretos nuevos de Login/EDA. Nunca se versionan contraseñas ni access/refresh tokens.
 
 ## Caso de eventos climáticos
 
-La publicación del caso climático es independiente del HTML del tablero y se conserva:
+Se conserva la publicación implementada y probada contra PostgreSQL: al decidir suspender zonas de una `CriticidadClimaticaConfirmada` de Espacios, Residuos publica `IntervencionActualizada` por cada parada pendiente de una ruta asignada o en curso, con `estadoNuevo=AFECTADA`, `causaTipo=EVENTO_CLIMATICO`, `causaId=alertaId`, `correlationId=alertaId` y el `camionId` de la cuadrilla. Analítica cuenta camiones distintos por alerta. No se modifican el consumo de eventos, la recuperación del servicio ni los datos de la base.
 
-- Espacios Públicos emite `CriticidadClimaticaConfirmada`; Residuos la recibe por el consumidor único Kafka o el webhook y la presenta en Alertas.
-- Al confirmar la suspensión sobre las zonas elegidas, Residuos publica `IntervencionActualizada` por cada parada pendiente de una ruta asignada o en curso: `estadoAnterior=PROGRAMADA`, `estadoNuevo=AFECTADA`, `causaId=alertaId`, `causaTipo=EVENTO_CLIMATICO`, `correlationId=alertaId` y `camionId` de la cuadrilla.
-- Analítica cuenta camiones distintos por alerta, no mensajes. Reintentos o eventos duplicados no deben sumar una cuadrilla extra. Las propuestas aún sin asignación y las paradas ya resueltas no entran en esa afectación.
-- El cierre de la alerta y la recuperación operativa conservan sus estados y publicaciones actuales. No se modifica la planificación ni se recalculan métricas en el frontend.
-- Los indicadores se recalculan **una vez por día** y el informe de IA **los lunes**, según la guía. Un evento recién publicado en EDA no tiene por qué verse inmediatamente en el HTML.
+El HTML recibido el 16/11 muestra indicadores de alertas de contenedores (llenado, tipo, prioridad, resolución e informe), pero no muestra todavía el indicador de cuadrillas afectadas por clima del contrato de Parte 2. La conexión del embed está validada; queda confirmar con Analítica la publicación de ese indicador y comparar sus datos después del procesamiento. Residuos no agrega ni recalcula ese contenido dentro del HTML ajeno.
 
-## Verificación
+## Verificación final en Render
 
-Automatizada: guards reales por HTTP, autorización previa al proveedor, token humano intacto solo en cabecera, tablero fijo, aislamiento de HTML, ausencia de caché, respuestas 400/401/403/503, renovación única, descarte de respuestas tardías y resize del iframe. El e2e de métrica climática cubre el evento publicado y su esquema Avro contra PostgreSQL.
-
-Con la URL real:
-
-1. Configurar el backend y entrar como administrador y como delegado en Métricas. Verificar HTML y reporte semanal sin errores en el navegador.
-2. Comprobar que una identidad de otro módulo o sin rol autorizado no pueda consultar el tablero.
-3. Seguir la prueba de suspensión climática con al menos una ruta asignada en una zona afectada; registrar `alertaId` y las patentes afectadas en EDA.
-4. Después del siguiente procesamiento diario de Analítica, comparar el conteo de cuadrillas distintas por `alertaId` con el tablero. La actualización manual recarga el HTML disponible; no fuerza su cálculo diario.
+1. Aplicar la URL y el rewrite, desplegar back/front y entrar como administrador y delegado.
+2. En Métricas, comprobar el HTML real y la CSP de la respuesta del iframe. En la red del navegador no debe haber tokens en URLs ni consultas directas a Analítica/Blob.
+3. Comprobar que un chofer, una cuenta sin rol, otro namespace o una ruta sin cookie no obtienen el tablero. Salir y cambiar de cuenta deben eliminar la vista anterior.
+4. Hacer una suspensión climática con una ruta asignada en la zona. Guardar el `alertaId` y las patentes publicadas en EDA. Comparar el conteo después del siguiente procesamiento de Analítica.

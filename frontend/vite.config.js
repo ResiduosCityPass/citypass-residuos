@@ -1,11 +1,19 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
+import { loadEnv } from 'vite';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), 'VITE_');
+  const target = new URL(env.VITE_API_URL || env.VITE_API_ORIGIN || 'http://localhost:3000');
+  const prefix = env.VITE_API_URL ? target.pathname.replace(/\/$/, '')
+    : `/${env.VITE_API_PREFIX || 'api/v1'}`;
+  return {
   plugins: [react()],
   // El puerto sale de PORT cuando el entorno lo fija (herramientas que levantan
   // el dev server con un puerto asignado). Sin PORT, el 5173 de siempre.
-  server: { port: Number(process.env.PORT) || 5173 },
+  server: { port: Number(process.env.PORT) || 5173, proxy: {
+    [`${prefix}/metricas`]: { target: target.origin, changeOrigin: true },
+  } },
   test: {
     environment: 'jsdom',
     globals: true,
@@ -22,4 +30,5 @@ export default defineConfig({
       exclude: ['src/main.jsx', 'src/test/**', 'src/mocks/**'],
     },
   },
+  };
 });

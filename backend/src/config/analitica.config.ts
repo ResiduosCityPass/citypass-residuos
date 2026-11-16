@@ -23,7 +23,6 @@ export function urlTableroAnalitica(value: string | undefined, entorno: string):
   const pathname = url.pathname;
   let end = pathname.length;
   while (end > 0 && pathname[end - 1] === '/') end -= 1;
-  url.pathname = `${pathname.slice(0, end)}/embed`;
-  url.searchParams.set('dashboard', 'residuos');
+  url.pathname = `${pathname.slice(0, end)}/embed/residuos`;
   return url;
 }

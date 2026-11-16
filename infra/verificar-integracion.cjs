@@ -20,8 +20,7 @@ const env = service => {
 const apiVars = env(api), webVars = env(web);
 const config = Object.fromEntries(Object.values(apiVars).map(v => [v.key,
   v.value ?? (v.fromDatabase ? 'postgresql://ci:ci@localhost:5432/residuos' :
-    v.fromService ? `https://${v.fromService.name}.onrender.com` :
-      v.key === 'ANALITICA_URL' ? '' : 'solo-validacion-ci')
+    v.fromService ? `https://${v.fromService.name}.onrender.com` : 'solo-validacion-ci')
 ]));
 const validated = validarEntorno(config);
 assert.equal(validated.NODE_ENV, 'production');
@@ -45,6 +44,11 @@ assert.equal(webVars.VITE_IDP_URL?.value + '/.well-known/jwks.json', validated.J
 assert.equal(webVars.VITE_API_ORIGIN?.fromService?.name, api.name);
 assert.equal(webVars.VITE_API_PREFIX?.value, validated.API_PREFIX);
 assert.equal(apiVars.CORS_ORIGIN?.fromService?.name, web.name);
+assert.equal(new URL(validated.ANALITICA_URL).protocol, 'https:');
+const proxyIndex = web.routes.findIndex(r => r.source === `/${validated.API_PREFIX}/metricas/*`);
+assert(proxyIndex >= 0 && proxyIndex < web.routes.findIndex(r => r.source === '/*'), 'El proxy debe preceder al fallback SPA');
+assert.equal(web.routes[proxyIndex].type, 'rewrite');
+assert.equal(web.routes[proxyIndex].destination, `https://${api.name}.onrender.com/${validated.API_PREFIX}/metricas/*`);
 for (const flag of ['VITE_USE_MOCKS', 'VITE_SIMULAR_GPS']) assert.equal(webVars[flag]?.value, 'false');
 assert(!Object.keys(webVars).some(k => /SECRET|TOKEN|PASSWORD/.test(k)), 'El frontend no lleva secretos');
 const local = backendRequire('dotenv').parse(fs.readFileSync(path.join(root, 'backend/.env.integration.example')));

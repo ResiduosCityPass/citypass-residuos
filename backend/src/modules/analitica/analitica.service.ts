@@ -3,13 +3,19 @@ import { ConfigService } from '@nestjs/config';
 import { urlTableroAnalitica } from '../../config/analitica.config';
 
 export const TIMEOUT_ANALITICA_MS = 60_000;
+export const CABECERAS_ANALITICA = [
+  'content-type',
+  'cache-control',
+  'content-security-policy',
+  'x-content-type-options',
+  'referrer-policy',
+] as const;
 
 @Injectable()
 export class AnaliticaService {
   constructor(private readonly config: ConfigService) {}
 
-  /** Reenvia el token humano, sin intercambiarlo por una credencial de servicio. */
-  async tablero(authorization: string): Promise<{ html: string }> {
+  validarConfiguracion(): URL {
     const url = urlTableroAnalitica(
       this.config.get<string>('ANALITICA_URL'),
       this.config.get<string>('NODE_ENV', 'development'),
@@ -20,9 +26,16 @@ export class AnaliticaService {
         message: 'El tablero de Analítica todavía no está conectado.',
       });
     }
+    return url;
+  }
+
+  /** Reenvia el token humano, sin intercambiarlo por una credencial de servicio. */
+  async tablero(authorization: string): Promise<{ body: Buffer; headers: Record<string, string> }> {
+    const url = this.validarConfiguracion();
     let response: Response;
     try {
       response = await fetch(url, {
+        method: 'GET',
         headers: { Authorization: authorization, Accept: 'text/html' },
         redirect: 'error',
         cache: 'no-store',
@@ -33,9 +46,20 @@ export class AnaliticaService {
         if (!/^text\/html(?:;|$)/i.test(response.headers.get('content-type') ?? '')) {
           throw new Error('Respuesta inesperada');
         }
-        const html = await response.text();
-        if (!html.trim()) throw new Error('Tablero vacio');
-        return { html };
+        const headers: Record<string, string> = {};
+        for (const name of CABECERAS_ANALITICA) {
+          const value = response.headers.get(name);
+          if (!value) throw new Error('Falta una cabecera del contrato');
+          headers[name] = value;
+        }
+        if (
+          !headers['cache-control'].split(',').some((v) => v.trim().toLowerCase() === 'no-store')
+        ) {
+          throw new Error('El tablero no permite cache');
+        }
+        const body = Buffer.from(await response.arrayBuffer());
+        if (!body.toString('utf8').trim()) throw new Error('Tablero vacio');
+        return { body, headers };
       }
     } catch {
       throw this.noDisponible();
@@ -51,6 +75,10 @@ export class AnaliticaService {
       403: {
         code: 'ANALITICA_MODULO_NO_AUTORIZADO',
         message: 'Analítica no habilitó el tablero de Residuos para esta cuenta.',
+      },
+      404: {
+        code: 'ANALITICA_TABLERO_NO_ENCONTRADO',
+        message: 'El tablero de Residuos no está disponible en esa ruta.',
       },
     };
     const error = errors[response.status];
