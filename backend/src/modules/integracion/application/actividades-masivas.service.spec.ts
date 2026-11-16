@@ -408,6 +408,18 @@ describe('ActividadesMasivasService (squad 3)', () => {
       expect(integracion.borrarRefuerzo).not.toHaveBeenCalled();
     });
 
+    it.each(['PENDING', 'FINISHED', '', undefined])(
+      'con un estado que no es ACTIVE ni ACTIVE_FULL (%s) el evento sigue suspendido',
+      async (estado) => {
+        integracion.quitarSuspension.mockResolvedValue(true);
+
+        await expect(service.cambioDeEstado(eventoComunitario({ estado }))).resolves.toBe(false);
+
+        expect(integracion.quitarSuspension).not.toHaveBeenCalled();
+        expect(integracion.guardarRefuerzo).not.toHaveBeenCalled();
+      },
+    );
+
     it('un evento reanudado sin id valido no consulta la suspension', async () => {
       await expect(service.cambioDeEstado(eventoComunitario({ eventoId: '' }))).resolves.toBe(
         false,
