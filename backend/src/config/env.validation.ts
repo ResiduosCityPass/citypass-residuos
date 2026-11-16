@@ -1,5 +1,6 @@
 import { plainToInstance } from 'class-transformer';
 import { IsEnum, IsIn, IsInt, IsOptional, IsString, Max, Min, validateSync } from 'class-validator';
+import { urlTableroAnalitica } from './analitica.config';
 
 /**
  * Emisor con el que se firman y se leen los tokens.
@@ -169,6 +170,10 @@ class VariablesEntorno {
   @IsString()
   @IsOptional()
   CORS_ORIGIN?: string;
+
+  @IsString()
+  @IsOptional()
+  ANALITICA_URL?: string;
 }
 
 /**
@@ -269,5 +274,6 @@ export function validarEntorno(config: Record<string, unknown>) {
         throw new Error('Kafka de produccion requiere TLS');
     }
   }
+  urlTableroAnalitica(instancia.ANALITICA_URL, instancia.NODE_ENV);
   return instancia;
 }
