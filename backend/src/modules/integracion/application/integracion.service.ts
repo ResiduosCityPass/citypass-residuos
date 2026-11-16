@@ -392,22 +392,28 @@ function afectaLaCirculacion(data: Record<string, unknown>): boolean {
 
 /**
  * Las unicas causas que Analitica lee en IntervencionActualizada (contrato del
- * 29/10, confirmado con Valen el 05/11). Cualquier otra, como la EVENTO_PUBLICO
- * de una cobertura preventiva, sale en null: corta el camino igual, pero no
- * suma a una metrica que no es la suya.
+ * 29/10, confirmado con Valen el 05/11). Si la emergencia trae una de estas, va
+ * tal cual.
  */
 const CAUSAS_DE_AFECTACION = new Set(['INCIDENTE_VIAL', 'EVENTO_CLIMATICO']);
 
+/**
+ * Movilidad no publica IncidenteVialCreado y no lo va a publicar (Valen con
+ * Joaco, 14/11), asi que ninguna emergencia trae INCIDENTE_VIAL. Una emergencia
+ * que corta la circulacion es el incidente vial: sin otra causa que Analitica
+ * lea, sale como INCIDENTE_VIAL con causaId = emergenciaId (acordado con Valen
+ * el 14/11, como el reclamoId de CU-INT-02).
+ */
 function causaDeLaEmergencia(data: Record<string, unknown>, emergenciaId: string): CausaAfectacion {
   const { causaId, causaTipo, correlationId } = data;
-  const completa =
+  const conocida =
     typeof causaId === 'string' &&
     typeof causaTipo === 'string' &&
     CAUSAS_DE_AFECTACION.has(causaTipo);
 
   return {
-    causaId: completa ? causaId : null,
-    causaTipo: completa ? causaTipo : null,
+    causaId: conocida ? causaId : emergenciaId,
+    causaTipo: conocida ? causaTipo : 'INCIDENTE_VIAL',
     correlationId: typeof correlationId === 'string' ? correlationId : emergenciaId,
   };
 }

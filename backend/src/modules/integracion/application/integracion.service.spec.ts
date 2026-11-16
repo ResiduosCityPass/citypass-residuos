@@ -273,12 +273,22 @@ describe('IntegracionService (CU-INT-01)', () => {
         );
       });
 
-      it('sin causa completa la manda en null: el contrato pide los dos campos juntos', async () => {
+      it('sin causa, la emergencia es el incidente vial: causaId = emergenciaId (Valen, 14/11)', async () => {
+        await conRutas().procesar(incidente({ causaId: null, causaTipo: null }));
+
+        expect(paradas.quitarContenedores.mock.calls[0][3]).toEqual({
+          causaId: 'em-1',
+          causaTipo: 'INCIDENTE_VIAL',
+          correlationId: 'em-1',
+        });
+      });
+
+      it('con la causa incompleta tambien: el contrato pide los dos campos juntos', async () => {
         await conRutas().procesar(incidente({ causaTipo: 'INCIDENTE_VIAL' }));
 
         expect(paradas.quitarContenedores.mock.calls[0][3]).toEqual({
-          causaId: null,
-          causaTipo: null,
+          causaId: 'em-1',
+          causaTipo: 'INCIDENTE_VIAL',
           correlationId: 'em-1',
         });
       });
@@ -295,14 +305,14 @@ describe('IntegracionService (CU-INT-01)', () => {
         });
       });
 
-      it('otra causa, como la de una cobertura preventiva, bloquea pero sale en null', async () => {
+      it('otra causa, como la de una cobertura preventiva, sale como el incidente vial de la emergencia', async () => {
         await conRutas().procesar(
           incidente({ causaId: 'ev-104', causaTipo: 'EVENTO_PUBLICO', correlationId: 'c-2' }),
         );
 
         expect(paradas.quitarContenedores.mock.calls[0][3]).toEqual({
-          causaId: null,
-          causaTipo: null,
+          causaId: 'em-1',
+          causaTipo: 'INCIDENTE_VIAL',
           correlationId: 'c-2',
         });
       });
