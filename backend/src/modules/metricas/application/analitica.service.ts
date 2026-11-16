@@ -32,7 +32,7 @@ export class AnaliticaService {
   constructor(private readonly config: ConfigService) {}
 
   async tablero(autorizacion: string): Promise<TableroAnalitica> {
-    const base = this.config.get<string>('ANALITICA_URL')?.trim().replace(/\/+$/, '');
+    const base = sinBarraFinal(this.config.get<string>('ANALITICA_URL')?.trim() ?? '');
     if (!base) {
       throw new ServiceUnavailableException({
         code: 'ANALITICA_NO_CONFIGURADA',
@@ -81,6 +81,13 @@ export class AnaliticaService {
 
     return { html };
   }
+}
+
+/** Sin regex: Sonar marca `/\/+$/` por backtracking. */
+function sinBarraFinal(url: string): string {
+  let fin = url.length;
+  while (fin > 0 && url[fin - 1] === '/') fin--;
+  return url.slice(0, fin);
 }
 
 /** El `detail` de un error de Analitica (FastAPI), si vino. */

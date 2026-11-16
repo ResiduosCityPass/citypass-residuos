@@ -35,9 +35,12 @@ export default function MetricsPage() {
   }, [attempt]);
 
   // El tablero avisa su altura para no tener doble scroll. Solo se le cree al
-  // iframe propio: cualquier otra ventana puede mandar mensajes.
+  // iframe propio: cualquier otra ventana puede mandar mensajes. Sin
+  // allow-same-origin, un iframe con srcDoc tiene origen opaco, que llega como
+  // el texto "null"; un mensaje con otro origen no es del tablero.
   useEffect(() => {
     const onMessage = (event) => {
+      if (event.origin !== 'null') return;
       if (event.source !== frame.current?.contentWindow) return;
       if (event.data?.tipo !== HEIGHT_MESSAGE) return;
       const altura = Number(event.data.altura);

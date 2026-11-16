@@ -91,11 +91,24 @@ describe('Metricas · dashboard de Analitica', () => {
     });
     expect(contenedor.style.height).toBe('');
 
+    // Del iframe, pero con un origen que no es el opaco del sandbox: tampoco.
     act(() => {
       window.dispatchEvent(
         new MessageEvent('message', {
           data: { tipo: 'citypass-tablero-altura', altura: 1800 },
           source: iframe.contentWindow,
+          origin: 'https://otro.sitio',
+        }),
+      );
+    });
+    expect(contenedor.style.height).toBe('');
+
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          data: { tipo: 'citypass-tablero-altura', altura: 1800 },
+          source: iframe.contentWindow,
+          origin: 'null',
         }),
       );
     });
