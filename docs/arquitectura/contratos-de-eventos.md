@@ -178,8 +178,9 @@ hay un camión comprometido, y una propuesta se puede descartar.
 - `causaId` es el `actividadId` de `ActividadCreada`, y `correlationId` es `act-<actividadId>`.
 - `camionId` es la patente del camión de la ruta. `contenedorId` es el primer contenedor de la
   actividad que entra en la ruta.
-- En el caso de Emergencias, `causaId`, `causaTipo` y `camionId` van en `null`. `emergenciaId` va en
-  `null` en el squad 3.
+- En el caso de Emergencias, `causaTipo` es `EMERGENCIA` y `causaId` es el id de la emergencia (pedido
+  de Analítica el 16/11, porque su tablero se arma por `causaTipo`); `camionId` va en `null`.
+  `emergenciaId` y `correlationId` no cambian. En el squad 3, `emergenciaId` va en `null`.
 
 ### `residuos.intervencion.completada` — CU-01 de Emergencias (A7)
 

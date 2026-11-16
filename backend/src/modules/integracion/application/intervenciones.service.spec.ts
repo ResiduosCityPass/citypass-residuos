@@ -96,6 +96,8 @@ describe('IntervencionesService (CU-01, A7)', () => {
       emergenciaId: 'EMG-1',
       contenedorId: 'c-10m',
       ubicacion: PUNTO,
+      causaId: 'EMG-1',
+      causaTipo: 'EMERGENCIA',
     });
   });
 
