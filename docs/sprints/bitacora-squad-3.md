@@ -705,3 +705,15 @@ Ensayé la demo en Render con el plan B: 1.200 personas en la sede de Recoleta, 
 
 **Falta:**
 - Del 13 al 18/11: ensayo con una actividad real de Rodrigo en Recoleta, incluido el paso 4 (chofer).
+
+## Sáb 14/11 · Mapa tapado por las actividades
+
+- **#96 mergeado a `develop`** el 12/11: bitácora del 12/11.
+- **Pase a `main` (#104) y deploy en Render:** Ramiro pasó `develop` a `main` con los arreglos de Emergencias, Reclamos y EDA (#102, #103 y #105). Antes actualizó la base de Render.
+- **Mapa tapado:** en Render hay muchas actividades masivas cargadas y cada una mostraba un aviso arriba del mapa, así que el mapa quedaba fuera de la pantalla. Ahora se muestra solo la que termina antes (la de la demo termina en minutos, así que queda primera) y un botón "Ver todas" abre un modal con el resto. Lo del modal lo propuso Nico.
+- **Pregunta de Analítica:** Fran preguntó si `IntervencionCompletada` se puede unir con `IntervencionActualizada` y cómo unir esta última con `IntervencionProgramada`. Son eventos distintos: la completada sale solo al cerrar una intervención por emergencia, y la actualizada cuando una emergencia o un reclamo corta una parada. Para el caso del evento solo sale `IntervencionProgramada`. El `correlationId` es el id del origen (emergencia, reclamo o actividad) y no es único: para unirlas, `correlationId` + `camionId` (la patente en los dos).
+
+**Falta:**
+- Que el arreglo del mapa llegue a `main` y a Render.
+- Revisar que ninguna ruta abierta tenga CT-0022, porque la base de Render se actualizó.
+- Del 15 al 18/11: ensayo con una actividad real de Rodrigo en Recoleta, incluido el paso 4 (chofer).
