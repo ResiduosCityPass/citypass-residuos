@@ -340,11 +340,12 @@ camionId distintos con estadoNuevo = AFECTADA y causaTipo = INCIDENTE_VIAL
   esa misma lectura, contar eventos da las paradas afectadas. No coincide con el `intervencionId` de
   `IntervencionProgramada`, que es uno por emergencia: esta métrica no los cruza.
 - **`causaId` y `causaTipo`:** si `EmergenciaCreada` trae `INCIDENTE_VIAL` o `EVENTO_CLIMATICO`, van
-  tal cual. Si no trae causa, o trae otra (por ejemplo `EVENTO_PUBLICO` de una cobertura preventiva),
-  salen `causaTipo = INCIDENTE_VIAL` y `causaId = emergenciaId`: la emergencia que corta la
-  circulación es el incidente vial. Movilidad no publica `IncidenteVialCreado` y no lo va a publicar,
-  así que sin esto la métrica quedaba en 0 (acordado con Valen el 14/11, igual que el `reclamoId` de
-  CU-INT-02).
+  tal cual. Si no trae causa, salen `causaTipo = INCIDENTE_VIAL` y `causaId = emergenciaId`: la
+  emergencia que corta la circulación es el incidente vial. Movilidad no publica
+  `IncidenteVialCreado` y no lo va a publicar, así que sin esto la métrica quedaba en 0 (acordado
+  con Valen el 14/11, igual que el `reclamoId` de CU-INT-02). Con otra causa (por ejemplo
+  `EVENTO_PUBLICO` de una cobertura preventiva), salen en `null`: la parada se omite igual, pero no
+  suma a la métrica.
 - **`updatedAt` va en ISO-8601**, como pide el contrato de Analítica del 29/10, y no en milisegundos
   como `ReclamoEvaluado`.
 
