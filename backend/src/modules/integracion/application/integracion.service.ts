@@ -72,7 +72,9 @@ function estadoDe(data: Record<string, unknown>): string {
 /**
  * Reacciones a eventos de otros modulos de CityPass+ (CU-INT-01).
  *
- *   EventoComunitarioPublicado -> refuerzo de recoleccion cerca del espacio
+ *   EventoComunitarioPublicado -> refuerzo de recoleccion cerca del espacio; si
+ *                                 viene suspendido o cancelado, se retira
+ *                                 (ActividadesMasivasService)
  *   EventoCancelado            -> se cancelan los refuerzos y la zona (ActividadesMasivasService)
  *   EmergenciaCreada           -> se bloquean para el ruteo las zonas afectadas y
  *                                 se sacan los contenedores cercanos de las rutas vivas
@@ -166,7 +168,10 @@ export class IntegracionService {
       // tipo llega asi, se maneja igual que el de la v1.
       switch (eventType.replace(/\.v\d+$/, '')) {
         case `${ESPACIOS}EventoComunitarioPublicado`:
-          await this.programarRefuerzo(data);
+          // Sale tambien al suspender, reanudar o cancelar, con el estado nuevo.
+          if (!(await this.actividades.cambioDeEstado(data))) {
+            await this.programarRefuerzo(data);
+          }
           return 'procesado';
         // EventoCancelado es como cancela Espacios. ReservaCancelada figura en el
         // CASO-RESERVA-ESPACIOS de EDA, pero todavia no esta en el catalogo.
@@ -232,8 +237,8 @@ export class IntegracionService {
     }
 
     const eventoId = texto(data, 'eventoId');
-    // La cancelacion pudo llegar antes: el bus no ordena entre topicos.
-    if (await this.actividades.estaCancelada(eventoId)) {
+    // La cancelacion o la suspension pudo llegar antes: el bus no ordena entre topicos.
+    if (await this.actividades.noSeAgenda(eventoId)) {
       return;
     }
 

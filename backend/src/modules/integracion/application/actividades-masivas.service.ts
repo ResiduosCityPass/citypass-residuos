@@ -21,6 +21,11 @@ const CAPACIDAD_MAXIMA = 2_147_483_647;
 
 /** Espacios publica los estados de sus actividades en ingles (`ACTIVE`). */
 const ESTADOS_CANCELADA = new Set(['CANCELADA', 'CANCELLED']);
+/**
+ * La web de Espacios usa `SUSPENDED`, aunque el catalogo todavia no lo lista: se
+ * aceptan tambien las variantes en castellano.
+ */
+const ESTADOS_SUSPENDIDA = new Set(['SUSPENDIDA', 'SUSPENDIDO', 'SUSPENDED']);
 
 /** Lo que Residuos necesita de una ActividadCreada, ya validado. */
 interface ActividadLeida {
@@ -50,6 +55,8 @@ interface ActividadLeida {
  * Si Espacios cancela (`EventoCancelado`, `ActividadModificada` o una actividad
  * con estado cancelado), se borran los refuerzos y la zona, y queda anotado:
  * si la creacion llega despues, no se vuelve a agendar la limpieza.
+ * Si la suspende (`EventoComunitarioPublicado` con estado suspendido), se retira
+ * igual, y al reanudar se vuelve a agendar.
  *
  * Lee los campos del contrato del squad (E1 en plan-squad-3.md), que es como
  * Espacios lo publica en el bus.
@@ -86,6 +93,10 @@ export class ActividadesMasivasService {
       await this.cancelar(data);
       return;
     }
+    if (esEstadoSuspendido(data.estado)) {
+      await this.suspender(data);
+      return;
+    }
 
     const actividad = leerActividad(data);
 
@@ -95,6 +106,10 @@ export class ActividadesMasivasService {
     }
     if (await this.integracion.estaCancelada(actividad.actividadId)) {
       this.logger.log(`ActividadCreada ignorada, ya cancelada: ${actividad.actividadId}`);
+      return;
+    }
+    if (await this.integracion.estaSuspendida(actividad.actividadId)) {
+      this.logger.log(`ActividadCreada ignorada, suspendida: ${actividad.actividadId}`);
       return;
     }
     if (actividad.capacidad < this.cupoMinimoRefuerzo) {
@@ -163,23 +178,82 @@ export class ActividadesMasivasService {
     }
 
     await this.integracion.registrarCancelacion(id);
+    await this.retirar(id);
+  }
 
+  /**
+   * Espacios suspendio la actividad: se retira la limpieza igual que al
+   * cancelar, pero queda anotada como suspendida y no como cancelada, porque
+   * se puede reanudar.
+   */
+  async suspender(data: Record<string, unknown>): Promise<void> {
+    const id = [data.actividadId, data.eventoId].find(esIdValido);
+
+    if (!id) {
+      this.logger.warn(`Suspension de actividad ignorada, sin id: ${JSON.stringify(data)}`);
+      return;
+    }
+
+    await this.integracion.registrarSuspension(id);
+    await this.retirar(id);
+  }
+
+  /** Espacios cambio el estado de una actividad: importa si la cancelo o la suspendio. */
+  async modificar(data: Record<string, unknown>): Promise<void> {
+    if (esEstadoCancelado(data.estadoNuevo)) {
+      await this.cancelar(data);
+    } else if (esEstadoSuspendido(data.estadoNuevo)) {
+      await this.suspender(data);
+    }
+  }
+
+  /**
+   * `EventoComunitarioPublicado` sale al crear, suspender, reanudar o cancelar
+   * un evento, con el estado nuevo. Devuelve true si el evento ya quedo
+   * resuelto aca (cancelado o suspendido) y no hay que agendar el refuerzo de
+   * CU-INT-01.
+   *
+   * Al reanudar, Espacios no vuelve a mandar `ActividadCreada`: la limpieza se
+   * agenda de nuevo con los datos de este evento, con el mismo umbral y prefijo.
+   */
+  async cambioDeEstado(data: Record<string, unknown>): Promise<boolean> {
+    if (esEstadoCancelado(data.estado)) {
+      await this.cancelar(data);
+      return true;
+    }
+    if (esEstadoSuspendido(data.estado)) {
+      await this.suspender(data);
+      return true;
+    }
+
+    const id = data.eventoId;
+    if (esIdValido(id) && (await this.integracion.quitarSuspension(id))) {
+      await this.registrar({
+        actividadId: id,
+        titulo: data.titulo,
+        capacidad: data.capacidad ?? data.cupoMaximo,
+        latitud: data.latitud,
+        longitud: data.longitud,
+        fechaHoraInicio: Date.parse(String(data.inicio)),
+        fechaHoraFinalizacion: Date.parse(String(data.fin)),
+      });
+    }
+    return false;
+  }
+
+  /** Para el refuerzo de CU-INT-01, que entra por `EventoComunitarioPublicado`. */
+  async noSeAgenda(id: string): Promise<boolean> {
+    return (
+      (await this.integracion.estaCancelada(id)) || (await this.integracion.estaSuspendida(id))
+    );
+  }
+
+  /** Borra todos los refuerzos de la actividad y su zona del mapa. */
+  private async retirar(id: string): Promise<void> {
     for (const eventoId of [id, `${PREFIJO_ACTIVIDAD}${id}`, `${PREFIJO_RESERVA}${id}`]) {
       await this.integracion.borrarRefuerzo(eventoId);
     }
     await this.integracion.borrarActividad(id);
-  }
-
-  /** Espacios cambio el estado de una actividad: solo importa si la cancelo. */
-  async modificar(data: Record<string, unknown>): Promise<void> {
-    if (esEstadoCancelado(data.estadoNuevo)) {
-      await this.cancelar(data);
-    }
-  }
-
-  /** Para el refuerzo de CU-INT-01, que entra por `EventoComunitarioPublicado`. */
-  estaCancelada(id: string): Promise<boolean> {
-    return this.integracion.estaCancelada(id);
   }
 
   /**
@@ -207,6 +281,10 @@ export class ActividadesMasivasService {
 
 function esEstadoCancelado(estado: unknown): boolean {
   return typeof estado === 'string' && ESTADOS_CANCELADA.has(estado.toUpperCase());
+}
+
+function esEstadoSuspendido(estado: unknown): boolean {
+  return typeof estado === 'string' && ESTADOS_SUSPENDIDA.has(estado.toUpperCase());
 }
 
 function esIdValido(valor: unknown): valor is string {

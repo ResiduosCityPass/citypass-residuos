@@ -505,7 +505,25 @@ Sin un id válido, el evento se ignora y queda en el log, sin responder `400`. U
 
 La cancelación queda anotada en `actividad_cancelada`. El bus no ordena eventos de tópicos distintos:
 si la cancelación llega antes que `ActividadCreada` o `EventoComunitarioPublicado`, esos avisos se
-ignoran y no se vuelve a agendar la limpieza.
+ignoran y no se vuelve a agendar la limpieza. `EventoComunitarioPublicado` con `estado` `CANCELLED`
+también cancela.
+
+**Suspensión (squad 6):** Espacios puede suspender un evento y reanudarlo después. Lo avisa con
+`EventoComunitarioPublicado` con el estado nuevo. Al suspender se retira la limpieza igual que al
+cancelar, pero queda anotada en `actividad_suspendida` y no en `actividad_cancelada`. Al reanudar
+(`ACTIVE` o `ACTIVE_FULL`), como Espacios no vuelve a mandar `ActividadCreada`, la limpieza se agenda
+otra vez con los datos de ese evento: mismo umbral de 100 personas, mismo prefijo `res-` o `act-` y
+la zona del mapa si es masivo.
+
+| Evento | Id | Condición |
+|---|---|---|
+| `com.citypass.espacios.EventoComunitarioPublicado` | `eventoId` | `estado` es `SUSPENDED`, `SUSPENDIDA` o `SUSPENDIDO` |
+| `com.citypass.espacios.ActividadModificada` | `actividadId` | `estadoNuevo` suspendido, con los mismos valores |
+| `com.citypass.espacios.ActividadCreada` | `actividadId` | `estado` suspendido, con los mismos valores |
+
+El catálogo (schemaId 48) todavía no lista el estado de suspendido. La web de Espacios usa
+`SUSPENDED`; se aceptan también las variantes en castellano. Si la suspensión llega antes que la creación, la limpieza no se agenda hasta que
+se reanude.
 
 ## Política de errores y reintentos
 
