@@ -267,6 +267,15 @@ describe('interpretarReclamo (CU-INT-02)', () => {
       ...cambios,
     });
 
+    it('un pozo en la bicisenda (BACHES + CICLOVIA) se ignora: no tapa ningun contenedor', () => {
+      expect(
+        interpretarReclamo(CREADO, {
+          ...transito({ objetoAfectado: 'CICLOVIA', titulo: 'Pozo en la bicisenda' }),
+          categoria: 'BACHES',
+        }),
+      ).toBeNull();
+    });
+
     it('CICLOVIA alcanza aunque el texto no nombre el vehiculo', () => {
       expect(
         interpretarReclamo(

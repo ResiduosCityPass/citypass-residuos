@@ -118,10 +118,15 @@ Necesita una ruta `EN_CURSO` o `ASIGNADA`, el token de administrador y el
 TOKEN=<jwt> WEBHOOK_TOKEN=webhook-local npm run reclamo
 ```
 
+Contra Render, en vez de `TOKEN` (el del navegador vence a los ~15 min), `LOGIN_USER` y
+`LOGIN_PASSWORD`: el simulador inicia sesión en Login en cada corrida. Las variables pueden ir en
+`simulator/.env`, que no se versiona; lo exportado en la terminal gana.
+
 | Comando | Qué provoca |
 |---|---|
 | `npm run reclamo` | Un auto a ~5 m de la próxima parada pendiente: la parada se omite y la ruta se reordena |
 | `npm run reclamo -- --lejos` | El auto a ~100 m: no tapa nada, `afectaRecoleccion: false` |
+| `npm run reclamo -- --bache` | Un pozo (`BACHES`) a ~5 m: se ignora aunque esté pegado al contenedor |
 | `npm run reclamo -- --ruta <id>` | Elige la ruta en vez de tomar la primera activa |
 | `npm run reclamo:resuelto` | Reclamos avisa que se retiró el auto (usa el último reclamo enviado) |
 

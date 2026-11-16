@@ -5,21 +5,36 @@
  *
  *   npm run reclamo                  auto frente a la proxima parada de una ruta en curso
  *   npm run reclamo -- --lejos       auto a 100 m: no tapa nada
+ *   npm run reclamo -- --bache       un pozo en la bicisenda al lado del contenedor: se ignora
  *   npm run reclamo -- --ruta <id>   elige la ruta en vez de tomar la primera activa
  *   npm run reclamo:resuelto         Reclamos avisa que se retiro el auto (usa el ultimo reclamo)
  *   npm run reclamo:resuelto -- <reclamoId>
  *
  * Requiere:
- *   TOKEN          token de administrador:  cd ../backend && npm run token:dev -- ADMINISTRADOR
- *   WEBHOOK_TOKEN  el GATEWAY_WEBHOOK_TOKEN del .env del backend
+ *   WEBHOOK_TOKEN  el GATEWAY_WEBHOOK_TOKEN del backend
+ *   y para leer la ruta, una de dos:
+ *     TOKEN                        en local:  cd ../backend && npm run token:dev -- ADMINISTRADOR
+ *     LOGIN_USER y LOGIN_PASSWORD  en Render: el simulador inicia sesion en Login como el front,
+ *                                  asi no vence el token copiado de F12 (dura ~15 min).
+ * Las variables pueden ir en simulator/.env (ignorado por git); lo exportado en la terminal gana.
  */
 import { randomUUID } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 
+try {
+  process.loadEnvFile();
+} catch {
+  // Sin .env se usan las variables de la terminal.
+}
+
 const API = process.env.API_URL ?? 'http://localhost:3000/api/v1';
-const TOKEN = process.env.TOKEN;
+const IDP = process.env.IDP_URL ?? 'https://api.citypass-login.pp.ua';
+let TOKEN = process.env.TOKEN;
 const WEBHOOK_TOKEN = process.env.WEBHOOK_TOKEN;
 const ULTIMO_RECLAMO = 'ultimo-reclamo.txt';
+
+// El OBSTRUCCION_RADIO_METROS del backend, solo para explicar la decision en pantalla.
+const RADIO_METROS = 15;
 
 // ~5 m al norte del contenedor: adentro del radio de 15 m. Con --lejos, ~100 m.
 const GRADOS_CERCA = 0.000045;
@@ -36,6 +51,30 @@ function exigir(variable, valor, comoConseguirla) {
     console.error(`Falta la variable ${variable}. ${comoConseguirla}`);
     process.exit(1);
   }
+}
+
+/** El mismo /auth/login que usa el front: un token nuevo en cada corrida. */
+async function iniciarSesion() {
+  const { LOGIN_USER, LOGIN_PASSWORD } = process.env;
+  if (!LOGIN_USER || !LOGIN_PASSWORD) {
+    console.error(
+      'Falta TOKEN, o LOGIN_USER y LOGIN_PASSWORD para iniciar sesion en Login:\n' +
+        "  read -p 'Usuario: ' LOGIN_USER && read -s -p 'Contraseña: ' LOGIN_PASSWORD && export LOGIN_USER LOGIN_PASSWORD",
+    );
+    process.exit(1);
+  }
+
+  const respuesta = await fetch(`${IDP}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: LOGIN_USER, password: LOGIN_PASSWORD, clientId: 'citypass-residuos-web' }),
+  });
+
+  if (!respuesta.ok) {
+    throw new Error(`Login -> ${respuesta.status}: revisa LOGIN_USER y LOGIN_PASSWORD.`);
+  }
+
+  return (await respuesta.json()).access_token;
 }
 
 async function api(ruta) {
@@ -83,6 +122,26 @@ async function rutaParaLaDemo() {
   process.exit(1);
 }
 
+/**
+ * Por que Residuos hizo lo que hizo, para que se vea en B y C, donde la ruta no
+ * cambia. Usa la consulta publica de contenedores cercanos (CU-11).
+ */
+async function explicar(lat, lng, bache) {
+  const respuesta = await fetch(`${API}/publico/contenedores/cercanos?lat=${lat}&lng=${lng}&radioMetros=500`);
+  const [cerca] = respuesta.ok ? await respuesta.json() : [];
+  const distancia = cerca && Math.round(cerca.distanciaMetros);
+  const masCerca = cerca ? `${cerca.codigo}, a ${distancia} m` : 'ninguno a menos de 500 m';
+
+  console.log(`\nContenedor mas cerca del reclamo: ${masCerca}.`);
+  if (bache) {
+    console.log('-> Es un pozo (BACHES), no un vehiculo: al camion no le impide vaciarlo. Residuos lo ignora.');
+  } else if (cerca && distancia <= RADIO_METROS) {
+    console.log(`-> Adentro de los ${RADIO_METROS} m: Residuos omite la parada, abre la alerta y publica ReclamoEvaluado (afectaRecoleccion: true).`);
+  } else {
+    console.log(`-> Afuera de los ${RADIO_METROS} m: Residuos no toca la ruta y publica ReclamoEvaluado (afectaRecoleccion: false).`);
+  }
+}
+
 function mostrar(titulo, ruta) {
   console.log(`\n${titulo}: ruta ${ruta.id.slice(0, 8)} · ${ruta.estado} · ${ruta.distanciaEstimadaKm} km`);
 
@@ -106,23 +165,28 @@ async function crear() {
   mostrar('Antes', antes);
 
   const lejos = args.includes('--lejos');
+  const bache = args.includes('--bache');
   const reclamoId = randomUUID();
-  const { lat, lng } = objetivo.contenedor;
+  const { lng } = objetivo.contenedor;
+  const lat = objetivo.contenedor.lat + (lejos ? GRADOS_LEJOS : GRADOS_CERCA);
+  const que = bache ? 'un pozo' : 'un auto';
 
-  // Payload del contrato de Reclamos: categoria TRANSITO y el auto en el titulo.
+  // Payload del contrato de Reclamos (v3): TRANSITO con el auto en el titulo, o
+  // BACHES para un pozo, los dos sobre la CICLOVIA.
   await webhook('com.citypass.reclamos.ReclamoCreado', {
     reclamoId,
     ciudadanoId: 'U000042',
     canal: 'APP',
-    titulo: 'Auto estacionado sobre la ciclovia',
-    descripcion: `Hay un auto arriba de la bicisenda, al lado del contenedor ${objetivo.contenedor.codigo}`,
-    categoria: 'TRANSITO',
+    titulo: bache ? 'Pozo en la bicisenda' : 'Auto estacionado sobre la ciclovia',
+    descripcion: `Hay ${que} en la bicisenda, al lado del contenedor ${objetivo.contenedor.codigo}`,
+    categoria: bache ? 'BACHES' : 'TRANSITO',
+    objetoAfectado: 'CICLOVIA',
     prioridad: 'ALTA',
     origenClasificacion: 'CIUDADANO',
     confianzaClasificacion: null,
     direccion: 'Demo',
     barrio: 'Centro',
-    latitud: lat + (lejos ? GRADOS_LEJOS : GRADOS_CERCA),
+    latitud: lat,
     longitud: lng,
     afectaCirculacion: true,
     correlationId: `demo-${reclamoId.slice(0, 8)}`,
@@ -131,12 +195,14 @@ async function crear() {
 
   writeFileSync(ULTIMO_RECLAMO, reclamoId);
   console.log(
-    `\nReclamo ${reclamoId} enviado: auto a ${lejos ? '~100 m' : '~5 m'} de ${objetivo.contenedor.codigo}.`,
+    `\nReclamo ${reclamoId} enviado: ${que} a ${lejos ? '~100 m' : '~5 m'} de ${objetivo.contenedor.codigo}.`,
   );
+  await explicar(lat, lng, bache);
 
   mostrar('Despues', await api(`/rutas/${antes.id}`));
-  console.log('\nEn la consola del backend aparece [residuos.reclamo.evaluado] en menos de 5 s.');
-  console.log('Para liberarlo:  npm run reclamo:resuelto');
+  if (!bache && !lejos) {
+    console.log(`\nPara liberarlo:  npm run reclamo:resuelto -- ${reclamoId}`);
+  }
 }
 
 async function resolver() {
@@ -166,10 +232,16 @@ function leerUltimo() {
   }
 }
 
-exigir('TOKEN', TOKEN, 'Generala con:  cd ../backend && npm run token:dev -- ADMINISTRADOR');
-exigir('WEBHOOK_TOKEN', WEBHOOK_TOKEN, 'Es el GATEWAY_WEBHOOK_TOKEN del .env del backend.');
+exigir('WEBHOOK_TOKEN', WEBHOOK_TOKEN, 'Es el GATEWAY_WEBHOOK_TOKEN del backend.');
 
-(args[0] === 'resuelto' ? resolver() : crear()).catch((error) => {
+// Resolver solo usa el webhook: no necesita sesion.
+(args[0] === 'resuelto'
+  ? resolver()
+  : (async () => {
+      TOKEN ||= await iniciarSesion();
+      await crear();
+    })()
+).catch((error) => {
   console.error(error.message);
   process.exit(1);
 });
