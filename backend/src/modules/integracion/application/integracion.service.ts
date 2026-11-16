@@ -397,22 +397,36 @@ function afectaLaCirculacion(data: Record<string, unknown>): boolean {
 
 /**
  * Las unicas causas que Analitica lee en IntervencionActualizada (contrato del
- * 29/10, confirmado con Valen el 05/11). Cualquier otra, como la EVENTO_PUBLICO
- * de una cobertura preventiva, sale en null: corta el camino igual, pero no
- * suma a una metrica que no es la suya.
+ * 29/10, confirmado con Valen el 05/11). Si la emergencia trae una de estas, va
+ * tal cual.
  */
 const CAUSAS_DE_AFECTACION = new Set(['INCIDENTE_VIAL', 'EVENTO_CLIMATICO']);
 
+/**
+ * Movilidad no publica IncidenteVialCreado y no lo va a publicar (Valen con
+ * Joaco, 14/11), asi que ninguna emergencia trae INCIDENTE_VIAL. Una emergencia
+ * que corta la circulacion y llega sin causa es el incidente vial: sale como
+ * INCIDENTE_VIAL con causaId = emergenciaId (acordado con Valen el 14/11, como
+ * el reclamoId de CU-INT-02). Con otra causa, como la EVENTO_PUBLICO de una
+ * cobertura preventiva, sale en null: Valen acordo solo el caso sin causa.
+ */
 function causaDeLaEmergencia(data: Record<string, unknown>, emergenciaId: string): CausaAfectacion {
   const { causaId, causaTipo, correlationId } = data;
-  const completa =
-    typeof causaId === 'string' &&
-    typeof causaTipo === 'string' &&
-    CAUSAS_DE_AFECTACION.has(causaTipo);
+  const correlacion = typeof correlationId === 'string' ? correlationId : emergenciaId;
+
+  if (typeof causaTipo === 'string' && causaTipo !== 'INCIDENTE_VIAL') {
+    const conocida = typeof causaId === 'string' && CAUSAS_DE_AFECTACION.has(causaTipo);
+    return {
+      causaId: conocida ? causaId : null,
+      causaTipo: conocida ? causaTipo : null,
+      correlationId: correlacion,
+    };
+  }
 
   return {
-    causaId: completa ? causaId : null,
-    causaTipo: completa ? causaTipo : null,
-    correlationId: typeof correlationId === 'string' ? correlationId : emergenciaId,
+    // Un causaId suelto, sin causaTipo, no se sabe de que es: va el de la emergencia.
+    causaId: causaTipo === 'INCIDENTE_VIAL' && typeof causaId === 'string' ? causaId : emergenciaId,
+    causaTipo: 'INCIDENTE_VIAL',
+    correlationId: correlacion,
   };
 }
