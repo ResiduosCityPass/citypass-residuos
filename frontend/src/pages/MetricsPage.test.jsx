@@ -1,93 +1,104 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import MetricsPage, { LOAD_TIMEOUT_MS } from './MetricsPage.jsx';
+import MetricsPage from './MetricsPage.jsx';
+import { fetchAnalyticsDashboard } from '../api/waste.js';
+import { ApiError } from '../api/client.js';
 
-const URL_DASHBOARD = 'https://bi.citypass.test/residuos';
+vi.mock('../api/waste.js', () => ({ fetchAnalyticsDashboard: vi.fn() }));
 
-const frame = () => screen.getByTitle('Dashboard de métricas de Residuos');
-const expire = () => act(() => { vi.advanceTimersByTime(LOAD_TIMEOUT_MS); });
+const HTML = '<!doctype html><html><body>Tablero</body></html>';
+const frame = () => screen.findByTitle('Dashboard de métricas de Residuos');
 
 describe('Metricas · dashboard de Analitica', () => {
   beforeEach(() => {
-    vi.useFakeTimers();
+    fetchAnalyticsDashboard.mockReset();
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
+  it('muestra el estado de carga mientras el backend trae el tablero', () => {
+    fetchAnalyticsDashboard.mockReturnValue(new Promise(() => {}));
+
+    render(<MetricsPage />);
+
+    expect(screen.getByText('Cargando el dashboard…')).toBeInTheDocument();
   });
 
-  it('sin URL configurada avisa que falta conectarlo y no monta el iframe', () => {
-    render(<MetricsPage dashboardUrl="" />);
+  it('muestra el HTML de Analitica en un iframe aislado', async () => {
+    fetchAnalyticsDashboard.mockResolvedValue({ html: HTML });
 
-    expect(screen.getByText('El dashboard todavía no está conectado')).toBeInTheDocument();
+    render(<MetricsPage />);
+
+    const iframe = await frame();
+    expect(iframe).toHaveAttribute('srcdoc', HTML);
+    // Sin allow-same-origin: el tablero no puede leer la sesion de la app.
+    expect(iframe).toHaveAttribute('sandbox', 'allow-scripts');
+    expect(screen.queryByText('Cargando el dashboard…')).not.toBeInTheDocument();
+  });
+
+  it('sin la conexion configurada avisa que falta conectarlo', async () => {
+    fetchAnalyticsDashboard.mockRejectedValue(
+      new ApiError({ code: 'ANALITICA_NO_CONFIGURADA', status: 503, message: 'x' }),
+    );
+
+    render(<MetricsPage />);
+
+    expect(await screen.findByText('El dashboard todavía no está conectado')).toBeInTheDocument();
     expect(screen.queryByTitle('Dashboard de métricas de Residuos')).not.toBeInTheDocument();
   });
 
-  it('muestra el estado de carga mientras el dashboard no termina de cargar', () => {
-    render(<MetricsPage dashboardUrl={URL_DASHBOARD} />);
+  it('si Analitica rechaza, muestra su motivo y permite reintentar', async () => {
+    fetchAnalyticsDashboard
+      .mockRejectedValueOnce(
+        new ApiError({
+          code: 'ANALITICA_RECHAZO',
+          status: 502,
+          message: 'Analítica respondió 401: Token inválido o expirado.',
+        }),
+      )
+      .mockResolvedValueOnce({ html: HTML });
 
-    expect(frame()).toHaveAttribute('src', URL_DASHBOARD);
-    expect(screen.getByText('Cargando el dashboard…')).toBeInTheDocument();
-  });
+    render(<MetricsPage />);
 
-  it('saca el estado de carga cuando el dashboard carga', () => {
-    render(<MetricsPage dashboardUrl={URL_DASHBOARD} />);
-
-    fireEvent.load(frame());
-
-    expect(screen.queryByText('Cargando el dashboard…')).not.toBeInTheDocument();
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-  });
-
-  it('avisa que no responde si se vence el plazo', () => {
-    render(<MetricsPage dashboardUrl={URL_DASHBOARD} />);
-
-    expire();
-
-    expect(screen.getByRole('alert')).toHaveTextContent('El dashboard no responde');
-    expect(screen.queryByText('Cargando el dashboard…')).not.toBeInTheDocument();
-  });
-
-  /** Si ya cargo, el timeout no puede pisarlo con un error falso. */
-  it('no marca error si el dashboard cargo antes del plazo', () => {
-    render(<MetricsPage dashboardUrl={URL_DASHBOARD} />);
-
-    fireEvent.load(frame());
-    expire();
-
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-  });
-
-  it('se recupera sola si el dashboard contesta despues del plazo', () => {
-    render(<MetricsPage dashboardUrl={URL_DASHBOARD} />);
-    expire();
-
-    fireEvent.load(frame());
-
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-  });
-
-  it('reintentar monta un iframe nuevo y le da otro plazo', () => {
-    render(<MetricsPage dashboardUrl={URL_DASHBOARD} />);
-    expire();
-    const failed = frame();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Token inválido o expirado');
 
     fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
 
-    expect(frame()).not.toBe(failed);
-    expect(screen.getByText('Cargando el dashboard…')).toBeInTheDocument();
+    expect(await frame()).toHaveAttribute('srcdoc', HTML);
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-
-    expire();
-    expect(screen.getByRole('alert')).toBeInTheDocument();
   });
 
-  /** Un sitio que prohibe que lo embeban no se detecta: el enlace es la salida. */
-  it('siempre ofrece abrir el dashboard en otra pestaña', () => {
-    render(<MetricsPage dashboardUrl={URL_DASHBOARD} />);
+  it('a un operador le explica que el tablero es solo para el admin', async () => {
+    fetchAnalyticsDashboard.mockRejectedValue(
+      new ApiError({ code: 'HTTP_403', status: 403, message: 'Forbidden' }),
+    );
 
-    const link = screen.getByRole('link', { name: 'Abrir en otra pestaña' });
-    expect(link).toHaveAttribute('href', URL_DASHBOARD);
-    expect(link).toHaveAttribute('target', '_blank');
+    render(<MetricsPage />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Solo un administrador puede ver el tablero de Analítica.',
+    );
+  });
+
+  it('ajusta la altura cuando el tablero la avisa, pero solo si viene de su iframe', async () => {
+    fetchAnalyticsDashboard.mockResolvedValue({ html: HTML });
+    render(<MetricsPage />);
+    const iframe = await frame();
+    const contenedor = iframe.parentElement;
+
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent('message', { data: { tipo: 'citypass-tablero-altura', altura: 1800 } }),
+      );
+    });
+    expect(contenedor.style.height).toBe('');
+
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          data: { tipo: 'citypass-tablero-altura', altura: 1800 },
+          source: iframe.contentWindow,
+        }),
+      );
+    });
+    expect(contenedor.style.height).toBe('1800px');
   });
 });

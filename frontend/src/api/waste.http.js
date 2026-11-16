@@ -45,6 +45,13 @@ export const fetchMapContainers = (filters) => api.get('/mapa/contenedores', fil
  */
 export const fetchMassEvents = () => api.get('/actividades-masivas');
 
+/**
+ * Tablero de Analitica (Grupo 8): `{ html }`, una pagina con los datos adentro.
+ * La pide nuestro backend con el token del admin: Analitica no habilita CORS
+ * para el navegador.
+ */
+export const fetchAnalyticsDashboard = () => api.get('/metricas/analitica');
+
 /* --- CU-01 · Contenedores ----------------------------------------------- */
 
 /** Listado completo. Mismos filtros que el mapa: zonaId, tipoResiduo, estado. */

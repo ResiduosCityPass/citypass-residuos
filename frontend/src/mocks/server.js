@@ -129,6 +129,12 @@ const MASS_EVENTS = [
   },
 ];
 
+export const fetchAnalyticsDashboard = () =>
+  respond({
+    html: '<!doctype html><html lang="es"><body style="font-family:sans-serif;padding:24px">'
+      + '<h1>Tablero de Analítica (mock)</h1><p>Con mocks no se llama a Analítica.</p></body></html>',
+  });
+
 export const fetchMassEvents = () =>
   respond(
     MASS_EVENTS.map((event) => ({

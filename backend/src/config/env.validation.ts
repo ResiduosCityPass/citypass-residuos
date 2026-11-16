@@ -109,6 +109,11 @@ class VariablesEntorno {
   @IsOptional()
   JWT_JWKS_URL?: string;
 
+  /** Backend de Analitica (Grupo 8). Vacio: la pantalla de Metricas avisa que no esta conectado. */
+  @IsString()
+  @IsOptional()
+  ANALITICA_URL?: string;
+
   @IsString() @IsOptional() JWT_MODULE: string = 'residuos';
   @IsIn(['true', 'false']) @IsOptional() CLIMA_SIMULACRO_EDA_HABILITADO: string = 'false';
 

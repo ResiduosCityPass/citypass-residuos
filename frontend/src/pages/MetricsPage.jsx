@@ -1,94 +1,105 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Button from '../components/ui/Button.jsx';
 import Notice from '../components/ui/Notice.jsx';
+import { fetchAnalyticsDashboard } from '../api/waste.js';
+
+/** Mensaje con el que el tablero de Analitica avisa su altura (guia del Grupo 8). */
+const HEIGHT_MESSAGE = 'citypass-tablero-altura';
 
 /**
- * Cuanto se le da al dashboard para cargar antes de decir que no responde. Los
- * dashboards de BI tardan: con un servicio dormido, el primer pedido puede
- * llevar varios segundos sin que este caido.
- */
-export const LOAD_TIMEOUT_MS = 20000;
-
-/**
- * Metricas de Residuos: el dashboard que arma Analitica, embebido en un iframe.
+ * Metricas de Residuos: el tablero que arma Analitica (Grupo 8).
  *
  * Los numeros no se calculan aca. Salen de los eventos que Residuos publica en
- * el bus, asi que un dashboard vacio no es un error de esta pantalla.
+ * el bus, asi que un tablero vacio no es un error de esta pantalla.
  *
- * Un iframe no avisa si fallo: no existe `onError` y `onLoad` tambien dispara
- * cuando el navegador pinta su propia pagina de error o el sitio prohibe que lo
- * embeban (X-Frame-Options). Lo unico detectable es que nunca termine de cargar,
- * y de ahi el timeout. Para el resto queda siempre visible el enlace que abre el
- * dashboard en otra pestaña.
+ * El tablero no se carga por URL: Analitica valida el token del admin y no
+ * habilita CORS para el navegador. Lo pide nuestro backend, que devuelve el HTML
+ * con los datos adentro, y aca se muestra en un iframe con `srcDoc`.
  *
- * El iframe sigue montado cuando se vence el plazo: si contesta tarde, la
- * pantalla se recupera sola.
+ * `sandbox="allow-scripts"` sin `allow-same-origin` es a proposito, como pide
+ * Analitica: el tablero corre sus graficos pero no puede leer la sesion de la
+ * app ni tocar esta pagina. No lo necesita, porque los datos ya vienen adentro.
  */
-export default function MetricsPage({ dashboardUrl = import.meta.env.VITE_BI_DASHBOARD_URL }) {
-  const [status, setStatus] = useState('loading');
-  // Cambiar la key del iframe es la unica forma de recargarlo: con otro origen
-  // no se puede llamar a `contentWindow.location.reload()`.
+export default function MetricsPage() {
+  const [state, setState] = useState({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
+  const [height, setHeight] = useState(null);
+  const frame = useRef(null);
 
   useEffect(() => {
-    if (!dashboardUrl) return undefined;
-    const timer = setTimeout(() => {
-      setStatus((current) => (current === 'loading' ? 'failed' : current));
-    }, LOAD_TIMEOUT_MS);
-    return () => clearTimeout(timer);
-  }, [dashboardUrl, attempt]);
+    let current = true;
+    fetchAnalyticsDashboard()
+      .then(({ html }) => current && setState({ status: 'ready', html }))
+      .catch((error) => current && setState({ status: 'failed', error }));
+    return () => { current = false; };
+  }, [attempt]);
 
-  if (!dashboardUrl) {
+  // El tablero avisa su altura para no tener doble scroll. Solo se le cree al
+  // iframe propio: cualquier otra ventana puede mandar mensajes.
+  useEffect(() => {
+    const onMessage = (event) => {
+      if (event.source !== frame.current?.contentWindow) return;
+      if (event.data?.tipo !== HEIGHT_MESSAGE) return;
+      const altura = Number(event.data.altura);
+      if (Number.isFinite(altura) && altura > 0) setHeight(altura);
+    };
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, []);
+
+  if (state.status === 'failed' && state.error?.code === 'ANALITICA_NO_CONFIGURADA') {
     return (
       <div className="screen">
         <Notice type="info" title="El dashboard todavía no está conectado">
-          Las métricas de Residuos se van a ver acá cuando Analítica entregue su dashboard.
+          Las métricas de Residuos se van a ver acá cuando se configure la conexión con Analítica.
         </Notice>
       </div>
     );
   }
 
   const retry = () => {
-    setStatus('loading');
-    setAttempt((current) => current + 1);
+    setState({ status: 'loading' });
+    setAttempt((value) => value + 1);
   };
 
   return (
     <div className="screen screen-metrics">
-      {status === 'failed' && (
-        <Notice type="error" title="El dashboard no responde">
-          Analítica no contestó a tiempo. Volvé a intentar en unos minutos.
+      {state.status === 'failed' && (
+        <Notice type="error" title="No se pudo cargar el dashboard">
+          {state.error?.status === 403
+            ? 'Solo un administrador puede ver el tablero de Analítica.'
+            : state.error?.message ?? 'Analítica no respondió.'}
         </Notice>
       )}
 
       <div className="filter-bar">
         <div className="filter-bar-right">
-          {status === 'failed' && <Button size="sm" onClick={retry}>Reintentar</Button>}
-          <a className="btn btn-secondary btn-sm" href={dashboardUrl} target="_blank" rel="noreferrer">
-            Abrir en otra pestaña
-          </a>
+          <Button size="sm" variant="secondary" onClick={retry} disabled={state.status === 'loading'}>
+            {state.status === 'failed' ? 'Reintentar' : 'Actualizar'}
+          </Button>
         </div>
       </div>
 
-      <div className="metrics-frame" hidden={status === 'failed'}>
-        {status === 'loading' && (
-          <div className="metrics-loading" role="status">
-            <span className="skeleton" />
-            <span className="skeleton" />
-            <span className="skeleton" />
-            <span>Cargando el dashboard…</span>
-          </div>
-        )}
-        <iframe
-          key={attempt}
-          src={dashboardUrl}
-          title="Dashboard de métricas de Residuos"
-          // Sin allow-top-navigation: el dashboard no puede sacar al operador
-          // de la app. Lo demas es lo que necesita cualquier herramienta de BI.
-          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads"
-          onLoad={() => setStatus('ready')}
-        />
-      </div>
+      {state.status !== 'failed' && (
+        <div className="metrics-frame" style={height ? { height } : undefined}>
+          {state.status === 'loading' && (
+            <div className="metrics-loading" role="status">
+              <span className="skeleton" />
+              <span className="skeleton" />
+              <span className="skeleton" />
+              <span>Cargando el dashboard…</span>
+            </div>
+          )}
+          {state.status === 'ready' && (
+            <iframe
+              ref={frame}
+              srcDoc={state.html}
+              title="Dashboard de métricas de Residuos"
+              sandbox="allow-scripts"
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }

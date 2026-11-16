@@ -81,6 +81,9 @@ services:
         sync: false
       - key: GATEWAY_NAMESPACE
         value: com.citypass.residuos
+      # Tablero de Analitica (Grupo 8), pedido con el token del admin.
+      - key: ANALITICA_URL
+        value: https://citypass-backend-prod-becqetepcjbqa8c7.brazilsouth-01.azurewebsites.net
       - key: KAFKA_BROKERS
         value: test.citypass.mrfranco.net.ar:9092
       - key: KAFKA_SSL
@@ -118,8 +121,6 @@ services:
         value: "false"
       - key: VITE_SIMULAR_GPS
         value: "false"
-      - key: VITE_BI_DASHBOARD_URL
-        sync: false
     routes:
       - type: rewrite
         source: /*
