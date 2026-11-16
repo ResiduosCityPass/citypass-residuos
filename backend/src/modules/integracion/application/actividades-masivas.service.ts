@@ -26,6 +26,8 @@ const ESTADOS_CANCELADA = new Set(['CANCELADA', 'CANCELLED']);
  * aceptan tambien las variantes en castellano.
  */
 const ESTADOS_SUSPENDIDA = new Set(['SUSPENDIDA', 'SUSPENDIDO', 'SUSPENDED']);
+/** Solo estos estados reanudan un evento suspendido (schemaId 48). */
+const ESTADOS_ACTIVA = new Set(['ACTIVE', 'ACTIVE_FULL']);
 
 /** Lo que Residuos necesita de una ActividadCreada, ya validado. */
 interface ActividadLeida {
@@ -215,6 +217,7 @@ export class ActividadesMasivasService {
    *
    * Al reanudar, Espacios no vuelve a mandar `ActividadCreada`: la limpieza se
    * agenda de nuevo con los datos de este evento, con el mismo umbral y prefijo.
+   * Solo reanudan `ACTIVE` y `ACTIVE_FULL`: con otro estado sigue suspendido.
    */
   async cambioDeEstado(data: Record<string, unknown>): Promise<boolean> {
     if (esEstadoCancelado(data.estado)) {
@@ -227,7 +230,11 @@ export class ActividadesMasivasService {
     }
 
     const id = data.eventoId;
-    if (esIdValido(id) && (await this.integracion.quitarSuspension(id))) {
+    if (
+      esIdValido(id) &&
+      esEstadoActivo(data.estado) &&
+      (await this.integracion.quitarSuspension(id))
+    ) {
       await this.registrar({
         actividadId: id,
         titulo: data.titulo,
@@ -285,6 +292,10 @@ function esEstadoCancelado(estado: unknown): boolean {
 
 function esEstadoSuspendido(estado: unknown): boolean {
   return typeof estado === 'string' && ESTADOS_SUSPENDIDA.has(estado.toUpperCase());
+}
+
+function esEstadoActivo(estado: unknown): boolean {
+  return typeof estado === 'string' && ESTADOS_ACTIVA.has(estado.toUpperCase());
 }
 
 function esIdValido(valor: unknown): valor is string {
