@@ -6,8 +6,9 @@
  *   npm run reclamo                  auto frente a la proxima parada de una ruta en curso
  *   npm run reclamo -- --lejos       auto a 100 m: no tapa nada
  *   npm run reclamo -- --bache       un pozo en la bicisenda al lado del contenedor: se ignora
- *   npm run reclamo -- --ruta <id>   elige la ruta en vez de tomar la primera activa
- *   npm run reclamo:resuelto         Reclamos avisa que se retiro el auto (usa el ultimo reclamo)
+ *   npm run reclamo -- --contenedor FRAN-02   tapa ese contenedor en vez de la proxima parada
+ *   npm run reclamo -- --ruta <id>   elige la ruta; sin esto, la activa del camion CAMION_DEMO (FR123AN)
+ *   npm run reclamo:resuelto         Reclamos avisa que se retiro el auto (el ultimo que tapo uno)
  *   npm run reclamo:resuelto -- <reclamoId>
  *
  * Requiere:
@@ -32,6 +33,7 @@ const IDP = process.env.IDP_URL ?? 'https://api.citypass-login.pp.ua';
 let TOKEN = process.env.TOKEN;
 const WEBHOOK_TOKEN = process.env.WEBHOOK_TOKEN;
 const ULTIMO_RECLAMO = 'ultimo-reclamo.txt';
+const CAMION_DEMO = process.env.CAMION_DEMO ?? 'FR123AN';
 
 // El OBSTRUCCION_RADIO_METROS del backend, solo para explicar la decision en pantalla.
 const RADIO_METROS = 15;
@@ -111,11 +113,11 @@ async function rutaParaLaDemo() {
     return api(`/rutas/${id}`);
   }
 
-  for (const estado of ['EN_CURSO', 'ASIGNADA']) {
-    const [ruta] = await api(`/rutas?estado=${estado}`);
-    if (ruta) {
-      return api(`/rutas/${ruta.id}`);
-    }
+  // En Render puede haber rutas de otros ensayos: primero la del camion de la demo.
+  const activas = [...(await api('/rutas?estado=EN_CURSO')), ...(await api('/rutas?estado=ASIGNADA'))];
+  const ruta = activas.find((r) => r.camion?.patente === CAMION_DEMO) ?? activas[0];
+  if (ruta) {
+    return api(`/rutas/${ruta.id}`);
   }
 
   console.error('No hay ninguna ruta EN_CURSO ni ASIGNADA. Genera y asigna una desde el front.');
@@ -153,12 +155,13 @@ function mostrar(titulo, ruta) {
 
 async function crear() {
   const antes = await rutaParaLaDemo();
+  const codigo = opcion('--contenedor');
   const objetivo = [...antes.paradas]
     .sort((a, b) => a.orden - b.orden)
-    .find((p) => p.estado === 'PENDIENTE');
+    .find((p) => p.estado === 'PENDIENTE' && (!codigo || p.contenedor.codigo === codigo));
 
   if (!objetivo) {
-    console.error('La ruta no tiene paradas pendientes.');
+    console.error(codigo ? `${codigo} no esta pendiente en la ruta.` : 'La ruta no tiene paradas pendientes.');
     process.exit(1);
   }
 
@@ -193,7 +196,10 @@ async function crear() {
     createdAt: Date.now(),
   });
 
-  writeFileSync(ULTIMO_RECLAMO, reclamoId);
+  // Solo el que tapa: B y C no pisan el que despues libera reclamo:resuelto.
+  if (!lejos && !bache) {
+    writeFileSync(ULTIMO_RECLAMO, reclamoId);
+  }
   console.log(
     `\nReclamo ${reclamoId} enviado: ${que} a ${lejos ? '~100 m' : '~5 m'} de ${objetivo.contenedor.codigo}.`,
   );
@@ -201,7 +207,7 @@ async function crear() {
 
   mostrar('Despues', await api(`/rutas/${antes.id}`));
   if (!bache && !lejos) {
-    console.log(`\nPara liberarlo:  npm run reclamo:resuelto -- ${reclamoId}`);
+    console.log('\nPara liberarlo:  npm run reclamo:resuelto');
   }
 }
 

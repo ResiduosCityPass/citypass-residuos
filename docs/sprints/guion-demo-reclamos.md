@@ -88,9 +88,9 @@ un título que nombre al auto ("Auto estacionado sobre la ciclovía").
    (`/chofer`, con su credencial): **No pude vaciar** en cada parada pendiente, motivo "Ensayo de la
    demo". Omitidas, los FRAN siguen al 95 %; confirmadas como vaciadas, bajarían a 0 % y quedarían
    afuera. Después, **F5** en **Rutas** (si no, el camión recién liberado no aparece en la lista),
-   generar con el camión **FR123AN** y la zona **Demo Fran**, y **asignarla** a **Fran Isola**. Tiene que quedar asignada: si queda como propuesta, la parada se
-   borra en vez de cancelarse y no sale el `CANCELADA` para Analítica. Copiar su id de la URL
-   (`/rutas/<id>`).
+   generar con el camión **FR123AN** y la zona **Demo Fran**, y **asignarla** a **Fran Isola**.
+   Tiene que quedar asignada: si queda como propuesta, la parada se borra en vez de cancelarse y no
+   sale el `CANCELADA` para Analítica. El simulador encuentra solo la ruta activa de FR123AN.
 
    Si dice `RUTA_SIN_CONTENEDORES`, los FRAN no están críticos o ya están en otra ruta.
 
@@ -150,7 +150,7 @@ Es el reclamo que creó agus. Con la API despierta llega en segundos.
 ### 3 · Escenario B: el auto no tapa nada (1 min 30 s)
 
 ```bash
-npm run reclamo -- --lejos --ruta <id>
+npm run reclamo -- --lejos
 ```
 
 El simulador hace de Reclamos: el mismo `ReclamoCreado`, con el auto a ~100 m de la próxima parada
@@ -168,7 +168,7 @@ calcular el porcentaje."
 ### 4 · Escenario C: no es un auto (1 min 30 s)
 
 ```bash
-npm run reclamo -- --bache --ruta <id>
+npm run reclamo -- --bache
 ```
 
 Un pozo en la bicisenda (`BACHES` + `CICLOVIA`), a ~5 m de la próxima parada.
@@ -224,7 +224,7 @@ agus pasa el reclamo a **`RESUELTO`** desde Reclamos.
 
 | Síntoma | Causa probable | Qué hacer |
 |---|---|---|
-| El reclamo de agus no cambia la ruta | La API estaba dormida, o el punto no tiene un contenedor a 15 m pendiente en la ruta | Esperar unos segundos y F5. Si no llega, plan B: `npm run reclamo -- --ruta <id>` |
+| El reclamo de agus no cambia la ruta | La API estaba dormida, o el punto no tiene un contenedor a 15 m pendiente en la ruta | Esperar unos segundos y F5. Si no llega, plan B: `npm run reclamo -- --contenedor FRAN-02` |
 | La parada se omite pero no aparece la alerta | La lista de Alertas no se refrescó | Pulsar **Refrescar** |
 | agus no puede resolverlo | Algo de su lado | `npm run reclamo:resuelto -- <reclamoId de agus>` |
 | `webhook … -> 401` | `WEBHOOK_TOKEN` no coincide con el de Render | Pedirle el vigente a Ramiro |
@@ -236,8 +236,9 @@ agus pasa el reclamo a **`RESUELTO`** desde Reclamos.
 | "La ruta no tiene paradas pendientes" | La ruta ya se usó en un ensayo | Armar una ruta nueva |
 | La ruta queda `COMPLETADA` después del reclamo | Tenía una sola parada | Armar una con dos o más |
 
-**Plan B, sin el bus:** el escenario A con el simulador, `npm run reclamo -- --ruta <id>`, guardando
-el id con `export TAPA=$(cat ultimo-reclamo.txt)`, y el D con `npm run reclamo:resuelto -- "$TAPA"`.
+**Plan B, sin el bus:** el escenario A con el simulador, `npm run reclamo -- --contenedor FRAN-02`
+(el mismo contenedor que tapa agus, así B y C no cambian), y el D con `npm run reclamo:resuelto`, que
+libera el último reclamo que tapó un contenedor: `--lejos` y `--bache` no lo pisan.
 Es el mismo `ReclamoCreado` del contrato de Reclamos, entrando por el webhook en vez de Kafka.
 
 **Plan C, sin Render:** el mismo guion en local, con el backend en `EVENT_BUS_DRIVER=inmemory` y
