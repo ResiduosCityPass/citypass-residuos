@@ -15,6 +15,9 @@ import { INTERVENCION_REPOSITORY, IntervencionRepository } from '../domain/inter
 /** Causa que Emergencias marca cuando el accidente se relaciono con residuos. */
 export const CAUSA_RESIDUOS = 'RESIDUOS';
 
+/** `causaTipo` de la IntervencionProgramada que nace de una emergencia (Analitica). */
+export const CAUSA_TIPO_EMERGENCIA = 'EMERGENCIA';
+
 export type ResultadoIntervencion = 'programada' | 'sin_causa_residuos' | 'duplicada' | 'ignorada';
 
 /**
@@ -94,6 +97,9 @@ export class IntervencionesService {
           contenedorId: intervencion.contenedorId,
           ubicacion: punto,
           programadaEn: ahora.toISOString(),
+          // Analitica arma el tablero por causaTipo (pedido del 16/11).
+          causaId: emergenciaId,
+          causaTipo: CAUSA_TIPO_EMERGENCIA,
         },
         { correlationId: emergenciaId },
       ),
