@@ -315,6 +315,50 @@ describe('Integracion CityPass+ (e2e)', () => {
 
       expect(await refuerzos()).toHaveLength(0);
     });
+
+    const eventoComunitario = (eventId: string, estado: string) =>
+      http
+        .post(webhook)
+        .send({
+          metadata: {
+            eventId,
+            eventType: 'com.citypass.espacios.EventoComunitarioPublicado',
+          },
+          data: {
+            eventoId: 'res-1',
+            titulo: 'Feria de barrio',
+            capacidad: 300,
+            cupoMaximo: 300,
+            latitud: PLAZA_ITALIA.lat,
+            longitud: PLAZA_ITALIA.lng,
+            inicio: new Date(fin - 4 * 3_600_000).toISOString(),
+            fin: new Date(fin).toISOString(),
+            estado,
+          },
+        })
+        .expect(204);
+
+    it('suspender retira la limpieza y reanudar la vuelve a agendar como reserva', async () => {
+      await zonaConContenedor();
+      await actividadCreada('ev-1');
+      expect(await refuerzos()).toHaveLength(1);
+
+      await eventoComunitario('ev-2', 'SUSPENDED');
+      expect(await refuerzos()).toHaveLength(0);
+
+      await eventoComunitario('ev-3', 'ACTIVE');
+      const ids = (await refuerzos()).map((r) => r.eventoId).sort();
+      expect(ids).toEqual(['res-1', 'res-res-1']);
+    });
+
+    it('si la suspension llega antes que la creacion, no se agenda la limpieza', async () => {
+      await zonaConContenedor();
+
+      await eventoComunitario('ev-1', 'SUSPENDED');
+      await actividadCreada('ev-2');
+
+      expect(await refuerzos()).toHaveLength(0);
+    });
   });
 
   it('una reentrega de un evento ya procesado no vuelve a bloquear la zona', async () => {

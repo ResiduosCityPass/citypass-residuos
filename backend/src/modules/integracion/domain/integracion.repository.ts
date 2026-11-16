@@ -20,6 +20,11 @@ export interface IntegracionRepository {
   /** Anota la cancelacion. Una segunda vez no cambia nada. */
   registrarCancelacion(actividadId: string): Promise<void>;
   estaCancelada(actividadId: string): Promise<boolean>;
+  /** Anota la suspension. Una segunda vez no cambia nada. */
+  registrarSuspension(actividadId: string): Promise<void>;
+  /** Saca la suspension. true si la actividad estaba suspendida. */
+  quitarSuspension(actividadId: string): Promise<boolean>;
+  estaSuspendida(actividadId: string): Promise<boolean>;
   /** Actividades que terminan despues de `desde`, ordenadas por hora de fin. */
   actividadesQueTerminanDespuesDe(desde: Date): Promise<ActividadMasiva[]>;
 }
