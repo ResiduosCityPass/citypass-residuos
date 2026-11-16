@@ -32,6 +32,7 @@ export function buildBaseUrl({
 }
 
 const BASE_URL = buildBaseUrl();
+export const sameOriginApiBase = () => new URL(BASE_URL, 'http://localhost').pathname.replace(/\/$/, '');
 const TOKEN_KEY = 'citypass.token';
 
 /**
@@ -233,14 +234,15 @@ function toText(message) {
 
 async function request(path, options = {}) {
   // `anonymous` no es parte de RequestInit: se saca antes de llegar a fetch.
-  const { anonymous = false, ...init } = options;
+  const { anonymous = false, sameOrigin = false, ...init } = options;
+  const url = `${sameOrigin ? sameOriginApiBase() : BASE_URL}${path}`;
   const driver = path === '/rutas/mias' || path.startsWith('/paradas/');
   const federated = federatedEnabled() && !anonymous && !driver;
   const token = anonymous ? '' : driver ? readDriverToken() : readToken();
 
   let response;
   try {
-    response = await fetch(`${BASE_URL}${path}`, {
+    response = await fetch(url, {
       ...init,
       headers: {
         'Content-Type': 'application/json',
@@ -263,7 +265,7 @@ async function request(path, options = {}) {
     const fresh = await renewAccessToken(token);
     if (fresh) {
       try {
-        response = await fetch(`${BASE_URL}${path}`, {
+        response = await fetch(url, {
           ...init, headers: { 'Content-Type': 'application/json', ...init.headers, Authorization: `Bearer ${fresh}` },
         });
       } catch { throw new ApiError({ code: 'SIN_CONEXION', status: 0, message: 'No se pudo contactar la API.' }); }
@@ -298,10 +300,17 @@ function query(filters = {}) {
 }
 
 export const api = {
-  get: (path, filters) => request(`${path}${query(filters)}`),
+  get: (path, filters, options) => request(`${path}${query(filters)}`, options),
   post: (path, body) => request(path, { method: 'POST', body: JSON.stringify(body ?? {}) }),
   patch: (path, body) => request(path, { method: 'PATCH', body: JSON.stringify(body ?? {}) }),
   delete: (path) => request(path, { method: 'DELETE' }),
+};
+
+/** El proxy de Analitica vive en el origen del front para usar cookies HttpOnly. */
+export const apiSameOrigin = {
+  post: (path, body, options) => request(path, {
+    ...options, sameOrigin: true, method: 'POST', body: JSON.stringify(body ?? {}),
+  }),
 };
 
 /**

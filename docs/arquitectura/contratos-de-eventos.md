@@ -178,8 +178,9 @@ hay un camión comprometido, y una propuesta se puede descartar.
 - `causaId` es el `actividadId` de `ActividadCreada`, y `correlationId` es `act-<actividadId>`.
 - `camionId` es la patente del camión de la ruta. `contenedorId` es el primer contenedor de la
   actividad que entra en la ruta.
-- En el caso de Emergencias, `causaId`, `causaTipo` y `camionId` van en `null`. `emergenciaId` va en
-  `null` en el squad 3.
+- En el caso de Emergencias, `causaTipo` es `EMERGENCIA` y `causaId` es el id de la emergencia (pedido
+  de Analítica el 16/11, porque su tablero se arma por `causaTipo`); `camionId` va en `null`.
+  `emergenciaId` y `correlationId` no cambian. En el squad 3, `emergenciaId` va en `null`.
 
 ### `residuos.intervencion.completada` — CU-01 de Emergencias (A7)
 
@@ -339,8 +340,13 @@ camionId distintos con estadoNuevo = AFECTADA y causaTipo = INCIDENTE_VIAL
 - **`intervencionId` es el id de la parada:** para Analítica, cada parada es una intervención. Con
   esa misma lectura, contar eventos da las paradas afectadas. No coincide con el `intervencionId` de
   `IntervencionProgramada`, que es uno por emergencia: esta métrica no los cruza.
-- **`causaId` y `causaTipo` son los de `EmergenciaCreada`:** si no vienen los dos, salen en `null` y
-  el evento no suma a la métrica, aunque la parada se omita igual.
+- **`causaId` y `causaTipo`:** si `EmergenciaCreada` trae `INCIDENTE_VIAL` o `EVENTO_CLIMATICO`, van
+  tal cual. Si no trae causa, salen `causaTipo = INCIDENTE_VIAL` y `causaId = emergenciaId`: la
+  emergencia que corta la circulación es el incidente vial. Movilidad no publica
+  `IncidenteVialCreado` y no lo va a publicar, así que sin esto la métrica quedaba en 0 (acordado
+  con Valen el 14/11, igual que el `reclamoId` de CU-INT-02). Con otra causa (por ejemplo
+  `EVENTO_PUBLICO` de una cobertura preventiva), salen en `null`: la parada se omite igual, pero no
+  suma a la métrica.
 - **`updatedAt` va en ISO-8601**, como pide el contrato de Analítica del 29/10, y no en milisegundos
   como `ReclamoEvaluado`.
 
@@ -505,7 +511,25 @@ Sin un id válido, el evento se ignora y queda en el log, sin responder `400`. U
 
 La cancelación queda anotada en `actividad_cancelada`. El bus no ordena eventos de tópicos distintos:
 si la cancelación llega antes que `ActividadCreada` o `EventoComunitarioPublicado`, esos avisos se
-ignoran y no se vuelve a agendar la limpieza.
+ignoran y no se vuelve a agendar la limpieza. `EventoComunitarioPublicado` con `estado` `CANCELLED`
+también cancela.
+
+**Suspensión (squad 6):** Espacios puede suspender un evento y reanudarlo después. Lo avisa con
+`EventoComunitarioPublicado` con el estado nuevo. Al suspender se retira la limpieza igual que al
+cancelar, pero queda anotada en `actividad_suspendida` y no en `actividad_cancelada`. Al reanudar
+(`ACTIVE` o `ACTIVE_FULL`), como Espacios no vuelve a mandar `ActividadCreada`, la limpieza se agenda
+otra vez con los datos de ese evento: mismo umbral de 100 personas, mismo prefijo `res-` o `act-` y
+la zona del mapa si es masivo.
+
+| Evento | Id | Condición |
+|---|---|---|
+| `com.citypass.espacios.EventoComunitarioPublicado` | `eventoId` | `estado` es `SUSPENDED`, `SUSPENDIDA` o `SUSPENDIDO` |
+| `com.citypass.espacios.ActividadModificada` | `actividadId` | `estadoNuevo` suspendido, con los mismos valores |
+| `com.citypass.espacios.ActividadCreada` | `actividadId` | `estado` suspendido, con los mismos valores |
+
+El catálogo (schemaId 48) todavía no lista el estado de suspendido. La web de Espacios usa
+`SUSPENDED`; se aceptan también las variantes en castellano. Si la suspensión llega antes que la creación, la limpieza no se agenda hasta que
+se reanude.
 
 ## Política de errores y reintentos
 

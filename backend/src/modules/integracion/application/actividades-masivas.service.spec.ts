@@ -39,6 +39,9 @@ describe('ActividadesMasivasService (squad 3)', () => {
       | 'borrarRefuerzo'
       | 'registrarCancelacion'
       | 'estaCancelada'
+      | 'registrarSuspension'
+      | 'quitarSuspension'
+      | 'estaSuspendida'
       | 'actividadesQueTerminanDespuesDe'
     >
   >;
@@ -54,6 +57,9 @@ describe('ActividadesMasivasService (squad 3)', () => {
       borrarRefuerzo: jest.fn().mockResolvedValue(undefined),
       registrarCancelacion: jest.fn().mockResolvedValue(undefined),
       estaCancelada: jest.fn().mockResolvedValue(false),
+      registrarSuspension: jest.fn().mockResolvedValue(undefined),
+      quitarSuspension: jest.fn().mockResolvedValue(false),
+      estaSuspendida: jest.fn().mockResolvedValue(false),
       actividadesQueTerminanDespuesDe: jest.fn().mockResolvedValue([]),
     };
     contenedores = { listar: jest.fn().mockResolvedValue([CERCA, LEJOS]) };
@@ -262,10 +268,164 @@ describe('ActividadesMasivasService (squad 3)', () => {
       expect(integracion.borrarActividad).not.toHaveBeenCalled();
     });
 
-    it('dice si una actividad esta cancelada', async () => {
-      integracion.estaCancelada.mockResolvedValue(true);
+    it.each([
+      ['cancelada', true, false],
+      ['suspendida', false, true],
+    ])('el refuerzo de CU-INT-01 no se agenda si la actividad esta %s', async (_c, can, sus) => {
+      integracion.estaCancelada.mockResolvedValue(can);
+      integracion.estaSuspendida.mockResolvedValue(sus);
 
-      await expect(service.estaCancelada('act-1')).resolves.toBe(true);
+      await expect(service.noSeAgenda('act-1')).resolves.toBe(true);
+    });
+
+    it('el refuerzo de CU-INT-01 se agenda si la actividad sigue en pie', async () => {
+      await expect(service.noSeAgenda('act-1')).resolves.toBe(false);
+    });
+  });
+
+  describe('suspension (squad 6): se retira la limpieza y al reanudar se vuelve a agendar', () => {
+    // EventoComunitarioPublicado tal como esta en el catalogo (schemaId 48).
+    const eventoComunitario = (cambios: Record<string, unknown> = {}) => ({
+      eventoId: 'act-1',
+      espacioId: 'esp-1',
+      titulo: 'Feria del barrio',
+      latitud: PLAZA_ITALIA.lat,
+      longitud: PLAZA_ITALIA.lng,
+      inicio: '2026-11-01T15:00:00.000Z',
+      fin: '2026-11-01T20:00:00.000Z',
+      capacidad: 300,
+      cupoMaximo: 300,
+      estado: 'ACTIVE',
+      ...cambios,
+    });
+
+    const retiroSinCancelar = (id: string) => {
+      expect(integracion.registrarSuspension).toHaveBeenCalledWith(id);
+      expect(integracion.registrarCancelacion).not.toHaveBeenCalled();
+      expect(integracion.borrarRefuerzo.mock.calls.flat()).toEqual([id, `act-${id}`, `res-${id}`]);
+      expect(integracion.borrarActividad).toHaveBeenCalledWith(id);
+    };
+
+    it.each(['SUSPENDED', 'SUSPENDIDA', 'suspendido'])(
+      'EventoComunitarioPublicado con estado %s suspende y corta ahi',
+      async (estado) => {
+        await expect(service.cambioDeEstado(eventoComunitario({ estado }))).resolves.toBe(true);
+
+        retiroSinCancelar('act-1');
+      },
+    );
+
+    it('EventoComunitarioPublicado con estado CANCELLED cancela y corta ahi', async () => {
+      await expect(
+        service.cambioDeEstado(eventoComunitario({ estado: 'CANCELLED' })),
+      ).resolves.toBe(true);
+
+      expect(integracion.registrarCancelacion).toHaveBeenCalledWith('act-1');
+    });
+
+    it('un EventoComunitarioPublicado activo de un evento no suspendido no cambia nada', async () => {
+      await expect(service.cambioDeEstado(eventoComunitario())).resolves.toBe(false);
+
+      expect(integracion.quitarSuspension).toHaveBeenCalledWith('act-1');
+      expect(integracion.guardarRefuerzo).not.toHaveBeenCalled();
+      expect(eventos.publish).not.toHaveBeenCalled();
+    });
+
+    it.each(['ACTIVE', 'ACTIVE_FULL'])(
+      'al reanudar (%s) vuelve a agendar la limpieza con el prefijo de reserva',
+      async (estado) => {
+        integracion.quitarSuspension.mockResolvedValue(true);
+
+        await expect(service.cambioDeEstado(eventoComunitario({ estado }))).resolves.toBe(false);
+
+        expect(integracion.guardarRefuerzo).toHaveBeenCalledWith(
+          expect.objectContaining({
+            eventoId: 'res-act-1',
+            contenedorIds: ['c-cerca'],
+            desde: new Date('2026-11-01T20:00:00.000Z'),
+          }),
+        );
+        expect(integracion.guardarActividad).not.toHaveBeenCalled();
+        expect(eventos.publish).toHaveBeenCalledWith(
+          expect.objectContaining({ eventType: EventTypes.REFUERZO_PROGRAMADO }),
+        );
+      },
+    );
+
+    it('al reanudar un evento masivo vuelve tambien la zona del mapa', async () => {
+      integracion.quitarSuspension.mockResolvedValue(true);
+
+      await service.cambioDeEstado(eventoComunitario({ capacidad: 1200, cupoMaximo: 1200 }));
+
+      expect(integracion.guardarActividad).toHaveBeenCalledWith(
+        expect.objectContaining({ actividadId: 'act-1', capacidad: 1200 }),
+      );
+      expect(integracion.guardarRefuerzo).toHaveBeenCalledWith(
+        expect.objectContaining({ eventoId: 'act-act-1' }),
+      );
+    });
+
+    it('si el evento reanudado solo trae cupoMaximo, usa ese valor', async () => {
+      integracion.quitarSuspension.mockResolvedValue(true);
+
+      await service.cambioDeEstado(eventoComunitario({ capacidad: undefined }));
+
+      expect(integracion.guardarRefuerzo).toHaveBeenCalledWith(
+        expect.objectContaining({ eventoId: 'res-act-1' }),
+      );
+    });
+
+    it('una ActividadCreada con estado suspendido suspende sin agendar', async () => {
+      await service.registrar(actividad({ estado: 'SUSPENDED' }));
+
+      retiroSinCancelar('act-1');
+      expect(integracion.guardarRefuerzo).not.toHaveBeenCalled();
+    });
+
+    it('si la suspension llego antes, la actividad no se agenda', async () => {
+      integracion.estaSuspendida.mockResolvedValue(true);
+
+      await service.registrar(actividad());
+
+      expect(integracion.estaSuspendida).toHaveBeenCalledWith('act-1');
+      expect(integracion.guardarActividad).not.toHaveBeenCalled();
+      expect(integracion.guardarRefuerzo).not.toHaveBeenCalled();
+    });
+
+    it('ActividadModificada con estadoNuevo suspendido suspende', async () => {
+      await service.modificar({ actividadId: 'act-1', estadoNuevo: 'SUSPENDED' });
+
+      retiroSinCancelar('act-1');
+    });
+
+    it.each([
+      ['sin id', {}],
+      ['con un id que no es texto', { eventoId: 42 }],
+    ])('una suspension %s se ignora sin error', async (_caso, data) => {
+      await expect(service.suspender(data)).resolves.toBeUndefined();
+
+      expect(integracion.registrarSuspension).not.toHaveBeenCalled();
+      expect(integracion.borrarRefuerzo).not.toHaveBeenCalled();
+    });
+
+    it.each(['PENDING', 'FINISHED', '', undefined])(
+      'con un estado que no es ACTIVE ni ACTIVE_FULL (%s) el evento sigue suspendido',
+      async (estado) => {
+        integracion.quitarSuspension.mockResolvedValue(true);
+
+        await expect(service.cambioDeEstado(eventoComunitario({ estado }))).resolves.toBe(false);
+
+        expect(integracion.quitarSuspension).not.toHaveBeenCalled();
+        expect(integracion.guardarRefuerzo).not.toHaveBeenCalled();
+      },
+    );
+
+    it('un evento reanudado sin id valido no consulta la suspension', async () => {
+      await expect(service.cambioDeEstado(eventoComunitario({ eventoId: '' }))).resolves.toBe(
+        false,
+      );
+
+      expect(integracion.quitarSuspension).not.toHaveBeenCalled();
     });
   });
 

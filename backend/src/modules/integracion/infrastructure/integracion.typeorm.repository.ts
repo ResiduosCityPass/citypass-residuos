@@ -3,6 +3,7 @@ import { DataSource, EntityManager, IsNull, LessThanOrEqual, MoreThan } from 'ty
 import { ContextoTransaccional } from '../../../shared/persistence/contexto-transaccional';
 import { ActividadCancelada } from '../domain/actividad-cancelada.entity';
 import { ActividadMasiva } from '../domain/actividad-masiva.entity';
+import { ActividadSuspendida } from '../domain/actividad-suspendida.entity';
 import { BloqueoPorIncidente } from '../domain/bloqueo-por-incidente.entity';
 import {
   IntegracionRepository,
@@ -81,6 +82,28 @@ export class IntegracionTypeormRepository
 
   async estaCancelada(actividadId: string): Promise<boolean> {
     const filas = await this.manager().getRepository(ActividadCancelada).countBy({ actividadId });
+    return filas > 0;
+  }
+
+  async registrarSuspension(actividadId: string): Promise<void> {
+    await this.manager()
+      .getRepository(ActividadSuspendida)
+      .createQueryBuilder()
+      .insert()
+      .values({ actividadId })
+      .orIgnore()
+      .execute();
+  }
+
+  async quitarSuspension(actividadId: string): Promise<boolean> {
+    const resultado = await this.manager()
+      .getRepository(ActividadSuspendida)
+      .delete({ actividadId });
+    return (resultado.affected ?? 0) > 0;
+  }
+
+  async estaSuspendida(actividadId: string): Promise<boolean> {
+    const filas = await this.manager().getRepository(ActividadSuspendida).countBy({ actividadId });
     return filas > 0;
   }
 

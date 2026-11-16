@@ -55,7 +55,10 @@ describe('IntegracionService (CU-INT-01)', () => {
   let bloqueos: BloqueoPorIncidente[];
   let zonasGuardadas: Map<string, Zona>;
   let actividades: jest.Mocked<
-    Pick<ActividadesMasivasService, 'registrar' | 'cancelar' | 'modificar' | 'estaCancelada'>
+    Pick<
+      ActividadesMasivasService,
+      'registrar' | 'cancelar' | 'modificar' | 'cambioDeEstado' | 'noSeAgenda'
+    >
   >;
 
   const bloqueada = (zonaId: string) => zonasGuardadas.get(zonaId)?.bloqueada;
@@ -80,13 +83,17 @@ describe('IntegracionService (CU-INT-01)', () => {
       borrarActividad: jest.fn(),
       registrarCancelacion: jest.fn(),
       estaCancelada: jest.fn(),
+      registrarSuspension: jest.fn(),
+      quitarSuspension: jest.fn(),
+      estaSuspendida: jest.fn(),
       actividadesQueTerminanDespuesDe: jest.fn(),
     };
     actividades = {
       registrar: jest.fn(),
       cancelar: jest.fn(),
       modificar: jest.fn(),
-      estaCancelada: jest.fn().mockResolvedValue(false),
+      cambioDeEstado: jest.fn().mockResolvedValue(false),
+      noSeAgenda: jest.fn().mockResolvedValue(false),
     };
     contenedores = { listar: jest.fn().mockResolvedValue([CERCA, LEJOS]) };
     // ZonasService real sobre un repositorio en memoria, con estado como la base:
@@ -156,13 +163,27 @@ describe('IntegracionService (CU-INT-01)', () => {
       expect(eventos.getPublished(EventTypes.REFUERZO_PROGRAMADO)).toHaveLength(0);
     });
 
-    it('si el evento ya se cancelo, no se programa el refuerzo', async () => {
-      actividades.estaCancelada.mockResolvedValue(true);
+    it('si el evento ya se cancelo o se suspendio, no se programa el refuerzo', async () => {
+      actividades.noSeAgenda.mockResolvedValue(true);
 
       await service.procesar(eventoCultural());
 
-      expect(actividades.estaCancelada).toHaveBeenCalledWith('evt-1');
+      expect(actividades.noSeAgenda).toHaveBeenCalledWith('evt-1');
       expect(integracion.guardarRefuerzo).not.toHaveBeenCalled();
+    });
+
+    it('si viene suspendido o cancelado, lo resuelve ActividadesMasivasService y no programa nada', async () => {
+      actividades.cambioDeEstado.mockResolvedValue(true);
+
+      await expect(service.procesar(eventoCultural({ estado: 'SUSPENDED' }))).resolves.toBe(
+        'procesado',
+      );
+
+      expect(actividades.cambioDeEstado).toHaveBeenCalledWith(
+        expect.objectContaining({ eventoId: 'evt-1', estado: 'SUSPENDED' }),
+      );
+      expect(integracion.guardarRefuerzo).not.toHaveBeenCalled();
+      expect(eventos.getPublished(EventTypes.REFUERZO_PROGRAMADO)).toHaveLength(0);
     });
   });
 
@@ -171,6 +192,16 @@ describe('IntegracionService (CU-INT-01)', () => {
 
     await expect(
       service.procesar(sobre('com.citypass.espacios.ActividadCreada', data)),
+    ).resolves.toBe('procesado');
+
+    expect(actividades.registrar).toHaveBeenCalledWith(data);
+  });
+
+  it('una ActividadCreada con la version en el tipo (.v3) tambien se maneja', async () => {
+    const data = { actividadId: 'act-1', capacidad: 5000, organizadorTipo: 'CIUDAD' };
+
+    await expect(
+      service.procesar(sobre('com.citypass.espacios.ActividadCreada.v3', data)),
     ).resolves.toBe('procesado');
 
     expect(actividades.registrar).toHaveBeenCalledWith(data);
@@ -263,12 +294,22 @@ describe('IntegracionService (CU-INT-01)', () => {
         );
       });
 
-      it('sin causa completa la manda en null: el contrato pide los dos campos juntos', async () => {
+      it('sin causa, la emergencia es el incidente vial: causaId = emergenciaId (Valen, 14/11)', async () => {
+        await conRutas().procesar(incidente({ causaId: null, causaTipo: null }));
+
+        expect(paradas.quitarContenedores.mock.calls[0][3]).toEqual({
+          causaId: 'em-1',
+          causaTipo: 'INCIDENTE_VIAL',
+          correlationId: 'em-1',
+        });
+      });
+
+      it('con la causa incompleta tambien: el contrato pide los dos campos juntos', async () => {
         await conRutas().procesar(incidente({ causaTipo: 'INCIDENTE_VIAL' }));
 
         expect(paradas.quitarContenedores.mock.calls[0][3]).toEqual({
-          causaId: null,
-          causaTipo: null,
+          causaId: 'em-1',
+          causaTipo: 'INCIDENTE_VIAL',
           correlationId: 'em-1',
         });
       });
