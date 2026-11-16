@@ -55,6 +55,7 @@ solo sirvió para ver el orden en que hay que armar la prueba.
 | Paradas | Las dos quedaron `OMITIDA` a las 19:50:55, con el motivo "Zona bloqueada por la emergencia 9f7698fd-…" |
 | Ruta | Pasó a `COMPLETADA`: al omitir la última parada pendiente, la ruta se cierra y libera el camión |
 | EDA | Llegaron dos `IntervencionActualizada`, uno por parada, a las 19:51:00 |
+| Cierre | Emergencias la llevó a `RESUELTA` y después a `CERRADA` (20:39). La zona DEMO-WEB02 Centro volvió a habilitada |
 
 ### Publicaciones comprobadas en EDA
 
@@ -111,9 +112,6 @@ llegaba después del cierre, la zona quedaba bloqueada para siempre. Se corrigi�
 
 ## Pendiente
 
-- **Cierre del 16/11:** al escribir esto, Emergencias todavía no había llevado `9f7698fd-…` a
-  `RESUELTA`, así que falta verificar que se libere la zona DEMO-WEB02 Centro. El desbloqueo ya se
-  vio el 13/11.
 - **Tablero de Analítica:** los eventos llegan a EDA con el formato acordado, pero el tablero que
   Analítica entrega embebido todavía no muestra la métrica. Su frontend no carga las métricas por
   caso en modo embebido (`useDashboardImpact.ts` devuelve `null`), y su backend arma las de Residuos
