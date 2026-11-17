@@ -326,10 +326,10 @@ se recalcula. En una ruta `PROPUESTA` la parada se borra sin publicar nada: el c
 emergencia con `causaTipo = INCIDENTE_VIAL` cuenta como corte de circulación. Un `false` explícito
 se respeta siempre, y con otra causa en `null` no se bloquea nada.
 
-**Pendiente con Emergencias (17/11): coberturas preventivas.** Sus emergencias con
-`categoria = PREVENTIVA` salen con `afectaCirculacion: true` al programarse, y hoy eso bloquea la
-zona desde ese momento aunque no haya ningún incidente. Juani (Emergencias) pidió no bloquear con
-`PREVENTIVA`; si ellos la sacan de `afectaCirculacion`, no hay que cambiar nada de nuestro lado.
+**Una cobertura `PREVENTIVA` nunca bloquea** (#125, pedido de Juani, de Emergencias, el 17/11).
+Emergencias las manda con `afectaCirculacion: true` desde que se programan, aunque no haya pasado
+nada; bloquear la zona desde ese momento sacaría contenedores del ruteo sin motivo. Si Emergencias
+deja de mandarlas en `true`, no cambia nada.
 
 **Coordenadas aproximadas.** Emergencias redondea las coordenadas a 3 decimales (hasta ~72 m de
 error), por su ADR de coordenadas aproximadas. Afecta sobre todo al radio de la intervención de A7.

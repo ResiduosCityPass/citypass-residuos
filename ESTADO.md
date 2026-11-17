@@ -729,9 +729,8 @@ que dejen los ensayos.
 - **El login del Squad 2 llega en el Sprint 3.** Hasta entonces los tokens se generan a mano y
   duran 8 horas. Cuando exista el login real cambia de dónde sale el token, pero el header
   `Authorization: Bearer <jwt>` no cambia.
-- **El bloqueo automático de zonas** por emergencias ya está hecho (CU-INT-01). Queda pendiente con
-  Emergencias que sus coberturas `PREVENTIVA` no salgan con `afectaCirculacion: true`, porque hoy
-  bloquean la zona sin que haya un incidente.
+- **El bloqueo automático de zonas** por emergencias ya está hecho (CU-INT-01). Las coberturas
+  `PREVENTIVA` no bloquean (#125), aunque Emergencias las mande con `afectaCirculacion: true`.
 
 ## 6. Recortes deliberados — esto NO es deuda
 
