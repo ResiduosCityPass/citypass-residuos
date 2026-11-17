@@ -14,6 +14,7 @@ import {
   deleteZone,
 } from '../api/waste.js';
 import { generalMessage } from '../domain/errors.js';
+import { useNeighborhoods } from '../hooks/useNeighborhoods.js';
 
 /**
  * CU-02 · Zonas y umbrales.
@@ -24,6 +25,7 @@ import { generalMessage } from '../domain/errors.js';
  * los controla. Cambiar un umbral aca cambia cuando se pone rojo medio barrio.
  */
 export default function ZonesPage() {
+  const neighborhoods = useNeighborhoods();
   const [zones, setZones] = useState([]);
   const [containers, setContainers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -82,6 +84,9 @@ export default function ZonesPage() {
 
   const columns = [
     { key: 'nombre', title: 'Zona', render: (z) => <strong>{z.nombre}</strong> },
+    { key: 'barrios', title: 'Barrios vinculados', render: (z) => z.barrioIds?.length
+      ? z.barrioIds.map((id) => neighborhoods.catalog?.find((b) => b.id === id)?.nombre ?? id).join(', ')
+      : <span className="muted">Sin vincular</span> },
     {
       key: 'umbral',
       title: 'Umbral de llenado',
@@ -136,7 +141,7 @@ export default function ZonesPage() {
       <Notice type="info" title="Qué define una zona">
         El umbral de llenado decide a partir de qué porcentaje un contenedor pasa a CRÍTICO. El de
         temperatura dispara las alertas de incendio, sin importar cuán lleno esté. Una zona
-        bloqueada queda excluida del ruteo. Las restricciones por evento climático se gestionan desde Eventos climáticos y se conservan al quitar un bloqueo manual.
+        bloqueada queda excluida del ruteo. Vinculá los barrios de cada zona para sugerir su selección al recibir una alerta climática; la suspensión siempre requiere confirmación. Las restricciones por evento climático se gestionan desde Eventos climáticos y se conservan al quitar un bloqueo manual.
       </Notice>
 
       <div className="filter-bar">
@@ -158,6 +163,7 @@ export default function ZonesPage() {
 
       {dialog?.type === 'create' && (
         <ZoneFormModal
+          neighborhoods={neighborhoods}
           onClose={closeDialog}
           onSave={async (data) => {
             const created = await createZone(data);
@@ -168,6 +174,7 @@ export default function ZonesPage() {
 
       {dialog?.type === 'edit' && (
         <ZoneFormModal
+          neighborhoods={neighborhoods}
           zone={dialog.zone}
           onClose={closeDialog}
           onSave={async (changes) => {

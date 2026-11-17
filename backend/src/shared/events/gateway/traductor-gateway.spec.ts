@@ -213,6 +213,22 @@ describe('traducirAGateway (CU-INT-01)', () => {
     });
   });
 
+  it('la parada cancelada por un reclamo lleva el barrio; sin barrio sale en null', () => {
+    const cancelada = (barrio: string | null) =>
+      traducirAGateway(
+        buildEvent(EventTypes.INTERVENCION_ACTUALIZADA, {
+          intervencionId: 'pa-2',
+          estadoNuevo: 'CANCELADA',
+          causaId: 'RC-1',
+          causaTipo: 'INCIDENTE_VIAL',
+          barrio,
+        }),
+      )?.datos;
+
+    expect(cancelada('Palermo')).toMatchObject({ causaId: 'RC-1', barrio: 'Palermo' });
+    expect(cancelada(null)).toMatchObject({ barrio: null });
+  });
+
   it('los eventos sin consumidores fuera del modulo no salen', () => {
     expect(traducirAGateway(buildEvent(EventTypes.RUTA_GENERADA, { rutaId: 'rt-1' }))).toBeNull();
     expect(

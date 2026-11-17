@@ -65,8 +65,18 @@ const OBJETO_CICLOVIA = 'ciclovia';
 const MENCIONA_UN_VEHICULO =
   /\b(autos?|coches?|carros?|vehiculos?|estacionad[oa]s?|camionetas?|camion(es)?|utilitarios?|taxis?|remises?|motos?|ciclovias?|bicisendas?)\b/;
 
+/** Un barrio mas largo no es un barrio: se descarta, no rompe nada. */
+const LARGO_MAXIMO_BARRIO = 100;
+
 export type ReclamoInterpretado =
-  | { tipo: 'creado'; reclamoId: string; ubicacion: Punto; correlationId: string | null }
+  | {
+      tipo: 'creado';
+      reclamoId: string;
+      ubicacion: Punto;
+      correlationId: string | null;
+      /** El de Reclamos. Analitica cuenta por barrio las paradas que cancela un reclamo. */
+      barrio: string | null;
+    }
   | { tipo: 'resuelto'; reclamoId: string };
 
 /**
@@ -111,7 +121,13 @@ function creado(reclamoId: string, data: Record<string, unknown>): ReclamoInterp
   const ubicacion = ubicacionDe(data);
 
   return ubicacion
-    ? { tipo: 'creado', reclamoId, ubicacion, correlationId: correlationDe(data) }
+    ? {
+        tipo: 'creado',
+        reclamoId,
+        ubicacion,
+        correlationId: correlationDe(data),
+        barrio: textoAcotado(data.barrio, LARGO_MAXIMO_BARRIO),
+      }
     : null;
 }
 
@@ -142,9 +158,14 @@ function reclasificado(
 }
 
 function correlationDe(data: Record<string, unknown>): string | null {
-  const valor = typeof data.correlationId === 'string' ? data.correlationId.trim() : '';
+  return textoAcotado(data.correlationId, LARGO_MAXIMO_CORRELATION_ID);
+}
 
-  return valor.length > 0 && valor.length <= LARGO_MAXIMO_CORRELATION_ID ? valor : null;
+/** El texto sin espacios de mas, o null si no hay o es demasiado largo. */
+function textoAcotado(valor: unknown, largoMaximo: number): string | null {
+  const texto = typeof valor === 'string' ? valor.trim() : '';
+
+  return texto.length > 0 && texto.length <= largoMaximo ? texto : null;
 }
 
 /**

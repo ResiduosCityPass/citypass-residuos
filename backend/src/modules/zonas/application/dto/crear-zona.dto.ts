@@ -1,11 +1,35 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsInt, IsString, Length, Max, Min } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  ArrayMaxSize,
+  ArrayUnique,
+  IsArray,
+  IsIn,
+  IsInt,
+  IsString,
+  Length,
+  Max,
+  Min,
+  ValidateIf,
+} from 'class-validator';
+import { BARRIO_IDS } from '../../domain/barrios-caba';
 
 export class CrearZonaDto {
   @ApiProperty({ example: 'Centro', description: 'Nombre del barrio o zona' })
   @IsString()
   @Length(2, 80)
   nombre!: string;
+
+  @ApiPropertyOptional({
+    type: [String],
+    enum: BARRIO_IDS,
+    description: 'Códigos del catálogo GET /barrios. Vacío permite revisión manual.',
+  })
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsArray()
+  @ArrayMaxSize(BARRIO_IDS.length)
+  @ArrayUnique()
+  @IsIn(BARRIO_IDS, { each: true })
+  barrioIds?: string[];
 
   @ApiProperty({
     example: 70,

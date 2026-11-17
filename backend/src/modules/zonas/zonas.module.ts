@@ -6,11 +6,12 @@ import { Zona } from './domain/zona.entity';
 import { ZONA_REPOSITORY } from './domain/zona.repository';
 import { ZonaTypeormRepository } from './infrastructure/zona.typeorm.repository';
 import { ZonasController } from './zonas.controller';
+import { BarriosController } from './barrios.controller';
 import { ContingenciasModule } from '../contingencias/contingencias.module';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Zona, Contenedor]), ContingenciasModule],
-  controllers: [ZonasController],
+  controllers: [ZonasController, BarriosController],
   providers: [ZonasService, { provide: ZONA_REPOSITORY, useClass: ZonaTypeormRepository }],
   exports: [ZonasService],
 })

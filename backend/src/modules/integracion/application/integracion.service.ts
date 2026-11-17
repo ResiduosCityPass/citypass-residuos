@@ -382,9 +382,18 @@ function texto(data: Record<string, unknown>, campo: string): string {
  * Una emergencia que Emergencias abre desde un reclamo es el mismo auto que ya
  * resuelve CU-INT-02 sacando los contenedores a 15 m. Bloquear la zona y las
  * paradas a 300 m seria reaccionar dos veces, y de mas (Fran, 05/11).
+ *
+ * Una cobertura `PREVENTIVA` (ambulancias en un recital, por ejemplo) sale con
+ * `afectaCirculacion: true` desde que se programa, aunque todavia no haya pasado
+ * nada. Bloquear la zona desde ese momento saca contenedores del ruteo sin
+ * motivo, asi que no cuenta como corte (pedido de Emergencias, 17/11).
  */
+function esPreventiva(categoria: unknown): boolean {
+  return typeof categoria === 'string' && categoria.trim().toUpperCase() === 'PREVENTIVA';
+}
+
 function afectaLaCirculacion(data: Record<string, unknown>): boolean {
-  if (data.causaTipo === 'RECLAMO') {
+  if (data.causaTipo === 'RECLAMO' || esPreventiva(data.categoria)) {
     return false;
   }
 

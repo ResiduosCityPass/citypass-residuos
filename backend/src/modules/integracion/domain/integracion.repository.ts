@@ -44,6 +44,12 @@ export interface ObstruccionRepository {
 
   /** Ids de los contenedores con una obstruccion sin resolver y sin vencer en ese momento. */
   contenedoresObstruidos(momento: Date): Promise<string[]>;
+
+  /**
+   * Reclamos distintos que Residuos evaluo (publico ReclamoEvaluado) desde ese
+   * momento, o desde siempre, y cuantos de ellos tapaban algun contenedor.
+   */
+  resumenEvaluaciones(desde: Date | null): Promise<{ evaluados: number; afectan: number }>;
 }
 
 export const INTEGRACION_REPOSITORY = Symbol('INTEGRACION_REPOSITORY');

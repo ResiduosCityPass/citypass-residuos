@@ -374,6 +374,16 @@ describe('IntegracionService (CU-INT-01)', () => {
           expect(bloqueada('z-palermo')).toBe(false);
         });
 
+        it.each(['PREVENTIVA', 'preventiva'])(
+          'una cobertura %s no bloquea aunque venga en true',
+          async (categoria) => {
+            await conRutas().procesar(incidente({ afectaCirculacion: true, categoria }));
+
+            expect(paradas.quitarContenedores).not.toHaveBeenCalled();
+            expect(bloqueada('z-palermo')).toBe(false);
+          },
+        );
+
         it('un false explicito gana aunque sea un incidente vial', async () => {
           await conRutas().procesar(
             incidente({ afectaCirculacion: false, causaId: 'in-1', causaTipo: 'INCIDENTE_VIAL' }),

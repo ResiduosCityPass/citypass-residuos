@@ -75,7 +75,12 @@ export class ReclamosService {
       // Si no tapaba nada, o ya habia vencido, no hay nada que destapar: no es un error.
       await this.obstrucciones.resolverReclamo(reclamo.reclamoId, new Date());
     } else {
-      await this.evaluar(reclamo.reclamoId, reclamo.ubicacion, reclamo.correlationId);
+      await this.evaluar(
+        reclamo.reclamoId,
+        reclamo.ubicacion,
+        reclamo.correlationId,
+        reclamo.barrio,
+      );
     }
 
     // ponytail: un bloqueo que vence a las 4 h cierra su alerta recien con el
@@ -86,10 +91,26 @@ export class ReclamosService {
     return true;
   }
 
+  /**
+   * Nuestra metrica de CU-INT-02: de los reclamos de autos que evaluamos, que
+   * porcentaje nos tapo un contenedor. Los que se ignoran (un pozo) no cuentan.
+   */
+  async metrica(desde: Date | null) {
+    const { evaluados, afectan } = await this.obstrucciones.resumenEvaluaciones(desde);
+
+    return {
+      desde: desde?.toISOString() ?? null,
+      evaluados,
+      afectan,
+      porcentaje: evaluados === 0 ? null : Math.round((afectan / evaluados) * 1000) / 10,
+    };
+  }
+
   private async evaluar(
     reclamoId: string,
     auto: Punto,
     correlationId: string | null,
+    barrio: string | null,
   ): Promise<void> {
     const ahora = new Date();
     const venceEn = new Date(ahora.getTime() + this.vigenciaMs);
@@ -124,6 +145,7 @@ export class ReclamosService {
               causaTipo: CAUSA_TIPO_RECLAMO,
               correlationId: correlationId ?? reclamoId,
               estadoNuevo: 'CANCELADA',
+              barrio,
             },
           )
         : [];

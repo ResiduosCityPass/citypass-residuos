@@ -230,8 +230,9 @@ que consume CU-05 es idéntica; el polígono es presentación, no dominio.
 - **No se puede borrar una zona con contenedores.** El botón se deshabilita con el conteo en el
   tooltip, en vez de dejar que el usuario descubra el límite chocándose contra un `409`.
 - **El valor del bloqueo va como query param**, no en el cuerpo. Una zona bloqueada queda excluida
-  del ruteo de CU-08. Hoy se bloquea a mano; desde el Sprint 4 lo va a disparar un incidente del
-  módulo de Emergencias.
+  del ruteo de CU-08. Se bloquea a mano y también sola, cuando llega una `EmergenciaCreada` que corta
+  la circulación (CU-INT-01). El bloqueo manual se guarda aparte y no se pierde cuando termina la
+  emergencia.
 
 ---
 
@@ -257,8 +258,8 @@ no se ven. Comparten pantalla porque comparten ciclo de vida.
 - **`EN_ATENCION` sigue sin resolver.** Cuenta igual que `ABIERTA` (`ESTADOS_SIN_RESOLVER`): no se
   genera otra alerta mientras haya una en atención, el vaciado de CU-10 también la cierra, y el
   halo de incendio del mapa no se apaga por atenderla. Hasta el 21/09 no era así: atender un
-  incendio con el contenedor todavía caliente creaba otra alerta y le mandaba a Emergencias un
-  segundo evento del mismo fuego.
+  incendio con el contenedor todavía caliente creaba otra alerta y publicaba una
+  segunda `AlertaGenerada` del mismo fuego.
 - **El incendio no depende del llenado.** Se evalúa solo la temperatura contra el umbral de la
   zona, así que un contenedor al 5% —verde en el mapa— puede tener una alerta `CRITICA` abierta.
   Por eso los incendios sin resolver van en un **bloque rojo aparte, arriba de la lista**.
@@ -528,8 +529,8 @@ en la calzada).
 [`InterventionsPage.jsx`](frontend/src/pages/InterventionsPage.jsx) ·
 [`simulator/emergencia.js`](simulator/emergencia.js)
 
-**Entra por:** el webhook de siempre, `POST /webhooks/citypass`, en el mismo `case` que el fin de
-una emergencia (`EmergenciaActualizada`/`EmergenciaResuelta`). **Consume:** `GET /intervenciones`.
+**Entra por:** el lector de Kafka (y el webhook `POST /webhooks/citypass` como respaldo), en el mismo
+`case` que el fin de una emergencia: `EmergenciaActualizada` con `estadoNuevo` `RESUELTA` o `CERRADA`. **Consume:** `GET /intervenciones`.
 
 **Reglas:**
 
@@ -538,8 +539,11 @@ una emergencia (`EmergenciaActualizada`/`EmergenciaResuelta`). **Consume:** `GET
 - **Una intervención por emergencia**, garantizado por un índice único en `emergenciaId`. Alcanza
   para el caso en que el aviso llegue por dos eventos distintos: la deduplicación por `eventId`
   solo frena el mismo evento reenviado.
-- **Radio de 50 m**, no los 300 de las zonas: si la causa es un contenedor en la ciclovía está a
-  pocos metros, y a 300 m agarraría uno que no tiene nada que ver. No se filtran los
+- **Radio de 50 m por defecto** (`INTEGRACION_RADIO_INTERVENCION_METROS`), no los 300 de las zonas.
+  Emergencias redondea las coordenadas a 3 decimales (hasta ~72 m de error), así que el 17/11 se
+  propuso subirlo a 120 m en Render, sin tocar código. Siempre se queda con el más cercano, que con ese
+  error puede no ser el correcto. No se usan los 300 m porque, si la causa es un contenedor en la
+  ciclovía, está a pocos metros, y a 300 m agarraría uno que no tiene nada que ver. No se filtran los
   `FUERA_DE_SERVICIO`: uno roto en la ciclovía puede ser justamente la causa.
 - **Sin contenedor cerca la intervención se programa igual**, con `contenedorId: null`.
 - **Con contenedor cerca se crea un refuerzo**, para que la próxima ruta pase por ahí aunque no
@@ -548,11 +552,11 @@ una emergencia (`EmergenciaActualizada`/`EmergenciaResuelta`). **Consume:** `GET
 - **El operador la cierra con `PATCH /intervenciones/:id/completar`** (botón "Marcar completada"), y se publica `residuos.intervencion.completada`, que el CU-01 lista como evento de Residuos. No se reabre (`409 INTERVENCION_YA_COMPLETADA`).
 - **Las tarjetas de la pantalla** son el dashboard del módulo que pide el caso (intervenciones, con refuerzo, sin contenedor cerca, completadas). Salen de la misma lista, sin un segundo endpoint. Los "motivos" que muestra el prototipo no existen: ningún evento los trae.
 - **Un evento sin ubicación o mal formado se ignora y se loguea**, no se responde 400.
-- **Pendiente de confirmar con Emergencias.** Su backend publica `EmergenciaEstadoActualizado` y
-  `EmergenciaCerrada`, y **ninguno trae `causasRelacionadas` ni `ubicacion`**: hasta que lo agreguen,
-  la intervención no se puede disparar con sus eventos reales (sí con el simulador). Se aceptan
-  todas las variantes de nombre, del campo del estado y de las coordenadas. El prototipo del caso
-  mostraba otro evento, `emergencia.solicitud.residuos`; la versión del 29/10 del CU-01 lo descartó y define `emergencia.resuelta`, que también se acepta.
+- **Con los eventos reales de Emergencias.** Según el catálogo de EDA (17/11), Emergencias publica
+  `EmergenciaCreada` y `EmergenciaActualizada`, que ya trae `causasRelacionadas`, `latitud` y
+  `longitud`. Los nombres viejos (`EmergenciaEstadoActualizado`, `EmergenciaCerrada`,
+  `emergencia.resuelta`) y las variantes del campo del estado y de las coordenadas se siguen
+  aceptando, pero ya no están en el catálogo.
 - **Para que el evento saliente llegue a EDA**, Residuos tiene que registrar `IntervencionProgramada`
   en la consola de EDA, con su esquema Avro (`docs/arquitectura/schemas/`); si no, el gateway
   responde 404 y queda `FALLIDO` en el outbox. La suscripción al evento de resolución de Emergencias
@@ -725,8 +729,8 @@ que dejen los ensayos.
 - **El login del Squad 2 llega en el Sprint 3.** Hasta entonces los tokens se generan a mano y
   duran 8 horas. Cuando exista el login real cambia de dónde sale el token, pero el header
   `Authorization: Bearer <jwt>` no cambia.
-- **El bloqueo automático de zonas** cuando llega un incidente del módulo de Emergencias es del
-  Sprint 4. Hoy se bloquea a mano.
+- **El bloqueo automático de zonas** por emergencias ya está hecho (CU-INT-01). Las coberturas
+  `PREVENTIVA` no bloquean (#125), aunque Emergencias las mande con `afectaCirculacion: true`.
 
 ## 6. Recortes deliberados — esto NO es deuda
 

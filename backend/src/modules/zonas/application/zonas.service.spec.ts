@@ -68,6 +68,24 @@ describe('ZonasService', () => {
   });
 
   describe('actualizar', () => {
+    it('conserva los barrios al cambiar umbrales y permite desvincularlos sin levantar un bloqueo', async () => {
+      const existing = zonaDe({
+        barrioIds: ['AR-CABA-PALERMO'],
+        bloqueada: true,
+        bloqueoManual: true,
+      });
+      repo.buscarPorId.mockResolvedValue(existing);
+      repo.guardar.mockImplementation(async (z) => z);
+      const first = await service.actualizar('z-1', { umbralCriticoPct: 80 });
+      expect(first.barrioIds).toEqual(['AR-CABA-PALERMO']);
+      const second = await service.actualizar('z-1', { barrioIds: [] });
+      expect(second).toMatchObject({
+        barrioIds: [],
+        bloqueada: true,
+        bloqueoManual: true,
+        umbralCriticoPct: 80,
+      });
+    });
     it('aplica los cambios sobre la zona existente', async () => {
       repo.buscarPorId.mockResolvedValue(zonaDe());
       repo.guardar.mockImplementation(async (z) => z);

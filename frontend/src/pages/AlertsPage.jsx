@@ -77,11 +77,12 @@ export default function AlertsPage({ onAlertsChanged }) {
 
   return (
     <div className="screen">
+      <p><a href="#alertas-contenedores">Ir a las alertas de contenedores</a></p>
       <section aria-label="Alertas climáticas">
         <h2>Alertas climáticas de Espacios Públicos</h2>
         <ClimateEventsPage embedded onAlertsChanged={onAlertsChanged} />
       </section>
-      <div className="filter-bar">
+      <div className="filter-bar" id="alertas-contenedores" tabIndex={-1}>
         <select value={filters.tipo} onChange={changeFilter('tipo')} aria-label="Filtrar por tipo">
           <option value="">Todo tipo de alerta</option>
           {Object.entries(ALERT_TYPE_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}

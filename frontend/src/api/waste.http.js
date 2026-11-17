@@ -77,6 +77,7 @@ export const setContainerOutOfService = (id, out) =>
 /* --- CU-02 · Zonas ------------------------------------------------------ */
 
 export const fetchZones = () => api.get('/zonas');
+export const fetchNeighborhoods = () => api.get('/barrios');
 export const createZone = (data) => api.post('/zonas', data);
 export const updateZone = (id, changes) => api.patch(`/zonas/${id}`, changes);
 

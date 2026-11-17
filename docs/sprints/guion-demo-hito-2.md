@@ -4,8 +4,20 @@
 > Espacios publica `ActividadCreada` y cada módulo reacciona. Residuos manda una escuadrilla a
 > limpiar los contenedores de la zona cuando termina el evento.
 
-**Duración objetivo: unos 4 minutos** (ajustar cuando el squad reparta los tiempos).
-Se ensaya entera al menos una vez el día anterior.
+**Duración objetivo: unos 7 minutos**, con PPT y demo intercalados. La espera hasta que termina
+el evento se aprovecha con el PPT. Se ensaya entera al menos una vez el día anterior.
+
+| Tiempo | Qué | Contenido |
+|---|---|---|
+| 0:00 – 1:00 | PPT | Intro: el caso, quién publica y quién reacciona |
+| 1:00 – 2:30 | Demo | Pasos 1 y 2: llega la actividad y aparece la zona en el mapa |
+| 2:30 – 4:30 | PPT | Mientras termina el evento: el bus (`ActividadCreada` v3 e `IntervencionProgramada`), el login con LDAP y la métrica de Analítica |
+| 4:30 – 6:30 | Demo | Pasos 3 y 4: la ruta de la escuadrilla y el chofer la cierra |
+| 6:30 – 7:00 | PPT | Cierre |
+
+La métrica de Analítica ("cuadrillas planificadas para las inmediaciones del evento") se muestra
+con una captura del ensayo: su tablero se actualiza cada unas 6 horas, así que la intervención de
+la demo no aparece en vivo.
 
 ---
 
@@ -24,9 +36,15 @@ no sabe que existimos; solo publica que se creó una actividad.
 
 ### El día anterior
 
-- [ ] El #57 está en `main` y desplegado en Render (Render despliega `main`).
-- [ ] La suscripción al bus está activa: `npm run bus -- listar` la muestra.
-- [ ] Hay un camión y un chofer de prueba con ruta vacía.
+- [ ] El #107 (mapa) y el #108 (`ActividadCreada` v3) están en `main` y desplegados en Render
+      (Render despliega `main`). Están desde el 16/11.
+- [ ] Las suscripciones al bus están activas: `npm run bus -- listar` muestra la v1 y la v3, y
+      `npm run bus -- fallidos` sale vacío.
+- [ ] Hay un camión de residuo común (AB1234D) y un chofer (Juana Perez) libres, y la credencial
+      del chofer anda. Si no, se emite otra en `/choferes` → "Emitir credencial".
+- [ ] CT-0022 no está en ninguna ruta abierta: es el único tacho común de la sede y, si está en
+      otra ruta, la nueva sale con `RUTA_SIN_CONTENEDORES`. Una ruta asignada solo la cierra el
+      chofer, desde `/chofer` con "No pude vaciar".
 - [ ] No quedan rutas en `PROPUESTA` ni actividades de ensayos que tapen el mapa: los contenedores
       de una ruta viva quedan fuera del ruteo nuevo.
 - [ ] Crear los contenedores de la **sede de Recoleta**, una sola vez por base:
@@ -38,8 +56,11 @@ no sabe que existimos; solo publica que se creó una actividad.
 
 1. Despertar la API: abrir `/api/v1/health` en Render. Dormida tarda más de 15 s y el bus solo
    espera unos segundos: el evento terminaría en la cola de fallidos.
-2. Abrir dos pestañas: el **mapa** (operador) y **`/chofer`** (chofer).
-3. Dejar una terminal abierta en `simulator/` con el comando del plan B ya escrito.
+2. Abrir dos pestañas: el **mapa** (operador) y **`/chofer`** (chofer). Tienen que ser pestañas
+   distintas: la sesión del operador vive en la pestaña donde se entró.
+3. En la pestaña de `/chofer`, dejar puesto en DevTools → Sensors → Location el punto de CT-0022
+   (-34.5859976, -58.3922127).
+4. Dejar una terminal abierta en `simulator/` con el comando del plan B ya escrito.
 
 ---
 
@@ -104,7 +125,7 @@ que nadie tuviera que avisarnos."
 |---|---|
 | El evento no aparece en el mapa | Refrescar. Si sigue sin aparecer, `npm run bus -- fallidos`; si tarda, pasar al plan B |
 | El bus o Espacios no responden | Plan B: el script, mismo evento, misma historia |
-| La ruta sale sin el tacho de la sede | El evento no terminó todavía (la escuadrilla arranca a la hora de fin) o el tacho está en otra ruta viva |
+| La ruta sale sin el tacho de la sede | El evento no terminó todavía (la escuadrilla arranca a la hora de fin), el tacho está en otra ruta viva o la zona "Sede Recoleta" está bloqueada por una emergencia: descartar la propuesta, Zonas → "Desbloquear" y generar de nuevo |
 | "No hay contenedores para la ruta" | El evento todavía no terminó: esperar a que el aviso diga "Terminó" y generar de nuevo. Si no, hay una ruta en `PROPUESTA` colgada: descartarla y generar de nuevo. Si los tachos ya se vaciaron, no vuelven a entrar: mandar otra actividad para repetir |
 | El chofer no puede confirmar | La ubicación de DevTools no es la del contenedor |
 | `/chofer` dice que no hay ruta | La ruta está asignada a otro chofer. En local, el token de chofer es el de Juana Perez, no el de `dev-chofer`. Una ruta asignada no se puede reasignar: hay que generar otra |
@@ -121,3 +142,5 @@ que nadie tuviera que avisarnos."
 | 02/11 | Local, por webhook y pantalla | Pasos 1 a 4 en Plaza Houssay, con el #68 adentro y el plan B: zona con 3 contenedores, CT-0018 al 0 % en la ruta del camión de reciclables y ruta cerrada por el chofer, con GPS simulado. Falta el ensayo en Render con el bus real |
 | 05/11 | Local, por webhook | Paso 1 en la sede de Recoleta: `npm run plaza` creó CT-0020, CT-0021 y CT-0022, y la actividad de 1.500 personas quedó con los 3. Falta el ensayo en Render |
 | 06/11 | Render, plan B y pantalla | Pasos 1 a 3 en la sede de Recoleta con 1.200 personas: zona con 3 contenedores, CT-0022 al 0 % en la ruta de AB123CD, asignada a Juana Perez, e `IntervencionProgramada` con `EVENTO_PUBLICO` en el bus. Paso 4 sin hacer. Falta el ensayo con una actividad real de Espacios |
+| 16/11 | Render, plan B y pantalla | Pasos 1 a 4 en la sede de Recoleta con 1.200 personas: zona con 3 contenedores, CT-0022 primero y al 0 % en la ruta de AB1234D, `IntervencionProgramada` con `EVENTO_PUBLICO` en el bus y el chofer confirmó CT-0022 con el GPS simulado. Falta el ensayo con una actividad real de Espacios que llegue por el bus |
+| 17/11 | Render, bus real y pantalla | Pasos 1 a 4 con la actividad real de Rodrigo ("Show de Charly Garcia", 1.200, Recoleta) llegada por el bus. La primera ruta salió sin CT-0022 porque la zona estaba bloqueada por una emergencia de otra prueba; después de desbloquearla, CT-0022 entró al 0 %, salió la `IntervencionProgramada` con `EVENTO_PUBLICO` y el chofer lo confirmó. Falta la captura del tablero de Analítica |

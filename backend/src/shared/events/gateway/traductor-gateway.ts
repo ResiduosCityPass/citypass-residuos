@@ -165,6 +165,8 @@ export function traducirAGateway(evento: DomainEvent): EventoGateway | null {
           estadoNuevo: p.estadoNuevo,
           causaId: p.causaId,
           causaTipo: p.causaTipo,
+          // Solo en las de CU-INT-02: las de emergencias y clima salen como antes.
+          ...('barrio' in p && { barrio: p.barrio }),
           correlationId,
           // En ISO, como pide el contrato de Analitica del 29/10.
           updatedAt: p.updatedAt,
