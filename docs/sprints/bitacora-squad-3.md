@@ -717,3 +717,30 @@ Ensayé la demo en Render con el plan B: 1.200 personas en la sede de Recoleta, 
 - Que el arreglo del mapa llegue a `main` y a Render.
 - Revisar que ninguna ruta abierta tenga CT-0022, porque la base de Render se actualizó.
 - Del 15 al 18/11: ensayo con una actividad real de Rodrigo en Recoleta, incluido el paso 4 (chofer).
+
+## Sáb 14/11 · `ActividadCreada` pasa a la v3
+
+- **Qué cambió en EDA:** Espacios publica `ActividadCreada` solo por el tópico `com.citypass.espacios.ActividadCreada.v3`, que suma `organizadorTipo`. Por la suscripción vieja no iba a llegar nada más.
+- **Suscripción nueva:** di de alta en el bus la v3 para el webhook de Render. Quedan las dos activas (v1 y v3); los repetidos se descartan por `eventId`.
+- **#108 mergeado a `develop`:** el backend acepta el tipo con sufijo `.vN` y lo procesa igual que la v1. El simulador (`npm run actividad`) y `npm run bus` usan la v3 por defecto.
+
+## Lun 16/11 · Prueba completa en Render (plan B)
+
+A la madrugada probé los cuatro pasos en Render con el script del plan B: "Festival de Primavera", 1.200 personas, en la sede de Recoleta.
+- **Paso 1 y 2:** la actividad apareció en el Mapa en vivo con 3 contenedores en la zona.
+- **Paso 3:** después de la hora de fin generé la ruta de AB1234D: CT-0022 entró primero, al 0 %, junto con DEMO-WEB01-03 y DEMO-WEB02-03. La asigné a Juana Perez.
+- **Evento publicado:** en el bus quedó la `IntervencionProgramada` con `causaTipo = EVENTO_PUBLICO` y `camionId = AB1234D` (eventId `06330389-d817-4168-abe8-afd30103bb0a`).
+- **Paso 4, primera vez en Render:** como Juana Perez, con el GPS simulado al lado del tacho, confirmé CT-0022 y volvió a 0 %. Las otras dos paradas las cerré con "No pude vaciar", así la ruta se cerró y AB1234D y Juana quedaron libres.
+- **#107 mergeado a `develop`:** el arreglo del mapa tapado por las actividades.
+
+**Ojo:** el plan B manda el evento directo al webhook, no pasa por el bus. Falta probar que una `ActividadCreada` v3 real de Espacios llegue a Render.
+
+## Lun 16/11 · Todo en main y chequeo antes del ensayo
+
+- **Pase a `main` (#116):** Ramiro pasó `develop` a `main`. Ya están el #107 y el #108, y Render tiene el deploy nuevo: en el Mapa en vivo queda una sola actividad arriba y el botón "Ver todas (24)".
+- **Chequeo en Render:** la API responde, el bus tiene las dos suscripciones activas (v1 y v3) y 0 envíos fallidos. La única ruta abierta es una de prueba de otro integrante, sin CT-0022. CT-0022 está activo y libre.
+- **Espacios:** Rodrigo avisó que ahora cada reserva de un ciudadano publica también `ActividadCreada`, con `organizadorTipo`. No hay que cambiar nada: debajo de 100 personas Residuos la ignora, y la de la demo (1.200) entra igual.
+- **Analítica:** Fran pidió que cada grupo pruebe que recibe y envía bien sus eventos. Le paso el eventId de la prueba de la madrugada. Su tablero se actualiza cada unas 6 horas, así que en la demo la métrica no se va a ver en vivo: se muestra con una captura del ensayo.
+
+**Falta:**
+- Hasta el 18/11: ensayo con una actividad real de Rodrigo que llegue por el bus, incluido el paso 4 (chofer), y que Fran vea la intervención en su tablero.
