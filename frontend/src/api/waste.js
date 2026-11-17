@@ -36,6 +36,7 @@ export const setContainerOutOfService = (...args) => source.setContainerOutOfSer
 
 /* CU-02 · Zonas */
 export const fetchZones = (...args) => source.fetchZones(...args);
+export const fetchNeighborhoods = (...args) => source.fetchNeighborhoods(...args);
 export const createZone = (...args) => source.createZone(...args);
 export const updateZone = (...args) => source.updateZone(...args);
 export const setZoneBlocked = (...args) => source.setZoneBlocked(...args);

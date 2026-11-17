@@ -2,12 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ZonesPage from './ZonesPage.jsx';
-import { fetchZones, fetchContainers, createZone, setZoneBlocked, deleteZone } from '../api/waste.js';
+import { fetchZones, fetchNeighborhoods, fetchContainers, createZone, updateZone, setZoneBlocked, deleteZone } from '../api/waste.js';
+import { neighborhoods } from '../test/neighborhoods.js';
 import { ApiError } from '../api/client.js';
 
 vi.mock('../api/waste.js', () => ({
   USING_MOCKS: false,
   fetchZones: vi.fn(),
+  fetchNeighborhoods: vi.fn(),
   fetchContainers: vi.fn(),
   createZone: vi.fn(),
   updateZone: vi.fn(),
@@ -30,8 +32,37 @@ const rowFor = (name) => screen.getByText(name).closest('tr');
 describe('CU-02 zonas y umbrales', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    fetchNeighborhoods.mockResolvedValue(neighborhoods);
     fetchZones.mockResolvedValue([zone()]);
     fetchContainers.mockResolvedValue([]);
+  });
+
+  it('permite vincular varios barrios al crear una zona y los envía por código', async () => {
+    createZone.mockResolvedValue(zone());
+    const user = userEvent.setup(); render(<ZonesPage />);
+    await user.click(await screen.findByRole('button', { name: /Nueva zona/ }));
+    await user.type(screen.getByLabelText(/Nombre/), 'Zona compartida');
+    await user.click(await screen.findByLabelText('SAN NICOLAS')); await user.click(screen.getByLabelText('PALERMO'));
+    await user.click(screen.getByRole('button', { name: 'Crear zona' }));
+    expect(createZone).toHaveBeenCalledWith({ nombre: 'Zona compartida', umbralCriticoPct: 70, umbralTemperaturaC: 60, barrioIds: ['AR-CABA-SAN-NICOLAS', 'AR-CABA-PALERMO'] });
+  });
+  it('muestra vínculos existentes y permite reemplazarlos sin cambiar los umbrales', async () => {
+    fetchZones.mockResolvedValue([zone({ barrioIds: ['AR-CABA-SAN-NICOLAS'] })]); updateZone.mockResolvedValue(zone());
+    const user = userEvent.setup(); render(<ZonesPage />);
+    await screen.findByText('SAN NICOLAS'); await user.click(screen.getByRole('button', { name: 'Editar' }));
+    expect(await screen.findByLabelText('SAN NICOLAS')).toBeChecked();
+    await user.click(screen.getByLabelText('SAN NICOLAS')); await user.click(screen.getByLabelText('NUÑEZ'));
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    expect(updateZone).toHaveBeenCalledWith('zn-1', expect.objectContaining({ barrioIds: ['AR-CABA-NUNEZ'], umbralCriticoPct: 70, umbralTemperaturaC: 60 }));
+  });
+  it('conserva los vínculos al editar otros datos si falla el catálogo', async () => {
+    fetchNeighborhoods.mockRejectedValue(new Error('sin conexión'));
+    fetchZones.mockResolvedValue([zone({ barrioIds: ['AR-CABA-SAN-NICOLAS'] })]); updateZone.mockResolvedValue(zone());
+    const user = userEvent.setup(); render(<ZonesPage />); await user.click(await screen.findByRole('button', { name: 'Editar' }));
+    await screen.findByText(/Se conservan los vínculos existentes/);
+    await user.clear(screen.getByLabelText(/Nombre/)); await user.type(screen.getByLabelText(/Nombre/), 'Centro operativo');
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    expect(updateZone).toHaveBeenCalledWith('zn-1', expect.objectContaining({ nombre: 'Centro operativo', barrioIds: ['AR-CABA-SAN-NICOLAS'] }));
   });
 
   it('distingue bloqueo por emergencia y bloqueo manual', async () => {

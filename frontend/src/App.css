@@ -528,6 +528,10 @@ body.no-scroll { overflow: hidden; }
 /* 900px es el punto en que el detalle de dos columnas deja de entrar. Se usa el
    mismo para el sidebar a proposito: si la pantalla ya no da para dos columnas
    de contenido, tampoco da para gastar 232px en un menu permanente. */
+.zone-neighborhoods { border: 1px solid var(--border); border-radius: 8px; margin: 16px 0; padding: 12px; }
+.neighborhood-options { display: grid; gap: 8px; max-height: 200px; overflow-y: auto; }
+.neighborhood-options label { display: flex; gap: 8px; align-items: center; }
+
 @media (max-width: 900px) {
   .detail { grid-template-columns: 1fr; }
   .map-and-panel { flex-direction: column; }
