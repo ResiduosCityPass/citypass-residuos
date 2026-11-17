@@ -744,3 +744,15 @@ A la madrugada probé los cuatro pasos en Render con el script del plan B: "Fest
 
 **Falta:**
 - Hasta el 18/11: ensayo con una actividad real de Rodrigo que llegue por el bus, incluido el paso 4 (chofer), y que Fran vea la intervención en su tablero.
+
+## Mar 17/11 · Ensayo con la actividad real de Espacios
+
+- **#118 mergeado a `develop`:** Tomás aprobó la bitácora del 14 y 16/11 y el guion de 7 minutos.
+- **La actividad real llegó por el bus:** a las 13:05 Rodrigo creó en Espacios "Show de Charly Garcia", 1.200 personas en la sede de Recoleta, de 13:10 a 13:12. Llegó a Render por el tópico `ActividadCreada.v3`, con 0 envíos fallidos. En el Mapa en vivo apareció la zona con 3 contenedores. Es la primera vez que el caso funciona con el bus real, sin el plan B.
+- **Trampa nueva:** la primera ruta salió sin CT-0022. La zona "Sede Recoleta" estaba con "Bloqueo por emergencia" desde el 16/11 a la noche, por una prueba de otro caso de integración que no se cerró. Una zona bloqueada queda fuera del ruteo. Descarté esa propuesta, desbloqueé la zona desde Zonas y generé de nuevo.
+- **Paso 3:** la ruta de AB1234D salió con 7 paradas y CT-0022 al 0 %. La asigné a Juana Perez y en el bus quedó la `IntervencionProgramada` con `causaTipo = EVENTO_PUBLICO`, `camionId = AB1234D` y `causaId` = el id de la actividad de Rodrigo (eventId `bb005ce1-114f-4d99-b6e5-07f749851463`).
+- **Paso 4:** como Juana Perez, con el GPS simulado al lado del tacho, confirmé CT-0022 y volvió a 0 %. Las otras paradas las cerré con "No pude vaciar"; la ruta quedó completada y AB1234D libre.
+
+**Falta:**
+- Le pasé a Fran el eventId nuevo; falta la captura del tablero de Analítica para el PPT.
+- Antes de la demo, revisar en Zonas que "Sede Recoleta" esté activa.
