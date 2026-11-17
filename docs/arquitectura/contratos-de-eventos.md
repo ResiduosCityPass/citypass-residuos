@@ -78,8 +78,12 @@ Alerta de máxima prioridad. Se emite cuando la temperatura interna supera el um
 }
 ```
 
-**Consumidor principal:** Emergencias y Seguridad (Squad 6). Este es nuestro punto de integración
-transversal más valioso: dispara un incidente en su módulo sin ninguna llamada sincrónica.
+Sale al bus como **`AlertaGenerada`** con `tipoAlerta = INCENDIO` (el crítico de CU-05 sale con el
+mismo tipo y `SATURACION`).
+
+**Consumidores:** ninguno confirmado para el incendio. Al principio se esperaba que Emergencias (Squad 6) abriera un incidente
+con este evento, pero **Emergencias no consume `AlertaGenerada`** (lo confirmó Juani, de
+Emergencias, el 17/11): un incendio en un contenedor no les llega por el bus.
 
 ---
 
@@ -322,6 +326,14 @@ se recalcula. En una ruta `PROPUESTA` la parada se borra sin publicar nada: el c
 emergencia con `causaTipo = INCIDENTE_VIAL` cuenta como corte de circulación. Un `false` explícito
 se respeta siempre, y con otra causa en `null` no se bloquea nada.
 
+**Pendiente con Emergencias (17/11): coberturas preventivas.** Sus emergencias con
+`categoria = PREVENTIVA` salen con `afectaCirculacion: true` al programarse, y hoy eso bloquea la
+zona desde ese momento aunque no haya ningún incidente. Juani (Emergencias) pidió no bloquear con
+`PREVENTIVA`; si ellos la sacan de `afectaCirculacion`, no hay que cambiar nada de nuestro lado.
+
+**Coordenadas aproximadas.** Emergencias redondea las coordenadas a 3 decimales (hasta ~72 m de
+error), por su ADR de coordenadas aproximadas. Afecta sobre todo al radio de la intervención de A7.
+
 **Una emergencia con `causaTipo = RECLAMO` nunca bloquea**, aunque traiga `afectaCirculacion: true`
 (acordado con Fran el 05/11). Es el mismo auto que ya resuelve CU-INT-02 sacando los contenedores a
 15 m; bloquear la zona y las paradas a 300 m sería reaccionar dos veces.
@@ -397,15 +409,23 @@ No sale al bus: lo usa nuestro front, que lo ve por la API. Ver
 
 | Evento | Squad origen | Qué hacemos al recibirlo |
 |---|---|---|
-| `emergencias.incidente.creado` | 6 — Emergencias | Si el incidente ocurre dentro de una zona, marcamos la zona como bloqueada y sus contenedores quedan excluidos del ruteo de CU-08. |
-| `emergencia.resuelta` (el del CU-01), `EmergenciaCerrada`, `EmergenciaResuelta`, y `EmergenciaEstadoActualizado` / `EmergenciaActualizada` con estado `RESUELTA` o `CERRADA` | 6 — Emergencias | Además de desbloquear las zonas, si `causasRelacionadas` incluye `RESIDUOS` programamos una intervención en `ubicacion` y publicamos `residuos.intervencion.programada`. El backend de Emergencias publica hoy `EmergenciaEstadoActualizado` y `EmergenciaCerrada`; su CU-01 documenta `emergencia.resuelta`. Se aceptan todas las variantes (el campo del estado puede llamarse `estadoNuevo`, `estado` o `nuevoEstado`). |
+| `com.citypass.emergencias.EmergenciaCreada` (schemaId 78) | 6 — Emergencias | **CU-INT-01, implementado.** Si la emergencia corta la circulación (ver `IntervencionActualizada`), bloqueamos las zonas de los contenedores a menos de 300 m y omitimos sus paradas pendientes en rutas vivas. |
+| `com.citypass.emergencias.EmergenciaActualizada` (schemaId 80) con `estadoNuevo` `RESUELTA` o `CERRADA` | 6 — Emergencias | **CU-01 A7 y CU-INT-01, implementado.** Desbloqueamos las zonas (también con `DESCARTADA` o `CANCELADA`) y, si `causasRelacionadas` incluye `RESIDUOS`, programamos una intervención en `latitud`/`longitud` y publicamos `residuos.intervencion.programada`. Los nombres viejos (`EmergenciaEstadoActualizado`, `EmergenciaCerrada`, `EmergenciaResuelta`, `emergencia.resuelta`) se siguen aceptando, pero ya no están en el catálogo. |
 | `movilidad.calle.cortada` | 3 — Movilidad Urbana | Se excluye el tramo del cálculo de ruta. Si la ruta ya estaba asignada, se marca para recálculo. |
 | `reclamos.creado` | 5 — Reclamos Ciudadanos | Si la categoría es residuos y referencia un contenedor nuestro, se le adjunta el reclamo y se eleva su prioridad en el ruteo. |
 | `com.citypass.reclamos.ReclamoCreado` (o variantes) | 5 — Reclamos Ciudadanos | **CU-INT-02, implementado.** Si es de estacionamiento indebido y el auto tapa un contenedor, lo sacamos del ruteo, recalculamos las rutas vivas y publicamos `ReclamoEvaluado`. Las variantes aceptadas están en `contrato-reclamos.ts` |
 | `com.citypass.reclamos.ReclamoActualizado` con `estadoNuevo: RESUELTO` (o variantes) | 5 — Reclamos Ciudadanos | **CU-INT-02, implementado.** Destapamos los contenedores del reclamo. También si queda rechazado o cancelado. Si nadie avisa, el bloqueo vence solo |
 | `com.citypass.reclamos.ReclamoReclasificado` (implementado por Reclamos, falta registrarlo en el catálogo) | 5 — Reclamos Ciudadanos | **CU-INT-02, implementado.** Si con la categoría nueva es un auto mal estacionado, se evalúa como un reclamo nuevo; si deja de serlo, se liberan sus contenedores. Para decidir si es un vehículo usamos el título y la descripción; `objetoAfectadoNuevo` solo suma (`CICLOVIA` alcanza) y nunca descarta, porque nombra lo afectado y lo elige el vecino |
 
+Emergencias publica hoy cuatro tipos (catálogo de EDA al 17/11): `EmergenciaCreada`,
+`EmergenciaActualizada`, `EmergenciaReportada` y `EmergenciaVinculadaAContextoZona`. Los dos últimos
+no los consumimos. Llegan por el lector de Kafka, igual que los de Espacios y Reclamos.
+
 ### Lo que necesitamos de Emergencias para el CU-01 (A7)
+
+> **Resuelto.** Desde noviembre, `EmergenciaActualizada` trae `causasRelacionadas`, `latitud` y
+> `longitud` (y `ubicacion` con las coordenadas como texto), así que la intervención se dispara con
+> sus eventos reales. Lo que sigue queda como historia del pedido.
 
 El CU-01 (versión del 29/10) define **`emergencia.resuelta`** con `causasRelacionadas` y `ubicacion`, y quitó las solicitudes con confirmación. Pero al 29/10 el backend de Emergencias publica `EmergenciaEstadoActualizado` y `EmergenciaCerrada`, y **ninguno trae `causasRelacionadas` ni `ubicacion`**: sin eso Residuos no puede saber si actuar ni dónde. Mínimo que pedimos, sin inventar un evento nuevo, en `EmergenciaCerrada` (o en `emergencia.resuelta`, como dice su CU-01):
 
