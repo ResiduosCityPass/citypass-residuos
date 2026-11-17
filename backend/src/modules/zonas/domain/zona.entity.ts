@@ -26,6 +26,10 @@ export class Zona {
   @Column({ unique: true, length: 80 })
   nombre!: string;
 
+  /** Vínculos explícitos al catálogo común; no se infieren del nombre ni del centroide. */
+  @Column({ type: 'jsonb', default: () => "'[]'::jsonb" })
+  barrioIds!: string[];
+
   /** Porcentaje de llenado a partir del cual el contenedor se considera critico. */
   @Column({ type: 'int' })
   umbralCriticoPct!: number;

@@ -11,10 +11,11 @@ import { fieldErrors, generalMessage } from '../../domain/errors.js';
  * La zona define a partir de que porcentaje un contenedor se considera critico.
  * En el centro conviene 70; en zonas de baja densidad, 85 alcanza.
  */
-export default function ZoneFormModal({ zone, onSave, onClose }) {
+export default function ZoneFormModal({ zone, onSave, onClose, neighborhoods = {} }) {
   const editing = Boolean(zone);
   const [values, setValues] = useState({
     nombre: zone?.nombre ?? '',
+    barrioIds: zone?.barrioIds ?? [],
     umbralCriticoPct: zone?.umbralCriticoPct ?? 70,
     umbralTemperaturaC: zone?.umbralTemperaturaC ?? 60,
   });
@@ -34,6 +35,7 @@ export default function ZoneFormModal({ zone, onSave, onClose }) {
     try {
       await onSave({
         nombre: values.nombre,
+        barrioIds: values.barrioIds,
         umbralCriticoPct: Number(values.umbralCriticoPct),
         umbralTemperaturaC: Number(values.umbralTemperaturaC),
       });
@@ -63,6 +65,22 @@ export default function ZoneFormModal({ zone, onSave, onClose }) {
                hint="Entre 2 y 80 caracteres. No puede repetirse.">
           <input id="nombre" value={values.nombre} onChange={change('nombre')} maxLength={80} />
         </Field>
+
+        <fieldset className="zone-neighborhoods" disabled={saving || neighborhoods.loading || neighborhoods.error}>
+          <legend>Barrios vinculados</legend>
+          <p className="muted">Elegí uno o varios barrios del catálogo de Espacios Públicos. Sus coordenadas son de referencia, no límites de la zona.</p>
+          {neighborhoods.loading && <p role="status">Cargando barrios…</p>}
+          <div className="neighborhood-options">{(neighborhoods.catalog ?? []).map((b) => (
+            <label key={b.id}><input type="checkbox" checked={values.barrioIds.includes(b.id)} onChange={(e) => {
+              setValues((v) => ({ ...v, barrioIds: e.target.checked ? [...v.barrioIds, b.id] : v.barrioIds.filter((id) => id !== b.id) }));
+            }} />{b.nombre}</label>
+          ))}</div>
+          <p className="muted">Podés dejarla sin vincular y seleccionar la zona manualmente en cada alerta.</p>
+          {byField.barrioIds && <p className="text-danger">{byField.barrioIds}</p>}
+        </fieldset>
+        {neighborhoods.error && <Notice type="warning">No se pudo cargar el catálogo. Se conservan los vínculos existentes y podés editar los demás datos.
+          <Button type="button" variant="secondary" onClick={neighborhoods.retry}>Reintentar barrios</Button>
+        </Notice>}
 
         <Field label="Umbral de llenado (%)" htmlFor="umbralCriticoPct" required
                error={byField.umbralCriticoPct}

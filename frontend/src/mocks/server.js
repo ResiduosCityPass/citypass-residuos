@@ -278,6 +278,13 @@ export function linkSensor(containerId, data = {}) {
 
 export const fetchZones = () => respond(store.zones);
 
+// Datos del modo mock; el catálogo completo se obtiene de GET /barrios en la API real.
+export const fetchNeighborhoods = () => respond([
+  { id: 'AR-CABA-SAN-NICOLAS', nombre: 'SAN NICOLAS', localidad: 'CABA', lat: -34.603666, lng: -58.380515 },
+  { id: 'AR-CABA-PALERMO', nombre: 'PALERMO', localidad: 'CABA', lat: -34.573855, lng: -58.422342 },
+  { id: 'AR-CABA-NUNEZ', nombre: 'NUÑEZ', localidad: 'CABA', lat: -34.543481, lng: -58.462751 },
+]);
+
 export function createZone(data) {
   const errors = [];
   if (!data.nombre || data.nombre.length < 2) errors.push('nombre must be longer than or equal to 2 characters');
@@ -296,6 +303,7 @@ export function createZone(data) {
   const created = {
     id: newId('zn'),
     nombre: data.nombre,
+    barrioIds: data.barrioIds ?? [],
     umbralCriticoPct: Number(data.umbralCriticoPct),
     umbralTemperaturaC: Number(data.umbralTemperaturaC),
     bloqueada: false,

@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { fetchClimateAlerts, fetchZones, resolveClimateAlert, simulateClimateEvent } from '../api/waste.js';
 import { climateAlertIsCurrent } from '../domain/climate-alerts.js';
 import { FLOOD_STATE_LABEL } from '../domain/contingencies.js';
+import { suggestClimateZones } from '../domain/climate-neighborhoods.js';
+import { useNeighborhoods } from '../hooks/useNeighborhoods.js';
 import Button from '../components/ui/Button.jsx';
 import Chip from '../components/ui/Chip.jsx';
 import Field from '../components/ui/Field.jsx';
@@ -13,10 +15,13 @@ const CONFIRMED = 'com.citypass.espacios.CriticidadClimaticaConfirmada';
 const ENDED = 'com.citypass.espacios.CriticidadClimaticaFinalizada';
 const date = (value) => value == null ? 'Sin informar' : new Date(value).toLocaleString('es-AR');
 
-function ReviewAlert({ alert, zones, busy, onResolve }) {
-  const [selected, setSelected] = useState([]);
+function ReviewAlert({ alert, zones, busy, onResolve, catalog }) {
+  // null usa sugerencias actuales. Una edición humana prevalece ante el polling.
+  const [selectionOverride, setSelectionOverride] = useState(null);
   const [reason, setReason] = useState('');
   const start = alert.confirmacion;
+  const suggestions = suggestClimateZones(start?.barrios ?? [], zones, catalog ?? []);
+  const selected = (selectionOverride ?? suggestions.zoneIds).filter((id) => zones.some((z) => z.id === id));
   const pending = alert.decision === 'PENDIENTE_REVISION';
   return <article className="panel-card" aria-label={`Alerta ${alert.alertaId}`}>
     <header className="detail-header"><h2>{start?.fenomeno?.replaceAll('_', ' ') ?? 'Finalización recibida antes del inicio'}</h2>
@@ -33,12 +38,17 @@ function ReviewAlert({ alert, zones, busy, onResolve }) {
     {!start && <p>Se conserva la finalización. Cuando llegue la confirmación se podrá evaluar su afectación.</p>}
     {pending && start && <form onSubmit={(event) => { event.preventDefault(); onResolve(alert.alertaId, { accion: 'SUSPENDER', motivo: reason.trim(), zonaIds: selected }); }}>
       <Notice type="warning" title="Confirmá la afectación antes de suspender">
-        Los puntos recibidos no delimitan un área. Verificá si las condiciones climáticas impiden recolectar y elegí las zonas correspondientes.
+        Los puntos recibidos no delimitan un área. Las sugerencias usan los barrios vinculados a cada zona. Verificá si las condiciones climáticas impiden recolectar y elegí las zonas correspondientes.
         Hasta confirmar, esta alerta no suspende la recolección.
       </Notice>
+      {catalog && suggestions.zoneIds.length > 0 && <p className="muted">{suggestions.zoneIds.length} zona(s) sugerida(s) por los barrios informados. Podés cambiar la selección.</p>}
+      {catalog && suggestions.unmappedNames.length > 0 && <Notice type="info">Barrios sin zonas vinculadas: {suggestions.unmappedNames.join(', ')}. Elegí las zonas manualmente o configurá sus vínculos en Zonas y umbrales.</Notice>}
+      {catalog && suggestions.unknownNames.length > 0 && <Notice type="warning">Barrios fuera del catálogo común: {suggestions.unknownNames.join(', ')}. Revisá la afectación manualmente.</Notice>}
+      {!start.barrios?.length && <p className="muted">La alerta no informa barrios. Seleccioná las zonas manualmente.</p>}
       <fieldset disabled={busy}><legend>Zonas de Residuos afectadas</legend><div className="flood-zones">
-        {zones.map((zone) => <label key={zone.id}><input type="checkbox" checked={selected.includes(zone.id)} onChange={(e) => setSelected((ids) => e.target.checked ? [...ids, zone.id] : ids.filter((id) => id !== zone.id))} />{zone.nombre}</label>)}
+        {zones.map((zone) => <label key={zone.id}><input type="checkbox" checked={selected.includes(zone.id)} onChange={(e) => setSelectionOverride(e.target.checked ? [...selected, zone.id] : selected.filter((id) => id !== zone.id))} />{zone.nombre}</label>)}
       </div></fieldset>
+      {selectionOverride !== null && catalog && <Button type="button" variant="secondary" disabled={busy} onClick={() => setSelectionOverride(null)}>Usar zonas sugeridas</Button>}
       <Field label="Fundamento de la decisión" htmlFor={`reason-${alert.alertaId}`} required>
         <textarea id={`reason-${alert.alertaId}`} value={reason} onChange={(e) => setReason(e.target.value)} minLength={10} maxLength={300} required disabled={busy} />
       </Field>
@@ -53,6 +63,7 @@ function ReviewAlert({ alert, zones, busy, onResolve }) {
 }
 
 export default function ClimateEventsPage({ embedded = false, onAlertsChanged }) {
+  const neighborhoods = useNeighborhoods();
   const [data, setData] = useState({ alertas: [], simuladorHabilitado: false });
   const [zones, setZones] = useState([]);
   const [error, setError] = useState('');
@@ -94,6 +105,9 @@ export default function ClimateEventsPage({ embedded = false, onAlertsChanged })
     </Notice>}
     {error && <Notice type="error">{error}</Notice>}
     {feedback && <Notice type="success">{feedback}</Notice>}
+    {neighborhoods.error && <Notice type="warning">No se pudo cargar el catálogo de barrios. Podés seleccionar las zonas manualmente.
+      <Button variant="secondary" onClick={neighborhoods.retry}>Reintentar barrios</Button>
+    </Notice>}
     {data.simuladorHabilitado && <details className="panel-card flood-simulator"><summary>Probar el contrato de Espacios Públicos</summary>
       <p className="muted">Simulación local: conserva el payload recibido y modifica la operación de Residuos. No publica mensajes en EDA.</p>
       <form onSubmit={(event) => { event.preventDefault(); void act(() => simulateClimateEvent({ tipo: type, payload: JSON.parse(payload) }), 'Evento procesado. Las reentregas idénticas no repiten acciones.'); }}>
@@ -105,10 +119,10 @@ export default function ClimateEventsPage({ embedded = false, onAlertsChanged })
       </form>
     </details>}
     {data.alertas.length === 0 && <p className="muted">No hay alertas climáticas recibidas.</p>}
-    <div className="flood-list">{data.alertas.filter((alert) => climateAlertIsCurrent(alert)).map((alert) => <ReviewAlert key={alert.alertaId} alert={alert} zones={zones} busy={busy} onResolve={resolve} />)}</div>
+    <div className="flood-list">{data.alertas.filter((alert) => climateAlertIsCurrent(alert)).map((alert) => <ReviewAlert key={alert.alertaId} alert={alert} zones={zones} busy={busy} onResolve={resolve} catalog={neighborhoods.catalog} />)}</div>
     {data.alertas.some((alert) => !climateAlertIsCurrent(alert)) && <details className="panel-card">
       <summary>Alertas climáticas revisadas ({data.alertas.filter((alert) => !climateAlertIsCurrent(alert)).length})</summary>
-      <div className="flood-list">{data.alertas.filter((alert) => !climateAlertIsCurrent(alert)).map((alert) => <ReviewAlert key={alert.alertaId} alert={alert} zones={zones} busy={busy} onResolve={resolve} />)}</div>
+      <div className="flood-list">{data.alertas.filter((alert) => !climateAlertIsCurrent(alert)).map((alert) => <ReviewAlert key={alert.alertaId} alert={alert} zones={zones} busy={busy} onResolve={resolve} catalog={neighborhoods.catalog} />)}</div>
     </details>}
   </div>;
 }
