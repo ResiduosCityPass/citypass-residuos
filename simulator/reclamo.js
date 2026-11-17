@@ -10,6 +10,7 @@
  *   npm run reclamo -- --ruta <id>   elige la ruta; sin esto, la activa del camion CAMION_DEMO (FR123AN)
  *   npm run reclamo:resuelto         Reclamos avisa que se retiro el auto (el ultimo que tapo uno)
  *   npm run reclamo:resuelto -- <reclamoId>
+ *   npm run reclamo:metrica          % de reclamos evaluados que tapan un contenedor (total y de hoy)
  *
  * Requiere:
  *   WEBHOOK_TOKEN  el GATEWAY_WEBHOOK_TOKEN del backend
@@ -238,14 +239,31 @@ function leerUltimo() {
   }
 }
 
-exigir('WEBHOOK_TOKEN', WEBHOOK_TOKEN, 'Es el GATEWAY_WEBHOOK_TOKEN del backend.');
+/** Nuestra metrica, por si el tablero de Analitica no la muestra: total y de hoy. */
+async function metrica() {
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
 
-// Resolver solo usa el webhook: no necesita sesion.
+  for (const [titulo, query] of [
+    ['Desde siempre', ''],
+    ['Hoy', `?desde=${hoy.toISOString()}`],
+  ]) {
+    const { evaluados, afectan, porcentaje } = await api(`/reclamos/metrica${query}`);
+    const valor = porcentaje === null ? 'sin reclamos evaluados' : `${porcentaje} %`;
+    console.log(`${titulo.padEnd(14)} ${valor}  (${afectan} de ${evaluados} reclamos tapaban un contenedor)`);
+  }
+}
+
+// Resolver solo usa el webhook y la metrica solo la API.
+if (args[0] !== 'metrica') {
+  exigir('WEBHOOK_TOKEN', WEBHOOK_TOKEN, 'Es el GATEWAY_WEBHOOK_TOKEN del backend.');
+}
+
 (args[0] === 'resuelto'
   ? resolver()
   : (async () => {
       TOKEN ||= await iniciarSesion();
-      await crear();
+      await (args[0] === 'metrica' ? metrica() : crear());
     })()
 ).catch((error) => {
   console.error(error.message);

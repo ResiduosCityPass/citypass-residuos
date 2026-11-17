@@ -72,6 +72,12 @@ export interface CausaAfectacion {
   correlationId: string;
   /** AFECTADA si no se dice: el corte puede pasar. CANCELADA: esa parada no se hace (CU-INT-02). */
   estadoNuevo?: 'AFECTADA' | 'CANCELADA';
+  /**
+   * Solo CU-INT-02: el barrio del reclamo, para que Analitica pueda armar
+   * "cuadrillas enviadas por reclamos, por barrio" sin cruzar con Reclamos.
+   * Sin definir, el evento sale sin el campo.
+   */
+  barrio?: string | null;
 }
 
 /**
@@ -325,6 +331,7 @@ export class ParadasService {
                 estadoNuevo: afectacion.estadoNuevo ?? 'AFECTADA',
                 causaId: afectacion.causaId,
                 causaTipo: afectacion.causaTipo,
+                ...(afectacion.barrio !== undefined && { barrio: afectacion.barrio }),
                 updatedAt: new Date().toISOString(),
               },
               { correlationId: afectacion.correlationId },

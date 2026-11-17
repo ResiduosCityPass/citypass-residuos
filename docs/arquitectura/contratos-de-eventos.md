@@ -250,6 +250,14 @@ Reclamos y, a la vez, el dato de la métrica para BI.
   no traer coordenadas, no generan evento y no entran en el denominador.
 - **Lectura complementaria:** con `rutasRecalculadas` no vacío se puede sacar, además, el
   porcentaje de reclamos que rompieron una ruta que ya estaba armada.
+- **Residuos la calcula también**, con la misma regla, sobre su outbox:
+  `GET /api/v1/reclamos/metrica?desde=<ISO>` (administrador u operador), o
+  `npm run reclamo:metrica` desde `simulator/`. Sirve de respaldo si el tablero de Analítica no la
+  muestra.
+
+**La que muestra Analítica es otra:** "cuadrillas enviadas por reclamos, por barrio" (17/11). La
+arma con `IntervencionActualizada` (`estadoNuevo = CANCELADA`, `causaId = reclamoId`), que también
+lleva el `barrio` del reclamo.
 
 > **Lo registra Residuos, no EDA:** desde la consola del gateway, en el catálogo de tipos, con el
 > esquema Avro de [`schemas/ReclamoEvaluado.avsc`](schemas/ReclamoEvaluado.avsc). El namespace sale
@@ -349,6 +357,13 @@ camionId distintos con estadoNuevo = AFECTADA y causaTipo = INCIDENTE_VIAL
   suma a la métrica.
 - **`updatedAt` va en ISO-8601**, como pide el contrato de Analítica del 29/10, y no en milisegundos
   como `ReclamoEvaluado`.
+- **CU-INT-02 también la emite**, por cada parada que un auto tapa: `estadoNuevo = CANCELADA`,
+  `causaTipo = INCIDENTE_VIAL`, `causaId = reclamoId` y, solo en estas, **`barrio`** (el del
+  `ReclamoCreado`, o `null` si no vino), para "cuadrillas enviadas por reclamos, por barrio". Las
+  de emergencias y clima no llevan el campo; en el esquema es opcional, con `null` por defecto.
+
+> **Antes de desplegar el `barrio`:** registrar en la consola del gateway la versión nueva de
+> `IntervencionActualizada.avsc` (el campo es opcional, la versión anterior sigue leyéndose igual).
 
 > **Lo registra Residuos, no EDA:** desde la consola del gateway, en el catálogo de tipos, con el
 > esquema Avro de [`schemas/IntervencionActualizada.avsc`](schemas/IntervencionActualizada.avsc).

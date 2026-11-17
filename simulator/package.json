@@ -16,6 +16,7 @@
     "plaza": "node plaza-demo.js",
     "bus": "node bus.js",
     "reclamo": "node reclamo.js",
-    "reclamo:resuelto": "node reclamo.js resuelto"
+    "reclamo:resuelto": "node reclamo.js resuelto",
+    "reclamo:metrica": "node reclamo.js metrica"
   }
 }

@@ -130,6 +130,7 @@ Contra Render, en vez de `TOKEN` (el del navegador vence a los ~15 min), `LOGIN_
 | `npm run reclamo -- --contenedor FRAN-02` | Tapa ese contenedor en vez de la próxima parada pendiente |
 | `npm run reclamo -- --ruta <id>` | Elige la ruta; sin esto toma la activa del camión `CAMION_DEMO` (`FR123AN`) |
 | `npm run reclamo:resuelto` | Reclamos avisa que se retiró el auto (el último reclamo que tapó un contenedor) |
+| `npm run reclamo:metrica` | Nuestra métrica: % de reclamos evaluados que tapan un contenedor, desde siempre y de hoy (no usa el webhook) |
 
 El id del último reclamo que tapó un contenedor queda en `ultimo-reclamo.txt`, que no se versiona: `--lejos` y `--bache` no lo pisan.
 
