@@ -8,6 +8,7 @@ describe('atención de alertas climáticas', () => {
     [{ decision: 'SUSPENDER', contingenciaId: 'c', estadoContingencia: 'EN_RECUPERACION' }, false, true],
     [{ decision: 'SUSPENDER', contingenciaId: 'c', estadoContingencia: 'RECUPERADA' }, false, false],
     [{ decision: 'SIN_AFECTACION' }, false, false],
+    [{ decision: 'DESCARTADA', finalizacion: { finalizadaEn: 1 } }, false, false],
   ])('refleja el estado operativo %j', (alert, attention, current) => {
     expect(climateAlertNeedsAttention(alert)).toBe(attention);
     expect(climateAlertIsCurrent(alert)).toBe(current);

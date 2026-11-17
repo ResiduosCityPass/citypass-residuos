@@ -241,4 +241,71 @@ describe('Contrato real de Espacios Publicos y revision de zonas (e2e)', () => {
       (await http.get(`/api/v1/contingencias/${decision.contingenciaId}`).set(admin)).body.alertaId,
     ).toBe(p.alertaId);
   });
+  it.each(['solo-cierre', 'inicio-finalizado', 'texto'])(
+    'descarta %s con motivo, actor de sesión e historial persistidos sin generar eventos',
+    async (alertaId) => {
+      if (alertaId !== 'solo-cierre') await receive(INICIO, { ...start(), alertaId }).expect(201);
+      if (alertaId !== 'texto') await receive(FIN, end(alertaId)).expect(201);
+      const decision = {
+        accion: 'DESCARTAR',
+        motivo: '  Ensayo concluido, se archiva la alerta  ',
+      };
+      await http
+        .patch(`/api/v1/contingencias/clima/${alertaId}/resolver`)
+        .set('Authorization', `Bearer ${ctx.token(Rol.OPERADOR, 'operador-de-prueba')}`)
+        .send(decision)
+        .expect(200);
+      const [stored] = await ctx.dataSource.query(
+        'SELECT * FROM alerta_climatica_externa WHERE "alertaId" = $1',
+        [alertaId],
+      );
+      expect(stored).toMatchObject({
+        decision: 'DESCARTADA',
+        motivo: decision.motivo.trim(),
+        revisadoPor: 'operador-de-prueba',
+        contingenciaId: null,
+      });
+      expect(stored.revisadaEn).toBeInstanceOf(Date);
+      expect(Boolean(stored.finalizacion)).toBe(alertaId !== 'texto');
+      expect(await ctx.dataSource.query('SELECT * FROM contingencia')).toHaveLength(0);
+      expect(await ctx.dataSource.query('SELECT * FROM evento_pendiente')).toHaveLength(0);
+      await http
+        .patch(`/api/v1/contingencias/clima/${alertaId}/resolver`)
+        .set(admin)
+        .send(decision)
+        .expect(409);
+      await receive(INICIO, { ...start(), alertaId }).expect(201);
+      const list = (await http.get('/api/v1/contingencias/clima').set(admin).expect(200)).body
+        .alertas;
+      expect(list[0]).toMatchObject({
+        alertaId,
+        decision: 'DESCARTADA',
+        revisadoPor: 'operador-de-prueba',
+      });
+    },
+  );
+  it('valida el motivo de descarte y no permite descartar una suspensión pendiente de recuperación', async () => {
+    const p = start();
+    const z = await zone();
+    await receive(INICIO, p).expect(201);
+    const action = (motivo: unknown) =>
+      http
+        .patch(`/api/v1/contingencias/clima/${p.alertaId}/resolver`)
+        .set(admin)
+        .send({ accion: 'DESCARTAR', motivo });
+    for (const motivo of [undefined, '', '          ', 'corto', 'x'.repeat(301), 42])
+      await action(motivo).expect(400);
+    await http
+      .patch(`/api/v1/contingencias/clima/${p.alertaId}/resolver`)
+      .set('Authorization', `Bearer ${ctx.token(Rol.CHOFER)}`)
+      .send({ accion: 'DESCARTAR', motivo: 'Ensayo finalizado sin afectación' })
+      .expect(403);
+    const suspended = (await resolve(p.alertaId, [z.id]).expect(200)).body;
+    await receive(FIN, end(p.alertaId)).expect(201);
+    await action('No debe omitir la recuperación pendiente').expect(409);
+    expect(
+      (await http.get(`/api/v1/contingencias/${suspended.contingenciaId}`).set(admin).expect(200))
+        .body.estado,
+    ).toBe('PENDIENTE_RECUPERACION');
+  });
 });

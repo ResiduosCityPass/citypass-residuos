@@ -12,3 +12,11 @@
 .flood-containers li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .5rem; padding: .5rem 0; }
 .flood-list details { margin-top: 1rem; }
 .flood-list summary { cursor: pointer; }
+.climate-card-actions, .climate-pagination { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; }
+.climate-card-actions { justify-content: space-between; }
+.climate-pagination { justify-content: center; margin: 1rem 0; }
+.climate-alert-detail > summary { color: var(--blue); padding: .25rem 0; }
+.climate-alert-id { overflow-wrap: anywhere; margin: .5rem 0; }
+.climate-alert-card.panel-card { padding: var(--space-3); }
+.climate-alert-card .detail-header { margin-bottom: 0; }
+.flood-list .climate-alert-detail { margin-top: .25rem; }
