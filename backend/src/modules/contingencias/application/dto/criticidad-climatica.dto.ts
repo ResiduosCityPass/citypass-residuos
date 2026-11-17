@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayNotEmpty,
@@ -65,8 +65,12 @@ export class SimularCriticidadDto {
 }
 
 export class ResolverCriticidadDto {
-  @IsIn(['SUSPENDER', 'SIN_AFECTACION']) accion!: 'SUSPENDER' | 'SIN_AFECTACION';
-  @IsString() @Length(10, 300) motivo!: string;
+  @IsIn(['SUSPENDER', 'SIN_AFECTACION', 'DESCARTAR']) accion!:
+    'SUSPENDER' | 'SIN_AFECTACION' | 'DESCARTAR';
+  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @Length(10, 300)
+  motivo!: string;
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(100)

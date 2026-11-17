@@ -151,6 +151,84 @@ describe('Adaptacion de criticidad climatica de Espacios Publicos', () => {
     expect(saved.get(id)?.decision).toBe('SIN_AFECTACION');
     expect(contingencias.procesarEvento).not.toHaveBeenCalled();
   });
+  it.each(['solo cierre', 'inicio y cierre', 'inicio textual'])(
+    'descarta con auditoría sin operar zonas: %s',
+    async (caseName) => {
+      const alertaId = caseName === 'inicio textual' ? 'texto' : id;
+      if (caseName !== 'solo cierre') await service.recibir(INICIO, { ...start, alertaId });
+      if (caseName !== 'inicio textual') await service.recibir(FIN, { ...end, alertaId });
+      const before = structuredClone(saved.get(alertaId)!);
+      const a = await service.resolver(
+        alertaId,
+        { accion: 'DESCARTAR', motivo: 'Ensayo finalizado, conservar como prueba' },
+        'operador-res',
+      );
+      expect(a).toMatchObject({
+        alertaId,
+        decision: 'DESCARTADA',
+        motivo: 'Ensayo finalizado, conservar como prueba',
+        revisadoPor: 'operador-res',
+        contingenciaId: null,
+        confirmacion: before.confirmacion,
+        finalizacion: before.finalizacion,
+        origen: before.origen,
+      });
+      expect(a.revisadaEn).toBeInstanceOf(Date);
+      expect(contingencias.procesarEvento).not.toHaveBeenCalled();
+      await expect(
+        service.resolver(
+          alertaId,
+          { accion: 'DESCARTAR', motivo: 'Reintento de la decisión' },
+          'otro',
+        ),
+      ).rejects.toThrow('ya fue revisada');
+      expect(saved.get(alertaId)?.revisadoPor).toBe('operador-res');
+    },
+  );
+  it('un inicio tardío o una reentrega no reabre una alerta descartada', async () => {
+    await service.recibir(FIN, end);
+    await service.resolver(
+      id,
+      { accion: 'DESCARTAR', motivo: 'Cierre de ensayo sin inicio recibido' },
+      'operador-res',
+    );
+    await service.recibir(INICIO, start);
+    await service.recibir(INICIO, start);
+    await service.recibir(FIN, end);
+    expect(saved.get(id)).toMatchObject({
+      decision: 'DESCARTADA',
+      confirmacion: start,
+      finalizacion: end,
+      revisadoPor: 'operador-res',
+    });
+    expect(contingencias.procesarEvento).not.toHaveBeenCalled();
+  });
+  it('no descarta suspensiones revisadas ni registros pendientes asociados a una contingencia', async () => {
+    await service.recibir(INICIO, start);
+    await suspend();
+    const reviewed = structuredClone(saved.get(id)!);
+    await expect(
+      service.resolver(id, { accion: 'DESCARTAR', motivo: 'No debe levantar la suspensión' }, 'op'),
+    ).rejects.toThrow('ya fue revisada');
+    expect(saved.get(id)).toEqual(reviewed);
+    saved.set(id, { ...reviewed, decision: 'PENDIENTE_REVISION' });
+    await expect(
+      service.resolver(id, { accion: 'DESCARTAR', motivo: 'No debe levantar la suspensión' }, 'op'),
+    ).rejects.toThrow('gestioná su recuperación');
+    expect(contingencias.procesarEvento).toHaveBeenCalledTimes(1);
+  });
+  it('rechaza zonas en el descarte y mantiene la alerta pendiente', async () => {
+    await service.recibir(FIN, end);
+    await expect(
+      service.resolver(
+        id,
+        { accion: 'DESCARTAR', motivo: 'Cierre de ensayo sin afectación', zonaIds: [zone] },
+        'op',
+      ),
+    ).rejects.toThrow('no debe tener zonas');
+    expect(saved.get(id)?.decision).toBe('PENDIENTE_REVISION');
+    expect(contingencias.procesarEvento).not.toHaveBeenCalled();
+  });
   it('exige zonas, vigencia y existencia de la alerta', async () => {
     await expect(suspend()).rejects.toThrow('No existe');
     await service.recibir(INICIO, start);

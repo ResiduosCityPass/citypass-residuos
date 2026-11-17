@@ -8,7 +8,7 @@ import { neighborhoods } from '../test/neighborhoods.js';
 vi.mock('../api/waste.js', () => ({ fetchClimateAlerts: vi.fn(), fetchZones: vi.fn(), fetchNeighborhoods: vi.fn(), resolveClimateAlert: vi.fn(), simulateClimateEvent: vi.fn() }));
 const alert = (patch = {}) => ({ alertaId: 'a1', decision: 'PENDIENTE_REVISION', origen: 'eda',
   confirmacion: { fenomeno: 'TORMENTA_FUERTE', nivelCriticidad: 'ALTA', ubicaciones: [{ latitud: -34.6, longitud: -58.38 }], vigenciaDesde: 1793311620000, vigenciaHasta: 1793333220000 }, ...patch });
-const mount = () => render(<MemoryRouter><ClimateEventsPage /></MemoryRouter>);
+const mount = (props = {}) => render(<MemoryRouter><ClimateEventsPage {...props} /></MemoryRouter>);
 beforeEach(() => {
   vi.resetAllMocks();
   fetchNeighborhoods.mockResolvedValue(neighborhoods);
@@ -17,6 +17,80 @@ beforeEach(() => {
   resolveClimateAlert.mockResolvedValue({}); simulateClimateEvent.mockResolvedValue({});
 });
 describe('Eventos climaticos', () => {
+  it.each([
+    ['solo-cierre', null, { finalizadaEn: 1793333220000 }],
+    ['texto', alert().confirmacion, null],
+  ])('descarta %s desde una tarjeta compacta, exige motivo y la conserva en el historial', async (id, confirmacion, finalizacion) => {
+    let row = alert({ alertaId: id, confirmacion, finalizacion });
+    fetchClimateAlerts.mockImplementation(async () => ({ alertas: [row] }));
+    resolveClimateAlert.mockImplementation(async (_id, decision) => { row = { ...row, decision: 'DESCARTADA', motivo: decision.motivo, revisadoPor: 'operador-res', revisadaEn: '2026-11-17T12:00:00Z' }; });
+    const onAlertsChanged = vi.fn(); const user = userEvent.setup(); mount({ embedded: true, onAlertsChanged });
+    await user.click(await screen.findByRole('button', { name: 'Descartar', exact: true }));
+    const dialog = screen.getByRole('dialog', { name: 'Descartar alerta climática' });
+    const confirm = within(dialog).getByRole('button', { name: 'Confirmar descarte' });
+    expect(confirm).toBeDisabled(); expect(resolveClimateAlert).not.toHaveBeenCalled();
+    await user.type(within(dialog).getByLabelText(/Motivo del descarte/), '   ');
+    expect(confirm).toBeDisabled();
+    await user.type(within(dialog).getByLabelText(/Motivo del descarte/), 'Prueba concluida sin operación');
+    await user.click(confirm);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(resolveClimateAlert).toHaveBeenCalledWith(id, { accion: 'DESCARTAR', motivo: 'Prueba concluida sin operación' });
+    expect(onAlertsChanged).toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Descartar', exact: true })).not.toBeInTheDocument();
+    await user.click(screen.getByText('Alertas climáticas revisadas (1)'));
+    expect(screen.getByText('Descartada')).toBeVisible();
+    await user.click(screen.getByText('Ver detalle y revisión'));
+    expect(screen.getByText(/Revisión: Prueba concluida sin operación/)).toBeVisible();
+    expect(screen.getByText('Revisada por: operador-res')).toBeVisible();
+  });
+  it('permite cancelar y conserva el motivo ante errores de descarte para reintentar', async () => {
+    resolveClimateAlert.mockRejectedValueOnce(new Error('La alerta ya fue revisada'));
+    const user = userEvent.setup(); mount({ embedded: true });
+    await user.click(await screen.findByRole('button', { name: 'Descartar', exact: true }));
+    await user.click(screen.getByRole('button', { name: 'Cancelar', exact: true }));
+    expect(resolveClimateAlert).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Descartar', exact: true }));
+    const dialog = screen.getByRole('dialog');
+    await user.type(within(dialog).getByLabelText(/Motivo del descarte/), 'Ensayo concluido en la revisión');
+    await user.click(within(dialog).getByRole('button', { name: 'Confirmar descarte' }));
+    expect(await within(dialog).findByText('La alerta ya fue revisada')).toBeVisible();
+    expect(within(dialog).getByLabelText(/Motivo del descarte/)).toHaveValue('Ensayo concluido en la revisión');
+    await user.click(within(dialog).getByRole('button', { name: 'Confirmar descarte' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(resolveClimateAlert).toHaveBeenCalledTimes(2);
+  });
+  it('en Alertas pliega detalles y pagina de a cinco sin perder una revisión al cambiar de página', async () => {
+    fetchClimateAlerts.mockResolvedValue({ alertas: Array.from({ length: 6 }, (_, i) => alert({ alertaId: `a${i}` })) });
+    const user = userEvent.setup(); mount({ embedded: true });
+    const first = await screen.findByRole('article', { name: 'Alerta a0', exact: true });
+    expect(screen.getAllByRole('article')).toHaveLength(5);
+    expect(within(first).getByLabelText(/Fundamento/)).not.toBeVisible();
+    await user.click(within(first).getByText('Ver detalle y revisión'));
+    await user.click(within(first).getByLabelText('Centro'));
+    await user.type(within(first).getByLabelText(/Fundamento/), 'Revisión manual en curso');
+    await user.click(screen.getByRole('button', { name: 'Siguientes' }));
+    expect(screen.getAllByRole('article')).toHaveLength(1);
+    expect(screen.getByRole('article', { name: 'Alerta a5', exact: true })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Anteriores' }));
+    expect(within(first).getByLabelText('Centro')).toBeChecked();
+    expect(within(first).getByLabelText(/Fundamento/)).toHaveValue('Revisión manual en curso');
+    expect(resolveClimateAlert).not.toHaveBeenCalled();
+  });
+  it('al descartar la última alerta de una página vuelve a una página existente', async () => {
+    const rows = Array.from({ length: 6 }, (_, i) => alert({ alertaId: `a${i}` }));
+    fetchClimateAlerts.mockImplementation(async () => ({ alertas: rows.map(a => ({ ...a })) }));
+    resolveClimateAlert.mockImplementation(async (id, decision) => { Object.assign(rows.find(a => a.alertaId === id), { decision: 'DESCARTADA', motivo: decision.motivo }); });
+    const user = userEvent.setup(); mount({ embedded: true });
+    await user.click(await screen.findByRole('button', { name: 'Siguientes' }));
+    await user.click(screen.getByRole('button', { name: 'Descartar', exact: true }));
+    const dialog = screen.getByRole('dialog');
+    await user.type(within(dialog).getByLabelText(/Motivo del descarte/), 'Prueba concluida para esta alerta');
+    await user.click(within(dialog).getByRole('button', { name: 'Confirmar descarte' }));
+    expect(await screen.findByText('Alertas climáticas revisadas (1)')).toBeInTheDocument();
+    for (let i = 0; i < 5; i++) expect(screen.getByLabelText(`Alerta a${i}`, { selector: 'article' })).toBeVisible();
+    expect(screen.getByLabelText('Alerta a5', { selector: 'article' })).not.toBeVisible();
+    expect(screen.queryByRole('navigation', { name: 'Páginas de alertas climáticas' })).not.toBeInTheDocument();
+  });
   it('preselecciona las zonas vinculadas y mantiene la confirmación con fundamento', async () => {
     fetchClimateAlerts.mockResolvedValue({ alertas: [alert({ confirmacion: { ...alert().confirmacion, barrios: ['San Nicolás'] } })] });
     fetchZones.mockResolvedValue([{ id: 'z1', nombre: 'Centro', barrioIds: ['AR-CABA-SAN-NICOLAS'] }, { id: 'z2', nombre: 'Norte', barrioIds: ['AR-CABA-NUNEZ'] }]);
@@ -160,6 +234,7 @@ describe('Eventos climaticos', () => {
     mount();
     expect(await screen.findByRole('link', { name: 'Ver suspensión y recuperación' })).toBeVisible();
     expect(screen.getByText('Pendiente de habilitación')).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Descartar', exact: true })).not.toBeInTheDocument();
     expect(screen.queryByText(/Alertas climáticas revisadas/)).not.toBeInTheDocument();
     fetchClimateAlerts.mockResolvedValue({ alertas: [alert({ decision: 'SUSPENDER', contingenciaId: 'f1', estadoContingencia: 'RECUPERADA' })], simuladorHabilitado: false });
     await userEvent.click(screen.getByRole('button', { name: 'Actualizar' }));

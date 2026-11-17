@@ -15,7 +15,7 @@ export class AlertaClimaticaExterna {
   @Column({ type: 'jsonb', nullable: true }) finalizacion!: CriticidadFinalizadaDto | null;
   @Column({ type: 'uuid', nullable: true }) contingenciaId!: string | null;
   @Column({ type: 'varchar', length: 25, default: 'PENDIENTE_REVISION' })
-  decision!: 'PENDIENTE_REVISION' | 'SUSPENDER' | 'SIN_AFECTACION';
+  decision!: 'PENDIENTE_REVISION' | 'SUSPENDER' | 'SIN_AFECTACION' | 'DESCARTADA';
   @Column({ type: 'varchar', length: 300, nullable: true }) motivo!: string | null;
   @Column({ type: 'text', nullable: true }) revisadoPor!: string | null;
   @Column({ type: 'timestamptz', nullable: true }) revisadaEn!: Date | null;

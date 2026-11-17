@@ -115,22 +115,26 @@ export class CriticidadClimaticaService {
       await this.contingencias.bloquearOperacion();
       const alerta = await this.repo.buscar(id);
       if (!alerta) throw new NotFoundException('No existe la alerta climatica');
-      if (!alerta.confirmacion)
-        throw new ConflictException('Falta recibir la confirmacion de Espacios Publicos');
       if (alerta.decision !== 'PENDIENTE_REVISION')
         throw new ConflictException('La alerta ya fue revisada');
+      // Descartar es una decisión auditada sobre una alerta sin suspensión.
+      // También permite archivar cierres huérfanos; nunca levanta restricciones.
+      if (alerta.contingenciaId)
+        throw new ConflictException('La alerta tiene una suspensión; gestioná su recuperación');
+      if (!alerta.confirmacion && dto.accion !== 'DESCARTAR')
+        throw new ConflictException('Falta recibir la confirmacion de Espacios Publicos');
       alerta.revisadoPor = actor;
       if (dto.accion === 'SUSPENDER') {
         if (!dto.zonaIds?.length)
           throw new BadRequestException('Selecciona al menos una zona afectada');
-        if (alerta.confirmacion.vigenciaDesde > Date.now())
+        if (alerta.confirmacion!.vigenciaDesde > Date.now())
           throw new ConflictException('La alerta aun no esta vigente');
         alerta.contingenciaId = randomUUID();
         await this.aplicar(alerta, EVENTO_INICIO, dto.zonaIds);
         if (alerta.finalizacion) await this.aplicar(alerta, EVENTO_FIN, dto.zonaIds);
       } else if (dto.zonaIds?.length)
-        throw new BadRequestException('Una alerta sin afectacion no debe tener zonas');
-      alerta.decision = dto.accion;
+        throw new BadRequestException('Una decisión sin suspensión no debe tener zonas');
+      alerta.decision = dto.accion === 'DESCARTAR' ? 'DESCARTADA' : dto.accion;
       alerta.motivo = dto.motivo;
       alerta.revisadoPor = actor;
       alerta.revisadaEn = new Date();
