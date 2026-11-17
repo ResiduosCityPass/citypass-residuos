@@ -125,7 +125,7 @@ que nadie tuviera que avisarnos."
 |---|---|
 | El evento no aparece en el mapa | Refrescar. Si sigue sin aparecer, `npm run bus -- fallidos`; si tarda, pasar al plan B |
 | El bus o Espacios no responden | Plan B: el script, mismo evento, misma historia |
-| La ruta sale sin el tacho de la sede | El evento no terminó todavía (la escuadrilla arranca a la hora de fin) o el tacho está en otra ruta viva |
+| La ruta sale sin el tacho de la sede | El evento no terminó todavía (la escuadrilla arranca a la hora de fin), el tacho está en otra ruta viva o la zona "Sede Recoleta" está bloqueada por una emergencia: descartar la propuesta, Zonas → "Desbloquear" y generar de nuevo |
 | "No hay contenedores para la ruta" | El evento todavía no terminó: esperar a que el aviso diga "Terminó" y generar de nuevo. Si no, hay una ruta en `PROPUESTA` colgada: descartarla y generar de nuevo. Si los tachos ya se vaciaron, no vuelven a entrar: mandar otra actividad para repetir |
 | El chofer no puede confirmar | La ubicación de DevTools no es la del contenedor |
 | `/chofer` dice que no hay ruta | La ruta está asignada a otro chofer. En local, el token de chofer es el de Juana Perez, no el de `dev-chofer`. Una ruta asignada no se puede reasignar: hay que generar otra |
@@ -143,3 +143,4 @@ que nadie tuviera que avisarnos."
 | 05/11 | Local, por webhook | Paso 1 en la sede de Recoleta: `npm run plaza` creó CT-0020, CT-0021 y CT-0022, y la actividad de 1.500 personas quedó con los 3. Falta el ensayo en Render |
 | 06/11 | Render, plan B y pantalla | Pasos 1 a 3 en la sede de Recoleta con 1.200 personas: zona con 3 contenedores, CT-0022 al 0 % en la ruta de AB123CD, asignada a Juana Perez, e `IntervencionProgramada` con `EVENTO_PUBLICO` en el bus. Paso 4 sin hacer. Falta el ensayo con una actividad real de Espacios |
 | 16/11 | Render, plan B y pantalla | Pasos 1 a 4 en la sede de Recoleta con 1.200 personas: zona con 3 contenedores, CT-0022 primero y al 0 % en la ruta de AB1234D, `IntervencionProgramada` con `EVENTO_PUBLICO` en el bus y el chofer confirmó CT-0022 con el GPS simulado. Falta el ensayo con una actividad real de Espacios que llegue por el bus |
+| 17/11 | Render, bus real y pantalla | Pasos 1 a 4 con la actividad real de Rodrigo ("Show de Charly Garcia", 1.200, Recoleta) llegada por el bus. La primera ruta salió sin CT-0022 porque la zona estaba bloqueada por una emergencia de otra prueba; después de desbloquearla, CT-0022 entró al 0 %, salió la `IntervencionProgramada` con `EVENTO_PUBLICO` y el chofer lo confirmó. Falta la captura del tablero de Analítica |
