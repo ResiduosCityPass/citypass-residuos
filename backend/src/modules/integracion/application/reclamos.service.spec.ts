@@ -34,6 +34,7 @@ describe('ReclamosService (CU-INT-02)', () => {
       guardarObstrucciones: jest.fn(),
       resolverReclamo: jest.fn().mockResolvedValue(1),
       contenedoresObstruidos: jest.fn().mockResolvedValue([]),
+      resumenEvaluaciones: jest.fn().mockResolvedValue({ evaluados: 0, afectan: 0 }),
     };
     contenedores = { listar: jest.fn().mockResolvedValue([TAPADO, LEJOS]) };
     paradas = { quitarContenedores: jest.fn().mockResolvedValue(['rt-1']) };
@@ -78,7 +79,19 @@ describe('ReclamosService (CU-INT-02)', () => {
           causaTipo: 'INCIDENTE_VIAL',
           correlationId: 'RC-123',
           estadoNuevo: 'CANCELADA',
+          barrio: null,
         },
+      );
+    });
+
+    it('a Analitica le pasa el barrio del reclamo, para contar por barrio', async () => {
+      await service.procesar(CREADO, reclamo({ barrio: 'Palermo' }));
+
+      expect(paradas.quitarContenedores).toHaveBeenCalledWith(
+        ['ct-tapado'],
+        expect.any(String),
+        'RC-123',
+        expect.objectContaining({ barrio: 'Palermo' }),
       );
     });
 

@@ -11,6 +11,7 @@ describe('interpretarReclamo (CU-INT-02)', () => {
         reclamoId: 'RC-1',
         ubicacion: { lat: -34.6037, lng: -58.3816 },
         correlationId: null,
+        barrio: null,
       });
     });
 
@@ -132,6 +133,8 @@ describe('interpretarReclamo (CU-INT-02)', () => {
         ubicacion: { lat: -34.5955, lng: -58.4281 },
         // El de Reclamos: se propaga a ReclamoEvaluado para la trazabilidad.
         correlationId: 'req-7c9e6679',
+        // Para la metrica de Analitica por barrio.
+        barrio: 'Palermo',
       });
     });
 
@@ -204,6 +207,7 @@ describe('interpretarReclamo (CU-INT-02)', () => {
         reclamoId: 'RC-9',
         ubicacion: { lat: -34.6, lng: -58.38 },
         correlationId: 'req-9',
+        barrio: null,
       });
     });
 
@@ -245,6 +249,18 @@ describe('interpretarReclamo (CU-INT-02)', () => {
         interpretarReclamo('com.citypass.otro.ReclamoReclasificado', reclasificado('TRANSITO')),
       ).toBeNull();
     });
+  });
+
+  it('un barrio vacio, que no es texto o demasiado largo se descarta, sin descartar el reclamo', () => {
+    expect(interpretarReclamo(CREADO, { ...AUTO, barrio: '  San Telmo ' })).toMatchObject({
+      barrio: 'San Telmo',
+    });
+    for (const barrio of ['  ', 42, 'x'.repeat(101)]) {
+      expect(interpretarReclamo(CREADO, { ...AUTO, barrio })).toMatchObject({
+        tipo: 'creado',
+        barrio: null,
+      });
+    }
   });
 
   it('un correlationId vacio o demasiado largo se descarta, sin descartar el reclamo', () => {

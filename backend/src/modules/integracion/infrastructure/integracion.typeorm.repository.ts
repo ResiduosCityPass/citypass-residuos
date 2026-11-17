@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager, IsNull, LessThanOrEqual, MoreThan } from 'typeorm';
+import { EventTypes } from '../../../shared/domain/domain-event';
 import { ContextoTransaccional } from '../../../shared/persistence/contexto-transaccional';
 import { ActividadCancelada } from '../domain/actividad-cancelada.entity';
 import { ActividadMasiva } from '../domain/actividad-masiva.entity';
@@ -153,5 +154,24 @@ export class IntegracionTypeormRepository
       });
 
     return [...new Set(filas.map((f) => f.contenedorId))];
+  }
+
+  async resumenEvaluaciones(desde: Date | null): Promise<{ evaluados: number; afectan: number }> {
+    // ponytail: se lee del outbox porque un reclamo que no tapa nada no deja
+    // otra fila. Recorre todos los ReclamoEvaluado: alcanza para los de una
+    // demo. Si el outbox se empieza a purgar, hace falta una tabla propia.
+    // Como la define contratos-de-eventos.md: por reclamoId distinto, y si hay
+    // dos decisiones para el mismo reclamo, vale la primera.
+    const [fila]: { evaluados: number; afectan: number }[] = await this.manager().query(
+      `SELECT count(*)::int AS evaluados, count(*) FILTER (WHERE afecta)::int AS afectan
+         FROM (SELECT DISTINCT ON (sobre->'payload'->>'reclamoId')
+                      (sobre->'payload'->>'afectaRecoleccion')::boolean AS afecta
+                 FROM "evento_pendiente"
+                WHERE "eventType" = $1 AND ($2::timestamptz IS NULL OR "creadoEn" >= $2)
+                ORDER BY sobre->'payload'->>'reclamoId', "creadoEn") r`,
+      [EventTypes.RECLAMO_EVALUADO, desde],
+    );
+
+    return fila;
   }
 }

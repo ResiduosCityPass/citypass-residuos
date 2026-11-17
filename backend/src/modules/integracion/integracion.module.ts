@@ -19,6 +19,7 @@ import { Intervencion } from './domain/intervencion.entity';
 import { INTERVENCION_REPOSITORY } from './domain/intervencion.repository';
 import { IntervencionTypeormRepository } from './infrastructure/intervencion.typeorm.repository';
 import { IntervencionesController } from './intervenciones.controller';
+import { ReclamosController } from './reclamos.controller';
 import { BloqueoPorIncidente } from './domain/bloqueo-por-incidente.entity';
 import { EventoRecibido } from './domain/evento-recibido.entity';
 import {
@@ -51,7 +52,12 @@ import { IntegracionTypeormRepository } from './infrastructure/integracion.typeo
     // recalculan rutas (CU-INT-02).
     forwardRef(() => RutasModule),
   ],
-  controllers: [CitypassWebhookController, ActividadesMasivasController, IntervencionesController],
+  controllers: [
+    CitypassWebhookController,
+    ActividadesMasivasController,
+    IntervencionesController,
+    ReclamosController,
+  ],
   providers: [
     IntegracionService,
     CitypassKafkaConsumer,
