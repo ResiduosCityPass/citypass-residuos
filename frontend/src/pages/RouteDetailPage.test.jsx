@@ -84,6 +84,7 @@ describe('CU-08 / CU-09 · revisar y asignar una ruta', () => {
     fetchRoute.mockResolvedValue(suspended);
     const user = userEvent.setup(); mount();
     await screen.findByText('Recolección suspendida por evento climático');
+    await screen.findByRole('option', { name: /Juana Perez/ });
     await user.selectOptions(await screen.findByLabelText(/Asignar a/), JUANA.id);
     expect(screen.getByRole('button', { name: 'Confirmar y asignar' })).toBeDisabled();
     expect(screen.getByText(/Suspendida por evento climático: Inundacion Centro/)).toBeInTheDocument();
