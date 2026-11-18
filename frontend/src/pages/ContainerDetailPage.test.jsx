@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import ContainerDetailPage from './ContainerDetailPage.jsx';
 import { fetchContainer, fetchAlerts, fetchPrediction, setContainerOutOfService } from '../api/waste.js';
 import { ApiError } from '../api/client.js';
+import { SessionContext } from '../auth/SessionContext.js';
+import { simulateContainerReading, fetchOperatorIdentity } from '../api/waste.js';
 
 vi.mock('../api/waste.js', () => ({
   USING_MOCKS: false,
@@ -14,6 +16,8 @@ vi.mock('../api/waste.js', () => ({
   acknowledgeAlert: vi.fn(),
   resolveAlert: vi.fn(),
   setContainerOutOfService: vi.fn(),
+  simulateContainerReading: vi.fn(),
+  fetchOperatorIdentity: vi.fn(),
 }));
 
 const ZONE = { id: 'zn-1', nombre: 'Centro', umbralCriticoPct: 70, umbralTemperaturaC: 60, bloqueada: false };
@@ -36,16 +40,79 @@ const detail = (extras = {}) => ({
   ...extras,
 });
 
-const mount = () =>
-  render(
+const view = (rol = null, onAlertsChanged, tokenVersion = 0) => (
+    <SessionContext.Provider value={rol === 'LOCAL' ? null : { rol }}>
     <MemoryRouter initialEntries={['/contenedores/ct-3']}>
       <Routes>
-        <Route path="/contenedores/:id" element={<ContainerDetailPage />} />
+        <Route path="/contenedores/:id" element={<ContainerDetailPage onAlertsChanged={onAlertsChanged} tokenVersion={tokenVersion} />} />
       </Routes>
-    </MemoryRouter>,
+    </MemoryRouter>
+    </SessionContext.Provider>
   );
+const mount = (...args) => render(view(...args));
 
 describe('detalle del contenedor', () => {
+  it('al cambiar la credencial local descarta la identidad anterior y las respuestas tardias', async () => {
+    let resolveOld;
+    fetchContainer.mockResolvedValue(detail());
+    fetchOperatorIdentity.mockImplementationOnce(() => new Promise((done) => { resolveOld = done; }))
+      .mockResolvedValue({ rol: 'OPERADOR' });
+    const page = mount('LOCAL');
+    await screen.findByText('CT-0003');
+    page.rerender(view('LOCAL', undefined, 1));
+    await act(async () => { resolveOld({ rol: 'ADMINISTRADOR' }); });
+    expect(fetchOperatorIdentity).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('button', { name: 'Simular lectura' })).not.toBeInTheDocument();
+  });
+
+  it('en modo local consulta el rol al backend antes de mostrar la simulacion', async () => {
+    fetchContainer.mockResolvedValue(detail());
+    fetchOperatorIdentity.mockResolvedValue({ rol: 'ADMINISTRADOR' });
+    mount('LOCAL');
+    expect(await screen.findByRole('button', { name: 'Simular lectura' })).toBeEnabled();
+    expect(fetchOperatorIdentity).toHaveBeenCalledOnce();
+  });
+
+  it('sin verificacion local del rol no ofrece simular', async () => {
+    fetchContainer.mockResolvedValue(detail());
+    fetchOperatorIdentity.mockRejectedValue(new Error('Sin sesion'));
+    mount('LOCAL');
+    await screen.findByText('CT-0003');
+    expect(screen.queryByRole('button', { name: 'Simular lectura' })).not.toBeInTheDocument();
+  });
+  it.each(['OPERADOR', 'CHOFER', null])('no ofrece la simulacion al rol %s', async (rol) => {
+    fetchContainer.mockResolvedValue(detail());
+    mount(rol);
+    await screen.findByText('CT-0003');
+    expect(screen.queryByRole('button', { name: 'Simular lectura' })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    { sensor: null }, { estado: 'FUERA_DE_SERVICIO' },
+  ])('deshabilita la simulacion cuando no se puede registrar: %j', async (extras) => {
+    fetchContainer.mockResolvedValue(detail(extras));
+    mount('ADMINISTRADOR');
+    expect(await screen.findByRole('button', { name: 'Simular lectura' })).toBeDisabled();
+  });
+
+  it('el admin confirma una lectura y recarga contenedor, alertas y contador', async () => {
+    fetchContainer.mockResolvedValueOnce(detail({ temperaturaC: 20 }))
+      .mockResolvedValue(detail({ nivelLlenadoPct: 90, estado: 'CRITICO', ultimaLecturaEn: '2026-11-18T15:00:00Z' }));
+    simulateContainerReading.mockResolvedValue({ estadoNuevo: 'CRITICO' });
+    const changed = vi.fn();
+    mount('ADMINISTRADOR', changed);
+    await userEvent.click(await screen.findByRole('button', { name: 'Simular lectura' }));
+    const field = screen.getByLabelText(/Nivel de llenado/);
+    await userEvent.clear(field); await userEvent.type(field, '90');
+    await userEvent.click(screen.getByRole('checkbox'));
+    await userEvent.click(screen.getByRole('button', { name: 'Confirmar y registrar lectura' }));
+    expect(await screen.findByText(/90% de llenado/)).toBeInTheDocument();
+    expect(screen.getByText('Lectura simulada registrada')).toBeInTheDocument();
+    expect(fetchAlerts).toHaveBeenCalledTimes(2);
+    expect(changed).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     fetchAlerts.mockResolvedValue([]);

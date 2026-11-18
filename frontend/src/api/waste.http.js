@@ -65,6 +65,10 @@ export const deleteContainer = (id) => api.delete(`/contenedores/${id}`);
 /** Rol ADMINISTRADOR. Devuelve la apiKey UNA SOLA VEZ: el backend guarda solo su hash. */
 export const linkSensor = (id, data) => api.post(`/contenedores/${id}/sensor`, data);
 
+/** Solo ADMINISTRADOR, con confirmacion; no se transmite la clave del sensor. */
+export const simulateContainerReading = (id, data) => api.post(`/contenedores/${id}/lecturas/simulacion`, data);
+export const fetchOperatorIdentity = () => api.get('/auth/sesion');
+
 /**
  * Sacar de servicio (`true`) o reintegrar (`false`). Va por query y sin cuerpo,
  * como el bloqueo de zonas: es un acto operativo, no la edicion de un campo.

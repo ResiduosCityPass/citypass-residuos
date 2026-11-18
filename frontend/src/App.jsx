@@ -130,7 +130,7 @@ function Application() {
         <Route path="/" element={<Navigate to="/mapa" replace />} />
         <Route path="/mapa" element={<MapPage tokenVersion={tokenVersion} />} />
         <Route path="/contenedores" element={<ContainersPage />} />
-        <Route path="/contenedores/:id" element={<ContainerDetailPage onAlertsChanged={countAlerts} />} />
+        <Route path="/contenedores/:id" element={<ContainerDetailPage onAlertsChanged={countAlerts} tokenVersion={tokenVersion} />} />
         <Route path="/zonas" element={<ZonesPage />} />
         <Route path="/alertas" element={<AlertsPage onAlertsChanged={countAlerts} />} />
         <Route path="/flota" element={<FleetPage />} />

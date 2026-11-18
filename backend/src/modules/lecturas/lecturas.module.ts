@@ -8,10 +8,11 @@ import { Lectura } from './domain/lectura.entity';
 import { LECTURA_REPOSITORY } from './domain/lectura.repository';
 import { LecturaTypeormRepository } from './infrastructure/lectura.typeorm.repository';
 import { LecturasController } from './lecturas.controller';
+import { SimulacionLecturasController } from './simulacion-lecturas.controller';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Lectura]), ContenedoresModule, ZonasModule, AlertasModule],
-  controllers: [LecturasController],
+  controllers: [LecturasController, SimulacionLecturasController],
   providers: [LecturasService, { provide: LECTURA_REPOSITORY, useClass: LecturaTypeormRepository }],
   exports: [LecturasService, LECTURA_REPOSITORY],
 })
