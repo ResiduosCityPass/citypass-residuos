@@ -19,6 +19,10 @@ La métrica de Analítica ("cuadrillas planificadas para las inmediaciones del e
 vivo: su tablero se actualiza cada unas 6 horas. Se muestra el evento en el bus y se cuenta que
 Analítica confirmó el 18/11 que le llega bien, con todos los campos.
 
+**Extra, por las dudas:** no es obligatorio mostrar la métrica. Si sobra tiempo y ese día la
+métrica del ensayo del 17/11 ya figura en el tablero, se abre la pantalla **Métricas**
+(`/metricas`) unos segundos y se la señala. Si no figura, se sigue sin ella.
+
 ---
 
 ## La historia
