@@ -3,6 +3,7 @@ import {
   setZoneBlocked,
   setContainerOutOfService,
   linkSensor,
+  simulateContainerReading,
   fetchMapContainers,
   deleteZone,
   fetchDrivers,
@@ -35,6 +36,15 @@ describe('rutas contra la API real', () => {
 
   const calledPath = () => globalThis.fetch.mock.calls[0][0];
   const calledOptions = () => globalThis.fetch.mock.calls[0][1];
+
+  it('simula una lectura con JWT humano y confirmacion, sin credenciales IoT', async () => {
+    await simulateContainerReading('ct-3', { nivelLlenadoPct: 90, confirmar: true });
+    expect(calledPath()).toMatch(/\/contenedores\/ct-3\/lecturas\/simulacion$/);
+    expect(calledOptions().method).toBe('POST');
+    expect(calledOptions().headers.Authorization).toBe('Bearer un.jwt.valido');
+    expect(calledOptions().headers['X-Sensor-Key']).toBeUndefined();
+    expect(JSON.parse(calledOptions().body)).toEqual({ nivelLlenadoPct: 90, confirmar: true });
+  });
 
   it('consulta contingencias y sus capacidades con autenticacion', async () => {
     await fetchFloods();

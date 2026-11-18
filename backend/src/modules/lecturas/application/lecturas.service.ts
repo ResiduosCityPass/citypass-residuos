@@ -100,6 +100,46 @@ export class LecturasService {
     return this.transaccion.ejecutar(() => this.registrarEnTransaccion(sensor, datos));
   }
 
+  async simular(
+    contenedorId: string,
+    nivelLlenadoPct: number,
+    actorSub: string,
+  ): Promise<ResultadoIngesta> {
+    const resultado = await this.transaccion.ejecutar(async () => {
+      const contenedor = await this.contenedores.buscarPorId(contenedorId);
+      if (!contenedor || !contenedor.activo) {
+        throw new NotFoundException({
+          message: 'Contenedor no encontrado',
+          code: 'CONTENEDOR_NO_ENCONTRADO',
+        });
+      }
+      if (contenedor.estado === EstadoContenedor.FUERA_DE_SERVICIO) {
+        throw new ConflictException({
+          message: 'Reintegra el contenedor antes de simular una lectura',
+          code: 'CONTENEDOR_FUERA_DE_SERVICIO',
+        });
+      }
+      const sensor = await this.sensores.buscarPorContenedor(contenedorId);
+      if (!sensor) {
+        throw new ConflictException({
+          message: 'Vincula un sensor antes de simular una lectura',
+          code: 'CONTENEDOR_SIN_SENSOR',
+        });
+      }
+      // Conserva las otras mediciones y aplica la misma ingesta, alertas y outbox.
+      // Para un sensor nuevo sin temperatura previa se usa una lectura de 20 C.
+      return this.registrarEnTransaccion(sensor, {
+        nivelLlenadoPct,
+        temperaturaC: contenedor.temperaturaC ?? 20,
+        bateriaPct: sensor.bateriaPct ?? 100,
+      });
+    });
+    this.logger.log(
+      JSON.stringify({ accion: 'LECTURA_SIMULADA', actorSub, nivelLlenadoPct, ...resultado }),
+    );
+    return resultado;
+  }
+
   private async registrarEnTransaccion(
     sensor: Sensor,
     datos: {

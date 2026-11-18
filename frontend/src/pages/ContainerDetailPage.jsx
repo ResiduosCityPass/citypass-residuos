@@ -6,12 +6,15 @@ import Notice from '../components/ui/Notice.jsx';
 import FillBar from '../components/ui/FillBar.jsx';
 import AlertRow from '../components/alerts/AlertRow.jsx';
 import PredictionCard from '../components/containers/PredictionCard.jsx';
+import SimulateReadingModal from '../components/containers/SimulateReadingModal.jsx';
+import { useOperatorSession } from '../auth/SessionContext.js';
 import {
   fetchContainer,
   fetchAlerts,
   acknowledgeAlert,
   resolveAlert,
   setContainerOutOfService,
+  fetchOperatorIdentity,
 } from '../api/waste.js';
 import { generalMessage } from '../domain/errors.js';
 import {
@@ -30,14 +33,29 @@ import {
  * unica que llama a GET /contenedores/:id, que los trae anidados. El payload del
  * mapa es flaco a proposito y el del listado no incluye sensor.
  */
-export default function ContainerDetailPage({ onAlertsChanged }) {
+export default function ContainerDetailPage({ onAlertsChanged, tokenVersion = 0 }) {
   const { id } = useParams();
+  const session = useOperatorSession();
   const [container, setContainer] = useState(null);
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [changingService, setChangingService] = useState(false);
   const [serviceResult, setServiceResult] = useState(null);
+  const [simulating, setSimulating] = useState(false);
+  const [readingResult, setReadingResult] = useState(null);
+  const [localIdentity, setLocalIdentity] = useState(null);
+  // En Login federado el contexto ya trae el rol verificado. El perfil local
+  // consulta al backend y vuelve a hacerlo si cambia el token de desarrollo.
+  useEffect(() => {
+    if (session) return undefined;
+    let active = true;
+    fetchOperatorIdentity().then((user) => {
+      if (active) setLocalIdentity({ tokenVersion, user });
+    }).catch(() => { /* Sin identidad verificada no se ofrece la simulacion. */ });
+    return () => { active = false; };
+  }, [session, tokenVersion]);
+  const administrator = (session ?? (localIdentity?.tokenVersion === tokenVersion ? localIdentity.user : null))?.rol === 'ADMINISTRADOR';
 
   const load = useCallback(() => {
     Promise.all([fetchContainer(id), fetchAlerts({ contenedorId: id })])
@@ -158,6 +176,8 @@ export default function ContainerDetailPage({ onAlertsChanged }) {
           )}
 
           <div className="detail-actions">
+            {administrator && <Button variant="secondary" disabled={!sensor || outOfService || changingService}
+              onClick={() => setSimulating(true)}>Simular lectura</Button>}
             {/* PATCH /contenedores/:id/servicio?fuera=. Al reintegrarlo el
                 backend lo reevalua contra el umbral: no vuelve a NORMAL a ciegas. */}
             <Button
@@ -168,6 +188,12 @@ export default function ContainerDetailPage({ onAlertsChanged }) {
               {outOfService ? 'Reintegrar al servicio' : 'Poner fuera de servicio'}
             </Button>
           </div>
+          {administrator && (!sensor || outOfService) && <p className="muted">
+            {outOfService ? 'Reintegrá el contenedor al servicio para simular una lectura.' : 'Vinculá un sensor desde el listado de contenedores para simular una lectura.'}
+          </p>}
+          {readingResult && <Notice type="success" title="Lectura simulada registrada">
+            Estado resultante: {STATE_LABEL[readingResult.estadoNuevo]}. Las alertas se actualizaron con las reglas habituales.
+          </Notice>}
         </section>
 
         <section className="panel-card">
@@ -198,7 +224,7 @@ export default function ContainerDetailPage({ onAlertsChanged }) {
           {canPredict(container) && (
             <>
               <h3 className="spaced">Predicción de saturación</h3>
-              <PredictionCard containerId={container.id} thresholdPct={zona.umbralCriticoPct} />
+              <PredictionCard key={container.ultimaLecturaEn} containerId={container.id} thresholdPct={zona.umbralCriticoPct} />
             </>
           )}
 
@@ -214,6 +240,8 @@ export default function ContainerDetailPage({ onAlertsChanged }) {
           )}
         </section>
       </div>
+      {simulating && administrator && <SimulateReadingModal key={id} container={container}
+        onClose={() => setSimulating(false)} onDone={(result) => { setReadingResult(result); load(); onAlertsChanged?.(); }} />}
     </div>
   );
 }

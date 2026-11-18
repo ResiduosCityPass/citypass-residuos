@@ -104,6 +104,77 @@ describe('LecturasService (CU-04)', () => {
     );
   });
 
+  describe('simulacion administrativa', () => {
+    beforeEach(() => {
+      construir(contenedorDe({ activo: true }));
+      sensores.buscarPorContenedor.mockResolvedValue({ ...sensorDe(), bateriaPct: 83 });
+    });
+
+    it('aplica la ingesta real, conserva temperatura/bateria y genera saturacion', async () => {
+      const resultado = await service.simular('c-1', 90, 'admin-1');
+      expect(resultado).toMatchObject({
+        estadoNuevo: EstadoContenedor.CRITICO,
+        alertasGeneradas: [TipoAlerta.SATURACION],
+      });
+      expect(lecturas.crear).toHaveBeenCalledWith(
+        expect.objectContaining({
+          contenedorId: 'c-1',
+          nivelLlenadoPct: 90,
+          temperaturaC: 22,
+          bateriaPct: 83,
+          registradaEn: expect.any(Date),
+        }),
+      );
+      expect(alertas.registrarSaturacion).toHaveBeenCalledTimes(1);
+      expect(sensores.crear).not.toHaveBeenCalled();
+    });
+
+    it('usa 20 C y 100% de bateria solo si no habia mediciones previas', async () => {
+      sensores.buscarPorContenedor.mockResolvedValue({ ...sensorDe(), bateriaPct: null });
+      construir(contenedorDe({ activo: true, temperaturaC: null }));
+      await service.simular('c-1', 50, 'admin-1');
+      expect(lecturas.crear).toHaveBeenCalledWith(
+        expect.objectContaining({ temperaturaC: 20, bateriaPct: 100 }),
+      );
+    });
+
+    it.each([null, contenedorDe({ activo: false })])(
+      'rechaza un contenedor inexistente o dado de baja: %s',
+      async (contenedor) => {
+        contenedores.buscarPorId.mockResolvedValue(contenedor);
+        await expect(service.simular('c-1', 90, 'admin-1')).rejects.toThrow(NotFoundException);
+        expect(lecturas.crear).not.toHaveBeenCalled();
+      },
+    );
+
+    it('no cambia contenedores fuera de servicio', async () => {
+      construir(contenedorDe({ activo: true, estado: EstadoContenedor.FUERA_DE_SERVICIO }));
+      await expect(service.simular('c-1', 90, 'admin-1')).rejects.toMatchObject({
+        response: { code: 'CONTENEDOR_FUERA_DE_SERVICIO' },
+      });
+      expect(lecturas.crear).not.toHaveBeenCalled();
+    });
+
+    it('exige un sensor vinculado sin generar credenciales nuevas', async () => {
+      sensores.buscarPorContenedor.mockResolvedValue(null);
+      await expect(service.simular('c-1', 90, 'admin-1')).rejects.toMatchObject({
+        response: { code: 'CONTENEDOR_SIN_SENSOR' },
+      });
+      expect(lecturas.crear).not.toHaveBeenCalled();
+      expect(sensores.crear).not.toHaveBeenCalled();
+    });
+
+    it('respeta el control cronologico de las lecturas reales', async () => {
+      lecturas.ultimaDe.mockResolvedValue({
+        registradaEn: new Date(Date.now() + 10000),
+      } as Lectura);
+      await expect(service.simular('c-1', 90, 'admin-1')).rejects.toMatchObject({
+        response: { code: 'LECTURA_FUERA_DE_ORDEN' },
+      });
+      expect(lecturas.crear).not.toHaveBeenCalled();
+    });
+  });
+
   describe('persistencia y estado', () => {
     it('persiste la lectura contra el contenedor del sensor autenticado', async () => {
       construir(contenedorDe());

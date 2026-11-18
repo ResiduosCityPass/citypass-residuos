@@ -756,3 +756,15 @@ A la madrugada probé los cuatro pasos en Render con el script del plan B: "Fest
 **Falta:**
 - Le pasé a Fran el eventId nuevo; falta la captura del tablero de Analítica para el PPT.
 - Antes de la demo, revisar en Zonas que "Sede Recoleta" esté activa.
+
+## Mié 18/11 · Analítica confirma que le llega el evento
+
+- **Analítica:** Fran Csik revisó la `IntervencionProgramada` del ensayo del 17/11 y avisó en el grupo que le llegó bien, con todos los campos que necesita. Con eso queda probado el caso de punta a punta: Espacios → Residuos → Analítica.
+- **Sin captura del tablero:** decidí no usarla. En la demo alcanza con mostrar el evento en el bus y contar que Analítica ya lo confirmó.
+- **Otra actividad en la sede:** Rodrigo creó para Reclamos "Territorio Creativo" (1.000 personas, en Junín 1930, la sede de Recoleta), que termina a las 13:35. Es una prueba de otro caso: no genero ruta con ella, así CT-0022 queda libre.
+- **¿Cada uno muestra métricas?** Lo pregunté en el grupo de Residuos. Adriel respondió que no es obligatorio: él muestra una porque su parte es corta. Sumé al guion un extra opcional: si sobra tiempo y la métrica ya figura en el tablero, abrir la pantalla Métricas unos segundos.
+- **#128 aprobado:** Ramiro sumó la simulación de llenado de un contenedor desde su detalle. No cambia el armado de rutas ni el CT-0022.
+
+**Falta:**
+- Ensayo cronometrado con Rodrigo antes del 26/11.
+- El 26/11, antes de exponer: zona "Sede Recoleta" activa, CT-0022 libre y la API despierta.
