@@ -351,15 +351,24 @@ error), por su ADR de coordenadas aproximadas. Afecta sobre todo al radio de la 
 }
 ```
 
-#### Métrica para BI: cuadrillas afectadas por incidentes viales (caso 4)
+#### Métrica para BI: paradas omitidas por cortes de circulación (caso 4)
 
 ```text
-camionId distintos con estadoNuevo = AFECTADA y causaTipo = INCIDENTE_VIAL
+intervencionId distintos con estadoNuevo = AFECTADA y causaTipo = INCIDENTE_VIAL
 ```
 
-- **`intervencionId` es el id de la parada:** para Analítica, cada parada es una intervención. Con
-  esa misma lectura, contar eventos da las paradas afectadas. No coincide con el `intervencionId` de
-  `IntervencionProgramada`, que es uno por emergencia: esta métrica no los cruza.
+- **La define Residuos, con el OK del profe (18/11):** reemplaza a "cuadrillas afectadas"
+  (`camionId` distintos), que se había acordado con Analítica. En un corte, CU-INT-01 no manda
+  cuadrillas: saltea paradas. Lo que se pierde son contenedores sin recolectar, y contar camiones
+  no lo muestra. Además, `camionId` distintos nunca supera la cantidad de camiones de la flota.
+  Se le avisó a Valen el 18/11.
+- **`intervencionId` es el id de la parada:** para Analítica, cada parada es una intervención. No
+  coincide con el `intervencionId` de `IntervencionProgramada`, que es uno por emergencia: esta
+  métrica no los cruza.
+- **Se cuenta por `intervencionId`, no por evento:** el gateway le pone un `eventId` nuevo a cada
+  reintento, así que contando mensajes un duplicado suma dos veces.
+- **`estadoNuevo = AFECTADA` deja afuera a CU-INT-02:** las paradas que corta un reclamo también
+  salen con `INCIDENTE_VIAL`, pero como `CANCELADA`.
 - **`causaId` y `causaTipo`:** si `EmergenciaCreada` trae `INCIDENTE_VIAL` o `EVENTO_CLIMATICO`, van
   tal cual. Si no trae causa, salen `causaTipo = INCIDENTE_VIAL` y `causaId = emergenciaId`: la
   emergencia que corta la circulación es el incidente vial. Movilidad no publica
