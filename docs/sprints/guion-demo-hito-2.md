@@ -15,9 +15,9 @@ el evento se aprovecha con el PPT. Se ensaya entera al menos una vez el día ant
 | 4:30 – 6:30 | Demo | Pasos 3 y 4: la ruta de la escuadrilla y el chofer la cierra |
 | 6:30 – 7:00 | PPT | Cierre |
 
-La métrica de Analítica ("cuadrillas planificadas para las inmediaciones del evento") se muestra
-con una captura del ensayo: su tablero se actualiza cada unas 6 horas, así que la intervención de
-la demo no aparece en vivo.
+La métrica de Analítica ("cuadrillas planificadas para las inmediaciones del evento") no se ve en
+vivo: su tablero se actualiza cada unas 6 horas. Se muestra el evento en el bus y se cuenta que
+Analítica confirmó el 18/11 que le llega bien, con todos los campos.
 
 ---
 
