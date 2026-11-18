@@ -6,6 +6,8 @@ const requiresFloodApi = async () => { throw new ApiError({ code: 'CONTINGENCIAS
 export const simulateFloodStart = requiresFloodApi;
 export const simulateFloodEnd = requiresFloodApi;
 export const enableFloodRecovery = requiresFloodApi;
+export const simulateContainerReading = async () => { throw new ApiError({ code: 'SIMULACION_REQUIERE_API', status: 409, message: 'Conectá el backend para registrar lecturas de prueba.' }); };
+export const fetchOperatorIdentity = async () => ({ rol: null });
 import { ZONES, CONTAINERS, SENSORS, ALERTS, TRUCKS, DRIVERS, ROUTES, STOPS, INTERVENTIONS } from './data.js';
 import { DEPOT, distanceKm, distanceMeters } from '../domain/geo.js';
 
