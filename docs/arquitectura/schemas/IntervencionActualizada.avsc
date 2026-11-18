@@ -2,10 +2,10 @@
   "type": "record",
   "name": "IntervencionActualizada",
   "namespace": "com.citypass.residuos",
-  "doc": "Una parada pendiente de una ruta asignada o en curso quedo afectada por una emergencia vial o por una suspensión climática confirmada en Residuos. Una intervención es una parada. BI cuenta camionId distintos por causaId y causaTipo (INCIDENTE_VIAL o EVENTO_CLIMATICO), no la cantidad de mensajes.",
+  "doc": "Una parada pendiente de una ruta asignada o en curso quedo afectada por una emergencia vial o por una suspensión climática confirmada en Residuos. Una intervención es una parada. BI no cuenta mensajes. Para EVENTO_CLIMATICO cuenta camionId distintos por causaId. Para INCIDENTE_VIAL (CU-INT-01) cuenta intervencionId distintos con estadoNuevo AFECTADA: paradas omitidas por cortes de circulación.",
   "fields": [
     { "name": "intervencionId", "type": "string", "doc": "Id de la parada: para Analitica, cada parada es una intervencion." },
-    { "name": "camionId", "type": "string", "doc": "Patente del camion. Identifica a la cuadrilla: es la clave para contar." },
+    { "name": "camionId", "type": "string", "doc": "Patente del camion. Identifica a la cuadrilla: es la clave para contar en el caso climático." },
     { "name": "estadoAnterior", "type": "string", "doc": "PROGRAMADA." },
     { "name": "estadoNuevo", "type": "string", "doc": "AFECTADA." },
     { "name": "causaId", "type": ["null", "string"], "default": null, "doc": "Id de la causa externa: alertaId de Espacios Públicos para EVENTO_CLIMATICO. En un corte vial, el incidenteId que informe Emergencias; si la emergencia llega sin causa, el emergenciaId (acordado con Analítica el 14/11). Null si Emergencias manda otra causa, como EVENTO_PUBLICO." },

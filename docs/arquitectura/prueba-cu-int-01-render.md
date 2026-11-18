@@ -83,8 +83,9 @@ Tienen distinto `eventId` y distinto `payloadHash`, así que no son duplicados.
 }
 ```
 
-Con esto, la métrica del caso 4 de Analítica (`camionId` distintos con `estadoNuevo = AFECTADA` y
-`causaTipo = INCIDENTE_VIAL`) cuenta 1 cuadrilla afectada (QA123ZZ) y 2 paradas.
+Con esto, la métrica del caso 4, paradas omitidas por cortes de circulación (`intervencionId`
+distintos con `estadoNuevo = AFECTADA` y `causaTipo = INCIDENTE_VIAL`), da **2**. Las dos son del
+camión QA123ZZ.
 
 ## 13/11 — Primera prueba de punta a punta
 
