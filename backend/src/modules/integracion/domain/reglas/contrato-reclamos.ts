@@ -3,7 +3,7 @@ import { Punto, ubicacionDe } from '../../../../shared/domain/geo';
 /**
  * CU-INT-02 · Como se lee un evento de reclamos que llega por el bus.
  *
- * ponytail: el contrato con Reclamos todavia no existe, y tampoco se sabe que
+ * atajo: el contrato con Reclamos todavia no existe, y tampoco se sabe que
  * squad avisa que el auto ya no esta. Hasta que se cierre, se aceptan las
  * variantes razonables de nombre de evento y de campos. Cuando se defina, se
  * recortan estas listas a los nombres reales y nada mas cambia.
