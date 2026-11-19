@@ -17,6 +17,9 @@ export class HealthController {
       status: 'ok',
       service: 'residuos-service',
       timestamp: new Date().toISOString(),
+      // Lo inyecta Render en cada deploy. Permite comprobar desde CI que quedo
+      // arriba el commit recien desplegado. Fuera de Render es null.
+      commit: process.env.RENDER_GIT_COMMIT ?? null,
     };
   }
 }

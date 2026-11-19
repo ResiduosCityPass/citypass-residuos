@@ -101,6 +101,16 @@ services:
     rootDir: frontend
     buildCommand: npm ci && npm run build
     staticPublishPath: dist
+    headers:
+      - path: /version.json
+        name: Cache-Control
+        value: no-store
+      - path: /
+        name: Cache-Control
+        value: no-store
+      - path: /index.html
+        name: Cache-Control
+        value: no-store
     # Ver comentario equivalente en el servicio API.
     autoDeployTrigger: off
     envVars:

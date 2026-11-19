@@ -55,4 +55,8 @@ const local = backendRequire('dotenv').parse(fs.readFileSync(path.join(root, 'ba
 assert.notEqual(local.KAFKA_GROUP_ID, validated.KAFKA_GROUP_ID, 'Local y cloud deben usar grupos Kafka distintos');
 assert.equal(api.autoDeployTrigger, 'off');
 assert.equal(web.autoDeployTrigger, 'off');
+for (const pathname of ['/version.json', '/', '/index.html']) {
+  assert(web.headers?.some(h => h.path === pathname && h.name === 'Cache-Control' && h.value === 'no-store'),
+    `La marca de version y el HTML no deben cachearse: ${pathname}`);
+}
 console.log('Blueprint válido para Login federado y EDA; secretos externos, simuladores apagados y grupo Kafka separado.');
