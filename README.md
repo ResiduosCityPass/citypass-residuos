@@ -63,6 +63,7 @@ La API queda en `http://localhost:3000` y la documentación Swagger en `http://l
 - [Evidencia de despliegue](docs/devops/evidencia-despliegue.md) — URLs publicas, CI y chequeos post-deploy.
 - [Guion de la demo del Hito 1](docs/sprints/guion-demo-hito-1.md) — que mostrar, en que orden y con que comandos.
 - [Backlog priorizado](docs/sprints/backlog-priorizado.md) — qué construimos y en qué orden, con el recorte de alcance justificado.
+- [Cierres de los sprints 2 a 6](docs/sprints/sprints-2-a-6.md) — reconstruidos del historial de GitHub; la retrospectiva la completa el equipo.
 - [Diagramas](docs/arquitectura/diagramas.md) — casos de uso, C4, secuencia y máquinas de estado.
 - [Modelo de datos](docs/arquitectura/modelo-de-datos.md)
 - [Contratos de eventos](docs/arquitectura/contratos-de-eventos.md) — qué publicamos y a qué nos suscribimos.
