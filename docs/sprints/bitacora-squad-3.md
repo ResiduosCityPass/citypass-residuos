@@ -768,3 +768,9 @@ A la madrugada probé los cuatro pasos en Render con el script del plan B: "Fest
 **Falta:**
 - Ensayo cronometrado con Rodrigo antes del 26/11.
 - El 26/11, antes de exponer: zona "Sede Recoleta" activa, CT-0022 libre y la API despierta.
+
+## Jue 19/11 · Opciones consideradas en el ADR-007
+
+- **Pedido de Fran Isola:** la consigna pide que cada ADR muestre las opciones que se evaluaron, y el ADR-007 (design system, navegación y datos falsos del frontend) era el único sin esa sección. Fran armó un borrador; lo revisé y lo sumé antes de `## Decisión`.
+- **Qué compara:** tokens en CSS contra MUI/Chakra, Tailwind o estilos sueltos; `react-router-dom` contra estado en `App.jsx` o Next.js; el servidor en memoria contra MSW, `json-server` o datos fijos en cada componente.
+- Es solo documentación: no cambia nada de la app ni de la demo. Entra antes del freeze del 19/11.
