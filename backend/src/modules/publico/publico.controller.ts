@@ -7,9 +7,10 @@ import { BuscarCercanosDto } from './application/dto/buscar-cercanos.dto';
 /**
  * CU-11 — Consultar contenedores cercanos.
  *
- * Es el unico endpoint marcado `@Public()` del modulo, y esta documentado como
- * decision en el ADR-005: es informacion de servicio publico. Un vecino que
- * quiere saber donde tirar unas pilas no deberia necesitar una cuenta.
+ * Es el unico endpoint `@Public()` que llama una persona, y esta documentado
+ * como decision en el ADR-005 y en el inventario del ADR-013: es informacion de
+ * servicio publico. Un vecino que quiere saber donde tirar unas pilas no
+ * deberia necesitar una cuenta.
  */
 @ApiTags('publico')
 @Controller('publico')

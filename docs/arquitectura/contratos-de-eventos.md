@@ -420,8 +420,8 @@ No sale al bus: lo usa nuestro front, que lo ve por la API. Ver
 |---|---|---|
 | `com.citypass.emergencias.EmergenciaCreada` (schemaId 78) | 6 — Emergencias | **CU-INT-01, implementado.** Si la emergencia corta la circulación (ver `IntervencionActualizada`), bloqueamos las zonas de los contenedores a menos de 300 m y omitimos sus paradas pendientes en rutas vivas. |
 | `com.citypass.emergencias.EmergenciaActualizada` (schemaId 80) con `estadoNuevo` `RESUELTA` o `CERRADA` | 6 — Emergencias | **CU-01 A7 y CU-INT-01, implementado.** Desbloqueamos las zonas (también con `DESCARTADA` o `CANCELADA`) y, si `causasRelacionadas` incluye `RESIDUOS`, programamos una intervención en `latitud`/`longitud` y publicamos `residuos.intervencion.programada`. Los nombres viejos (`EmergenciaEstadoActualizado`, `EmergenciaCerrada`, `EmergenciaResuelta`, `emergencia.resuelta`) se siguen aceptando, pero ya no están en el catálogo. |
-| `movilidad.calle.cortada` | 3 — Movilidad Urbana | Se excluye el tramo del cálculo de ruta. Si la ruta ya estaba asignada, se marca para recálculo. |
-| `reclamos.creado` | 5 — Reclamos Ciudadanos | Si la categoría es residuos y referencia un contenedor nuestro, se le adjunta el reclamo y se eleva su prioridad en el ruteo. |
+| ~~`movilidad.calle.cortada`~~ | 3 — Movilidad Urbana | **No implementado.** Fue un supuesto del Sprint 0. Los cortes de circulación que afectan la recolección llegan por Emergencias (`EmergenciaCreada`, arriba). |
+| ~~`reclamos.creado`~~ | 5 — Reclamos Ciudadanos | **No implementado con este nombre.** Fue un supuesto del Sprint 0, reemplazado por `com.citypass.reclamos.ReclamoCreado` (fila siguiente). Los reclamos de categoría `RESIDUOS` se ignoran: Reclamos los abre a partir de nuestras propias alertas ([ADR-012](../adr/ADR-012-tolerancia-a-contratos-entre-squads.md)). |
 | `com.citypass.reclamos.ReclamoCreado` (o variantes) | 5 — Reclamos Ciudadanos | **CU-INT-02, implementado.** Si es de estacionamiento indebido y el auto tapa un contenedor, lo sacamos del ruteo, recalculamos las rutas vivas y publicamos `ReclamoEvaluado`. Las variantes aceptadas están en `contrato-reclamos.ts` |
 | `com.citypass.reclamos.ReclamoActualizado` con `estadoNuevo: RESUELTO` (o variantes) | 5 — Reclamos Ciudadanos | **CU-INT-02, implementado.** Destapamos los contenedores del reclamo. También si queda rechazado o cancelado. Si nadie avisa, el bloqueo vence solo |
 | `com.citypass.reclamos.ReclamoReclasificado` (implementado por Reclamos, falta registrarlo en el catálogo) | 5 — Reclamos Ciudadanos | **CU-INT-02, implementado.** Si con la categoría nueva es un auto mal estacionado, se evalúa como un reclamo nuevo; si deja de serlo, se liberan sus contenedores. Para decidir si es un vehículo usamos el título y la descripción; `objetoAfectadoNuevo` solo suma (`CICLOVIA` alcanza) y nunca descarta, porque nombra lo afectado y lo elige el vecino |
@@ -461,8 +461,8 @@ plaza y Residuos manda una escuadrilla a limpiar los contenedores de la zona.
 
 **Quién lo publica:** Espacios Públicos, cada vez que se crea una actividad o evento comunitario.
 Internamente lo emiten como `cultura.evento_comunitario_publicado` y, al publicarlo en el bus, lo
-mapean a este nombre y a los campos del contrato del squad (E1 en
-[plan-squad-3.md](../sprints/plan-squad-3.md)). Rodrigo lo confirmó en el grupo del squad: así
+mapean a este nombre y a los campos del contrato del squad (E1 en el
+plan del caso transversal del squad 3, que no está en este repo). Rodrigo lo confirmó en el grupo del squad: así
 Residuos, Reclamos, Emergencias y Movilidad consumen todos lo mismo.
 
 **Cómo llega:** por el webhook `POST /webhooks/citypass?token=...` (CU-INT-01), con el sobre del

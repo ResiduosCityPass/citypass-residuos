@@ -83,7 +83,7 @@ export class ReclamosService {
       );
     }
 
-    // ponytail: un bloqueo que vence a las 4 h cierra su alerta recien con el
+    // atajo: un bloqueo que vence a las 4 h cierra su alerta recien con el
     // proximo reclamo que llegue. Si hiciera falta en hora, un cron que llame a esto.
     await this.alertas.resolverAccesosLiberados(
       await this.obstrucciones.contenedoresObstruidos(new Date()),
