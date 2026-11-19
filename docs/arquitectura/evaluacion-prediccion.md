@@ -29,7 +29,8 @@ El código está en
   - **ritmo-diario:** el llenado depende de la hora. Es casi nulo de madrugada y el doble a la
     tarde.
   - **sensor-ruidoso:** como el simulador, pero cada lectura tiene un error de hasta ±4 puntos.
-    Así es un sensor real.
+    Es una hipótesis del escenario sintético para ver cómo responde cada estimador al ruido, no
+    una medición de un sensor real. Validar con datos reales queda como mejora futura.
 - **Dos estimaciones sencillas para comparar:**
   - **último tramo:** el ritmo entre las dos últimas lecturas.
   - **primera y última:** el ritmo promedio entre la primera y la última lectura del ciclo.
@@ -83,9 +84,10 @@ El código está en
    es que usa todas las lecturas, mientras que el ritmo promedio depende de solo dos, y un error
    del sensor en cualquiera de ellas mueve la predicción. En el promedio de todo el ciclo
    (MAE y RMSE), en cambio, gana el ritmo promedio.
-3. **La regresión además entrega una confianza (R²).** El ritmo promedio no tiene una forma
-   natural de calcularla, y la tarjeta de CU-12 avisa *"no planifiques con este número"* por
-   debajo de 0,5.
+3. **La regresión además entrega un R².** Mide qué tan bien la recta ajusta a las lecturas que
+   ya hay, no una confianza calibrada sobre la predicción futura: un R² alto no garantiza que el
+   ritmo se mantenga. Igual sirve como alarma: la tarjeta de CU-12 avisa *"no planifiques con
+   este número"* por debajo de 0,5. El ritmo promedio no tiene una medida equivalente.
 4. **Límite conocido: el ritmo que cambia con la hora.** Si un contenedor se llena distinto de día
    que de noche, todos los estimadores se equivocan entre 4 y 9 horas, porque suponen un ritmo
    constante. La mejora sería estimar un ritmo por franja horaria a partir del histórico. Eso
@@ -107,6 +109,7 @@ El código está en
    esta entrega porque cambia lo que ve el operador.
 
 **Decisión:** se mantiene la regresión lineal de CU-12. Le gana con claridad a la estimación
-ingenua y empata con el ritmo promedio cuando el llenado es parejo. Cuando el sensor tiene error,
-que es el caso real, es más precisa cerca del umbral y, desde la primera hora de datos, también
-en general. Además informa su propia confianza.
+ingenua y empata con el ritmo promedio cuando el llenado es parejo. Con el error de sensor que
+supone el escenario ruidoso, es más precisa cerca del umbral y, desde la primera hora de datos,
+también en general. Además informa con su R² qué tan bien ajusta a las lecturas. Falta validarla
+con lecturas de sensores reales.
