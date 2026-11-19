@@ -95,7 +95,10 @@ test('CLI devuelve exit 1 y resumen fallido si el frontend nunca publica el comm
 test('CLI falla aunque version y HTML sean nuevos si el bundle no esta publicado', async t => {
   const result = await ejecutar(t, { assetStatus: 404 });
   assert.equal(result.code, 1);
-  assert.match(result.stderr, /HTTP 404/);
+  // Al agotarse el plazo global, la ultima ronda puede abortarse antes de leer
+  // el 404. Verificar la deteccion en el log, no el texto de esa ultima ronda.
+  assert.match(result.stdout, /Frontend: HTTP 404/);
+  assert.match(result.stderr, /Tiempo agotado/);
 });
 
 test('CLI falla inmediatamente ante un hook rechazado sin divulgar la clave', async t => {
