@@ -173,7 +173,9 @@ describe('Contrato real de Espacios Publicos y revision de zonas (e2e)', () => {
       'CREATE TRIGGER qa_revision BEFORE UPDATE ON alerta_climatica_externa FOR EACH ROW EXECUTE FUNCTION qa_fallar_revision()',
     );
     try {
-      await resolve(p.alertaId, [z.id]).expect(500);
+      const fallo = await resolve(p.alertaId, [z.id]).expect(500);
+      // El error de PostgreSQL queda en el log, no en la respuesta.
+      expect(JSON.stringify(fallo.body)).not.toContain('qa rollback');
       expect(await ctx.dataSource.query('SELECT * FROM contingencia')).toHaveLength(0);
       expect(await ctx.dataSource.query('SELECT * FROM evento_climatico_recibido')).toHaveLength(0);
       expect(await ctx.dataSource.query('SELECT * FROM evento_pendiente')).toHaveLength(0);
