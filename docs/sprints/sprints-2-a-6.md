@@ -6,6 +6,9 @@
 > registrado. **La retrospectiva de cada sprint no se reconstruye.** Queda un apartado vacío para
 > que la complete el equipo (facilita Tomás, Scrum Master).
 >
+> El nombre y el objetivo de cada sprint son los de la planificación de la cátedra (presentación
+> de la materia, clase del 06/08).
+>
 > Los sprints anteriores están en [Sprint 0](sprint-0.md) y [Sprint 1](sprint-1.md).
 
 ## Resumen
@@ -26,10 +29,10 @@ otro: el #49 de Ramiro, por ejemplo, lleva commits de Nicolás. Los conteos mide
 
 ---
 
-## Sprint 2 · 11/09 – 23/09
+## Sprint 2 — Desarrollo Modular II · 11/09 – 23/09
 
-**Objetivo:** cerrar el módulo para el Hito 1 (*módulo funcional sin integración*), con el 24/09
-como límite para codear.
+**Objetivo de la cátedra:** finalización del módulo de integración e implementación de testing.
+El squad fijó el 24/09 como límite para codear, para llegar al Hito 1 con todo desplegado.
 
 **Entregado:**
 
@@ -53,14 +56,26 @@ gateway del Squad 1 ([ADR-010](../adr/ADR-010-integracion-real-con-el-bus.md)).
 
 ---
 
-## Hito 1 · 24/09 – 01/10
+## Hito 1 — Entrega Parcial · 24/09 – 01/10
+
+**Pedido de la cátedra:** módulo funcional sin integración, evidencia de testing, evidencia de
+trabajo en Git y tableros, diagramas UML (casos de uso y entidad-relación).
 
 Ventana de presentación. No se mergearon PRs. Las correcciones del testeo pre-Hito (commits del
 23/09) se mergearon recién el 16/10, en el #47.
 
 ---
 
-## Sprint 3 · 02/10 – 15/10
+## Sprint 3 — Planificación · 02/10 – 15/10
+
+**Objetivo de la cátedra:** diseño colaborativo de casos de uso transversales, identificar los
+servicios involucrados en cada caso y activar chapters técnicos por tema (seguridad, testing,
+DevOps).
+
+Es un sprint de planificación: lo que se espera son acuerdos entre squads, no código. Los
+contratos de eventos con otros squads están en
+[contratos-de-eventos.md](../arquitectura/contratos-de-eventos.md) y se implementaron desde el
+Sprint 4. Qué se acordó en este sprint y con quién lo completa el equipo en la retrospectiva.
 
 **Registrado en GitHub:** no hay PRs mergeados en este rango. El único commit es de Ramiro
 (15/10): apuntar el Blueprint de Render a la base restaurada, que entró a `main` en el #48.
@@ -69,7 +84,10 @@ Ventana de presentación. No se mergearon PRs. Las correcciones del testeo pre-H
 
 ---
 
-## Sprint 4 · 16/10 – 29/10
+## Sprint 4 — Desarrollo Modular I · 16/10 – 29/10
+
+**Objetivo de la cátedra:** desarrollo de casos de uso colaborativos entre squads y validación
+funcional de eventos entre servicios.
 
 **Entregado:**
 
@@ -86,7 +104,10 @@ El #52 es la base sobre la que se montaron después los casos integradores de to
 
 ---
 
-## Sprint 5 · 30/10 – 12/11
+## Sprint 5 — Desarrollo Modular II · 30/10 – 12/11
+
+**Objetivo de la cátedra:** integración de casos de uso, tests de integración y comunicación, y
+coordinación entre squads.
 
 **Entregado, por caso integrador:**
 
@@ -114,7 +135,10 @@ El #52 es la base sobre la que se montaron después los casos integradores de to
 
 ---
 
-## Sprint 6 · 13/11 – 18/11
+## Sprint 6 — Desarrollo Modular III · 13/11 – 18/11
+
+**Objetivo de la cátedra:** revisión global de la arquitectura integrada, documentación final y
+ajuste de interfaces.
 
 **Entregado:**
 
