@@ -14,6 +14,7 @@ ARG VITE_SIMULAR_GPS=false
 ARG VITE_AUTH_MODE=local
 ARG VITE_IDP_URL=https://api.citypass-login.pp.ua
 ARG VITE_IDP_CLIENT_ID=
+ARG GITHUB_SHA
 
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_USE_MOCKS=$VITE_USE_MOCKS
@@ -21,11 +22,12 @@ ENV VITE_SIMULAR_GPS=$VITE_SIMULAR_GPS
 ENV VITE_AUTH_MODE=$VITE_AUTH_MODE
 ENV VITE_IDP_URL=$VITE_IDP_URL
 ENV VITE_IDP_CLIENT_ID=$VITE_IDP_CLIENT_ID
+ENV GITHUB_SHA=$GITHUB_SHA
 
 COPY package.json package-lock.json ./
 RUN npm ci
 
-COPY index.html vite.config.js ./
+COPY index.html vite.config.js build-version.js ./
 COPY public ./public
 COPY src ./src
 

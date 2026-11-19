@@ -21,6 +21,7 @@ Un ADR nunca se edita una vez aceptado: si la decisión cambia, se escribe uno n
 | [011](ADR-011-tablero-de-analitica-embebido.md) | Tablero de Analítica embebido en la aplicación | Aceptado |
 | [012](ADR-012-tolerancia-a-contratos-entre-squads.md) | Tolerancia a contratos de eventos entre squads | Aceptado |
 | [013](ADR-013-endpoints-fuera-del-login-federado.md) | Endpoints fuera del login federado | Aceptado |
+| [014](ADR-014-verificacion-del-despliegue.md) | Verificar la versión publicada después del deploy | Propuesto |
 
 Varios ADR anteriores recibieron secciones de actualización con fecha (por ejemplo, el ADR-005 con
 el contrato del Squad 2). Desde el ADR-010, los cambios de decisión se registran en un ADR nuevo y

@@ -7,6 +7,17 @@ on:
     branches: [main, develop]
 
 jobs:
+  deploy-tests:
+    name: DevOps — verificacion del despliegue
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Probar verificador y marca de version
+        run: node --test infra/*.test.cjs
+
   backend:
     name: Backend — lint, build, unitarios e integrales
     runs-on: ubuntu-latest
@@ -116,6 +127,11 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Verificar version y archivos del build por HTTP
+        env:
+          FRONTEND_DIST: dist
+        run: node --test ../infra/desplegar-render.http.test.cjs
+
       - name: Tests con cobertura
         run: npm run cobertura
 
@@ -143,6 +159,7 @@ jobs:
           --build-arg VITE_AUTH_MODE=federated
           --build-arg VITE_IDP_URL=https://api.citypass-login.pp.ua
           --build-arg VITE_IDP_CLIENT_ID=citypass-residuos-web
+          --build-arg GITHUB_SHA=${{ github.sha }}
           ./frontend
 
   sonarqube:
@@ -175,11 +192,19 @@ jobs:
   deploy-render:
     name: Deploy — Render
     runs-on: ubuntu-latest
-    needs: [backend, frontend, docker-images, sonarqube]
+    needs: [backend, frontend, docker-images, sonarqube, deploy-tests]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    timeout-minutes: 25
+    concurrency:
+      group: render-production
+      cancel-in-progress: false
 
     steps:
       - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
 
       - name: Verificar configuracion de Render
         run: |
@@ -188,37 +213,23 @@ jobs:
           grep -q "citypass-residuos-frontend" render.yaml
           grep -q "citypass-residuos-db" render.yaml
 
-      - name: Verificar hooks de deploy
+      - name: Omitir un release superado por otro push a main
+        id: revision
+        run: |
+          latest=$(git ls-remote --exit-code origin refs/heads/main | cut -f1)
+          test -n "$latest"
+          if [ "$latest" = "$GITHUB_SHA" ]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "current=false" >> "$GITHUB_OUTPUT"
+            echo "Deploy omitido: main ya avanzo a otro commit." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Desplegar y esperar la version publicada de API y frontend
+        if: steps.revision.outputs.current == 'true'
         env:
+          DEPLOY_API_URL: https://citypass-residuos-api.onrender.com
+          DEPLOY_FRONTEND_URL: https://citypass-residuos-frontend.onrender.com
           RENDER_DEPLOY_HOOK_API: ${{ secrets.RENDER_DEPLOY_HOOK_API }}
           RENDER_DEPLOY_HOOK_FRONTEND: ${{ secrets.RENDER_DEPLOY_HOOK_FRONTEND }}
-        run: |
-          test -n "$RENDER_DEPLOY_HOOK_API"
-          test -n "$RENDER_DEPLOY_HOOK_FRONTEND"
-
-      - name: Desplegar API
-        env:
-          RENDER_DEPLOY_HOOK_API: ${{ secrets.RENDER_DEPLOY_HOOK_API }}
-        run: curl --fail --silent --show-error --retry 3 --request POST "$RENDER_DEPLOY_HOOK_API"
-
-      - name: Desplegar frontend
-        env:
-          RENDER_DEPLOY_HOOK_FRONTEND: ${{ secrets.RENDER_DEPLOY_HOOK_FRONTEND }}
-        run: curl --fail --silent --show-error --retry 3 --request POST "$RENDER_DEPLOY_HOOK_FRONTEND"
-
-      - name: Publicar resumen de deploy
-        run: |
-          {
-            echo "## Deploy en Render"
-            echo ""
-            echo "El despliegue cloud se gestiona con el Blueprint versionado en \`render.yaml\`."
-            echo ""
-            echo "- Branch desplegada: \`main\`"
-            echo "- Commit validado: \`${GITHUB_SHA}\`"
-            echo "- Politica Render: hooks disparados por este job despues de CI verde"
-            echo "- Frontend: https://citypass-residuos-frontend.onrender.com"
-            echo "- API: https://citypass-residuos-api.onrender.com"
-            echo "- Health: https://citypass-residuos-api.onrender.com/api/v1/health"
-            echo ""
-            echo "Los hooks de Render aceptaron ambos deploys. Verificar su estado final en Render."
-          } >> "$GITHUB_STEP_SUMMARY"
+        run: node infra/desplegar-render.cjs
