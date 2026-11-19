@@ -17,6 +17,7 @@ el mismo commit que el código que describen, y GitHub los renderiza solo.
 | [7. Máquinas de estado](#7-máquinas-de-estado) | Contenedor, alerta y ruta |
 | [8. Secuencia: evento masivo](#8-secuencia--recolección-después-de-un-evento-masivo-caso-transversal-del-squad-3) | Caso transversal del squad 3 |
 | [9. Despliegue en la nube](#9-despliegue-en-la-nube) | Render, CI/CD y servicios de otros squads |
+| [10. Secuencia: auto que bloquea un contenedor](#10-secuencia--auto-que-bloquea-un-contenedor-cu-int-02) | CU-INT-02, de punta a punta entre Reclamos, Residuos y Analítica |
 | [Entidad-relación](modelo-de-datos.md) | En su propio documento, junto al modelo |
 
 ---
@@ -668,6 +669,73 @@ flowchart LR
 - **Plan gratuito:** la API se duerme por inactividad. Por eso hay dos vías de consumo
   ([ADR-010](../adr/ADR-010-integracion-real-con-el-bus.md)).
 - Evidencia: [evidencia-despliegue.md](../devops/evidencia-despliegue.md).
+
+---
+
+## 10. Secuencia — auto que bloquea un contenedor (CU-INT-02)
+
+Un vecino reclama por un auto mal estacionado en la ciclovía. Si el auto tapa un contenedor,
+Residuos lo saca de las rutas que están en la calle, reordena las paradas pendientes y avisa al
+resto de la plataforma. Cuando el reclamo se resuelve, el contenedor vuelve al ruteo.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant R as Reclamos<br/>(Squad 5)
+    participant B as Bus de CityPass+<br/>(gateway + Kafka)
+    participant I as IntegracionService
+    participant RS as ReclamosService
+    participant P as ParadasService
+    participant DB as PostgreSQL
+    participant D as Despachador<br/>de outbox
+    participant A as Analítica<br/>(Squad 8)
+
+    R->>B: ReclamoCreado (TRANSITO, latitud, longitud, correlationId)
+    B->>I: por Kafka, o por el webhook si la API estaba dormida
+
+    rect rgba(31, 111, 84, 0.08)
+    Note over I,DB: Una sola transacción
+    I->>DB: registrar eventId
+    alt eventId ya procesado
+        I-->>B: duplicado, se ignora
+    end
+    I->>RS: procesar(evento)
+    RS->>RS: ¿es un auto mal estacionado?<br/>(categoría, objetoAfectado y texto)
+    RS->>DB: contenedores activos a ≤ 15 m del auto
+    alt tapa al menos un contenedor
+        RS->>DB: obstrucción por contenedor (vence a las 4 h)
+        RS->>DB: alerta ACCESO_BLOQUEADO
+        RS->>P: quitarContenedores(tapados, reclamoId)
+        P->>DB: paradas pendientes → OMITIDA
+        P->>DB: reordenar las pendientes desde<br/>la última parada confirmada
+        P->>DB: outbox: IntervencionActualizada<br/>(CANCELADA, causaId = reclamoId), una por parada
+    end
+    RS->>DB: outbox: ReclamoEvaluado<br/>(afectaRecoleccion, contenedores, rutas)
+    end
+
+    D->>DB: leer pendientes
+    D->>B: POST al gateway con el token de servicio
+    B-->>A: ReclamoEvaluado e IntervencionActualizada<br/>(métrica: % de reclamos que bloquean un contenedor)
+
+    Note over R,A: Más tarde, el área que corresponde retira el auto
+
+    R->>B: ReclamoActualizado (estadoNuevo RESUELTO)<br/>o IntervencionFinalizada con reclamoId
+    B->>I: por Kafka o webhook
+    I->>RS: procesar(evento)
+    RS->>DB: obstrucción resuelta y alerta cerrada
+    Note over RS,DB: Las paradas omitidas no se reabren:<br/>el contenedor sigue CRÍTICO y entra<br/>en la próxima ruta que se genere
+```
+
+**Decisiones que se ven en el diagrama:**
+- **Todo pasa en una transacción.** Si algo falla, no quedan registrados el `eventId`, las paradas
+  omitidas ni los eventos del outbox, y el bus reintenta. Un evento repetido se descarta por su
+  `eventId` ([ADR-010](../adr/ADR-010-integracion-real-con-el-bus.md)).
+- **`ReclamoEvaluado` se publica siempre**, tape o no un contenedor: es el denominador de la
+  métrica de Analítica.
+- **Si nadie avisa que se resolvió, la obstrucción vence sola a las 4 h.** El aviso puede venir de
+  cualquier squad ([ADR-012](../adr/ADR-012-tolerancia-a-contratos-entre-squads.md)).
+- **No se reabren las paradas omitidas.** El camión ya reordenó su recorrido y Analítica ya
+  recibió la cancelación. Otro camión levanta el contenedor en la ruta siguiente.
 
 ---
 
