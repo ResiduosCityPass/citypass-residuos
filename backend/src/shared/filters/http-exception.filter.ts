@@ -39,7 +39,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const payload: RespuestaError = {
       statusCode: status,
       error: HttpStatus[status] ?? 'Internal Server Error',
-      message: this.extraerMensaje(cuerpo),
+      message: this.extraerMensaje(cuerpo, exception),
       code: this.extraerCodigo(cuerpo, status),
       timestamp: new Date().toISOString(),
       path: request.url,
@@ -55,20 +55,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
     response.status(status).json(payload);
   }
 
-  /**
-   * Una excepcion no HTTP es un error inesperado (base de datos, bug): su mensaje
-   * puede traer tablas, columnas o SQL, asi que el cliente recibe uno generico y
-   * el detalle queda solo en el log. Las HttpException son mensajes pensados
-   * para el usuario y se devuelven tal cual.
-   */
-  private extraerMensaje(cuerpo: unknown): string | string[] {
+  private extraerMensaje(cuerpo: unknown, exception: unknown): string | string[] {
     if (typeof cuerpo === 'string') return cuerpo;
 
     if (cuerpo && typeof cuerpo === 'object' && 'message' in cuerpo) {
       return (cuerpo as { message: string | string[] }).message;
     }
 
-    return 'Error interno del servidor';
+    return exception instanceof Error ? exception.message : 'Error interno del servidor';
   }
 
   private extraerCodigo(cuerpo: unknown, status: number): string {

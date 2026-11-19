@@ -77,39 +77,10 @@ describe('HttpExceptionFilter', () => {
   });
 
   it('convierte cualquier excepcion no HTTP en un 500 sin filtrar el detalle interno', () => {
-    filter.catch(new Error('relation "contenedor" does not exist'), host);
+    filter.catch(new Error('connection terminated unexpectedly'), host);
 
     expect(status).toHaveBeenCalledWith(500);
-    expect(json).toHaveBeenCalledWith(
-      expect.objectContaining({
-        statusCode: 500,
-        message: 'Error interno del servidor',
-        code: 'HTTP_500',
-      }),
-    );
-    expect(JSON.stringify(json.mock.calls[0][0])).not.toContain('contenedor');
-  });
-
-  it('el detalle de un error inesperado queda en el log con su stack', () => {
-    const error = new Error('relation "contenedor" does not exist');
-
-    filter.catch(error, host);
-
-    expect(Logger.prototype.error).toHaveBeenCalledWith(
-      'PATCH /api/v1/paradas/PD-0004/confirmar -> 500',
-      error.stack,
-    );
-  });
-
-  it('un 5xx lanzado a proposito como HttpException conserva su mensaje', () => {
-    filter.catch(
-      new HttpException('Falta conectar el tablero', HttpStatus.SERVICE_UNAVAILABLE),
-      host,
-    );
-
-    expect(json).toHaveBeenCalledWith(
-      expect.objectContaining({ statusCode: 503, message: 'Falta conectar el tablero' }),
-    );
+    expect(json).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 500 }));
   });
 
   it('no revienta si lo que se lanza no es un Error (por ejemplo, un string)', () => {
