@@ -163,13 +163,14 @@ describe('Recalculo de rutas por obstruccion (e2e)', () => {
     const enviar = (eventId: string, eventType: string, data: Record<string, unknown>) =>
       http.post(webhook).send({ metadata: { eventId, eventType }, data }).expect(204);
 
-    const reclamoCreado = (eventId = 'ev-reclamo-1') =>
+    const reclamoCreado = (eventId = 'ev-reclamo-1', extra: Record<string, unknown> = {}) =>
       enviar(eventId, 'com.citypass.reclamos.ReclamoCreado', {
         // Formato real de Reclamos (Grupo 5): categoria TRANSITO y el auto en el titulo.
         reclamoId: 'RC-E2E',
         categoria: 'TRANSITO',
         titulo: 'Auto estacionado sobre la ciclovia',
         ...FRENTE_AL_SEGUNDO,
+        ...extra,
       });
 
     const generar = async (camionId: string) => {
@@ -414,6 +415,107 @@ describe('Recalculo de rutas por obstruccion (e2e)', () => {
       await enviar('ev-sin-coordenadas', 'com.citypass.reclamos.ReclamoCreado', {
         reclamoId: 'RC-SIN-UBICACION',
       });
+    });
+
+    const outbox = (eventType: string) =>
+      ctx.dataSource.getRepository(EventoPendiente).findBy({ eventType });
+
+    const metrica = async () =>
+      (await http.get('/api/v1/reclamos/metrica').set(auth(admin)).expect(200)).body;
+
+    const asignar = async (rutaId: string) => {
+      const chofer = await http
+        .post('/api/v1/choferes')
+        .set(auth(admin))
+        .send({ nombre: 'Juana Perez', legajo: `CH-${Date.now().toString().slice(-8)}` })
+        .expect(201);
+      await http
+        .patch(`/api/v1/rutas/${rutaId}/asignar`)
+        .set(auth(admin))
+        .send({ choferId: chofer.body.id })
+        .expect(200);
+    };
+
+    it('le responde a Reclamos con ReclamoEvaluado: que contenedor tapa, a que distancia y su correlationId', async () => {
+      const { rutaId, contenedorIds } = await propuestaConTresParadas();
+      const tapado = await http
+        .get(`/api/v1/contenedores/${contenedorIds[1]}`)
+        .set(auth(admin))
+        .expect(200);
+
+      await reclamoCreado('ev-reclamo-1', { correlationId: 'corr-reclamos' });
+
+      const [evaluado] = await outbox(EventTypes.RECLAMO_EVALUADO);
+      expect(evaluado.sobre.correlationId).toBe('corr-reclamos');
+      expect(evaluado.sobre.payload).toEqual(
+        expect.objectContaining({
+          reclamoId: 'RC-E2E',
+          afectaRecoleccion: true,
+          contenedoresAfectados: [
+            { codigo: tapado.body.codigo, distanciaMetros: expect.any(Number) },
+          ],
+          rutasRecalculadas: [rutaId],
+        }),
+      );
+      const { distanciaMetros } = (
+        evaluado.sobre.payload as { contenedoresAfectados: { distanciaMetros: number }[] }
+      ).contenedoresAfectados[0];
+      expect(distanciaMetros).toBeLessThanOrEqual(15);
+    });
+
+    it('el mismo reclamo reenviado no duplica la parada cancelada, la alerta ni la metrica', async () => {
+      const { rutaId } = await propuestaConTresParadas();
+      await asignar(rutaId);
+
+      await reclamoCreado('ev-reclamo-1');
+      // El mismo evento otra vez, y el mismo reclamo con otro eventId (el gateway
+      // le pone uno nuevo a cada POST).
+      await reclamoCreado('ev-reclamo-1');
+      await reclamoCreado('ev-reclamo-2');
+
+      expect(await outbox(EventTypes.INTERVENCION_ACTUALIZADA)).toHaveLength(1);
+      const accesos = await http
+        .get('/api/v1/alertas?tipo=ACCESO_BLOQUEADO')
+        .set(auth(admin))
+        .expect(200);
+      expect(accesos.body).toHaveLength(1);
+      expect(await metrica()).toEqual(
+        expect.objectContaining({ evaluados: 1, afectan: 1, porcentaje: 100 }),
+      );
+    });
+
+    it('un reclamo lejos de todo contenedor se evalua sin tocar la ruta y cuenta en la metrica', async () => {
+      const { rutaId } = await propuestaConTresParadas();
+
+      // ~1 km al norte del deposito: lejos de los tres contenedores.
+      await reclamoCreado('ev-lejos', {
+        reclamoId: 'RC-LEJOS',
+        latitud: DEPOSITO.lat + 0.01,
+        longitud: DEPOSITO.lng,
+      });
+
+      expect((await detalle(rutaId)).paradas).toHaveLength(3);
+      const [evaluado] = await outbox(EventTypes.RECLAMO_EVALUADO);
+      expect(evaluado.sobre.payload).toEqual(
+        expect.objectContaining({
+          reclamoId: 'RC-LEJOS',
+          afectaRecoleccion: false,
+          contenedoresAfectados: [],
+          rutasRecalculadas: [],
+        }),
+      );
+      expect(await metrica()).toEqual(
+        expect.objectContaining({ evaluados: 1, afectan: 0, porcentaje: 0 }),
+      );
+    });
+
+    it('un reclamo de RESIDUOS en el lugar del contenedor se ignora: es nuestra propia alerta', async () => {
+      const { rutaId } = await propuestaConTresParadas();
+
+      await reclamoCreado('ev-residuos', { reclamoId: 'RC-RESIDUOS', categoria: 'RESIDUOS' });
+
+      expect((await detalle(rutaId)).paradas).toHaveLength(3);
+      expect(await outbox(EventTypes.RECLAMO_EVALUADO)).toHaveLength(0);
     });
   });
 });
