@@ -238,4 +238,4 @@ un simulacro nuevo, pero sus mensajes no llegaron a los tópicos climáticos de 
 Las publicaciones de generación y asignación de ruta de Residuos sí llegaron al bus.
 Por tanto, la suspensión y recuperación completa entre equipos sigue pendiente de
 resolver la entrega desde el emisor. Ver [resultado y evidencia de la prueba](prueba-clima-real-2026-11-01.md)
-y [mensaje para coordinar la revisión](consultas-integracion-equipos.md#incidencia-encontrada-en-la-prueba-real).
+y [mensaje para coordinar la revisión](consultas-integracion-equipos.md#incidencia-de-la-prueba-del-0111-registro-histórico).

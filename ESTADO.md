@@ -90,7 +90,7 @@ dispara una alerta crítica. Son las dos cosas que conviene poder provocar a vol
 
 ### El token
 
-> **Desde el Sprint 3, en Render se entra con el Login federado del Squad 2.** Lo que sigue describe
+> **Desde el 03/11 (release #72), en Render se entra con el Login federado del Squad 2.** Lo que sigue describe
 > los tokens locales del Hito 1, que se siguen usando en desarrollo. Los endpoints que no exigen
 > el JWT humano están listados en el [ADR-013](docs/adr/ADR-013-endpoints-fuera-del-login-federado.md).
 
@@ -742,16 +742,15 @@ queda es del frontend:
 | **Saber si el contenedor ya tiene sensor** | `GET /contenedores` trae `sensor` en cada fila. La `apiKeyHash` no viaja: está declarada `select: false` | **Falta.** El listado deja intentar vincular y espera el `409` |
 | **Avance de paradas en el listado de rutas** | `GET /rutas` trae `avance` con `total`, `confirmadas`, `omitidas` y `pendientes` | Hecho |
 | **Omitir una parada** | `PATCH /paradas/:id/omitir` con `{ motivo }` | Hecho |
-| **Descartar una propuesta de ruta** | `PATCH /rutas/:id/descartar`, sin cuerpo. Solo desde `PROPUESTA`; si no, `409 RUTA_NO_PROPUESTA` | **Falta.** Hoy se descarta desde Swagger |
+| **Descartar una propuesta de ruta** | `PATCH /rutas/:id/descartar`, sin cuerpo. Solo desde `PROPUESTA`; si no, `409 RUTA_NO_PROPUESTA` | Hecho. El detalle de la ruta tiene el botón (#47) |
 
-Ninguno de los dos que faltan bloquea la demo. El de descartar sirve para limpiar las propuestas
-que dejen los ensayos.
+El que falta no bloquea la demo.
 
 ## 5. Lo que depende de otros equipos
 
-- **El login del Squad 2 llega en el Sprint 3.** Hasta entonces los tokens se generan a mano y
-  duran 8 horas. Cuando exista el login real cambia de dónde sale el token, pero el header
-  `Authorization: Bearer <jwt>` no cambia.
+- **El login del Squad 2 está integrado desde el 03/11** (release #72). En desarrollo se siguen
+  usando tokens locales de 8 horas; el header `Authorization: Bearer <jwt>` es el mismo en los dos
+  casos.
 - **El bloqueo automático de zonas** por emergencias ya está hecho (CU-INT-01). Las coberturas
   `PREVENTIVA` no bloquean (#125), aunque Emergencias las mande con `afectaCirculacion: true`.
 

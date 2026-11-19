@@ -461,8 +461,8 @@ plaza y Residuos manda una escuadrilla a limpiar los contenedores de la zona.
 
 **Quién lo publica:** Espacios Públicos, cada vez que se crea una actividad o evento comunitario.
 Internamente lo emiten como `cultura.evento_comunitario_publicado` y, al publicarlo en el bus, lo
-mapean a este nombre y a los campos del contrato del squad (E1 en
-[plan-squad-3.md](../sprints/plan-squad-3.md)). Rodrigo lo confirmó en el grupo del squad: así
+mapean a este nombre y a los campos del contrato del squad (E1 en el
+plan del caso transversal del squad 3, que no está en este repo). Rodrigo lo confirmó en el grupo del squad: así
 Residuos, Reclamos, Emergencias y Movilidad consumen todos lo mismo.
 
 **Cómo llega:** por el webhook `POST /webhooks/citypass?token=...` (CU-INT-01), con el sobre del
