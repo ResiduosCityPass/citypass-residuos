@@ -31,6 +31,7 @@
     "demo:preparar": "ts-node src/scripts/preparar-demo.ts",
     "demo:preparar:prod": "node dist/scripts/preparar-demo.js",
     "demo:http": "ts-node src/scripts/demo-http.ts",
+    "prediccion:evaluar": "ts-node src/scripts/evaluar-prediccion.ts",
     "deploy:verificar": "node ../infra/verificar-integracion.cjs"
   },
   "dependencies": {

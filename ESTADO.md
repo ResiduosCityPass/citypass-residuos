@@ -303,6 +303,9 @@ faltan para que cruce el umbral de su zona, con una regresión lineal sobre su h
 
 **No está en el documento de la cátedra**: lo agregó ADR-004 para cubrir la dimensión de IA/ML.
 
+**Evaluación:** con datos separados en el tiempo y comparada contra dos estimaciones sencillas, en
+[evaluacion-prediccion.md](docs/arquitectura/evaluacion-prediccion.md) (`npm run prediccion:evaluar`).
+
 **Dónde vive:** [`PredictionCard.jsx`](frontend/src/components/containers/PredictionCard.jsx)
 
 **Consume:** `GET /contenedores/:id/prediccion`
