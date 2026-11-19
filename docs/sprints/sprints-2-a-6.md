@@ -3,8 +3,7 @@
 > **Cómo se armó este documento.** Los cierres de los sprints 2 a 6 no se escribieron en su
 > momento. Este documento los reconstruye el 19/11 a partir del historial de GitHub: los PRs
 > mergeados a `develop` en cada rango de fechas y los releases a `main`. Solo lista lo que quedó
-> registrado. **La retrospectiva de cada sprint no se reconstruye.** Queda un apartado vacío para
-> que la complete el equipo (facilita Tomás, Scrum Master).
+> registrado. Las retrospectivas las completó el equipo, con Tomás (Scrum Master) como facilitador.
 >
 > El nombre y el objetivo de cada sprint son los de la planificación de la cátedra (presentación
 > de la materia, clase del 06/08).
@@ -52,7 +51,11 @@ La deuda que declaró el Sprint 1 (outbox, tests de integración contra Postgres
 había entrado el 02/09. El driver `rabbitmq` no se hizo: lo reemplazó la integración con el
 gateway del Squad 1 ([ADR-010](../adr/ADR-010-integracion-real-con-el-bus.md)).
 
-**Retrospectiva:** _pendiente, la completa el equipo._
+**Retrospectiva** (facilitó Tomás, Scrum Master):
+
+- **Bien:** se pagó toda la deuda que declaró el Sprint 1: outbox, tests de integración contra Postgres y migraciones. El CI pasó a verificar el deploy de Render, y la demo del Hito 1 se ensayó contra Render, no en local.
+- **Mal:** el trabajo quedó concentrado en dos personas: Máximo y Francisco hicieron 19 de los 22 PRs, y Nicolás y Tomás no mergearon ninguno. Además, los ensayos se dejaron para los últimos días, así que las correcciones del testeo pre-Hito no llegaron a entrar antes del 24/09.
+- **Acciones:** que cada integrante tenga al menos un caso propio con PR a su nombre (se cumplió desde el Sprint 5, con los casos integradores) y fijar un día límite para codear antes de cada hito (se aplicó el 24/09 y otra vez el 18/11).
 
 ---
 
@@ -75,12 +78,16 @@ DevOps).
 Es un sprint de planificación: lo que se espera son acuerdos entre squads, no código. Los
 contratos de eventos con otros squads están en
 [contratos-de-eventos.md](../arquitectura/contratos-de-eventos.md) y se implementaron desde el
-Sprint 4. Qué se acordó en este sprint y con quién lo completa el equipo en la retrospectiva.
+Sprint 4. Lo que pasó con esos acuerdos está en la retrospectiva.
 
 **Registrado en GitHub:** no hay PRs mergeados en este rango. El único commit es de Ramiro
 (15/10): apuntar el Blueprint de Render a la base restaurada, que entró a `main` en el #48.
 
-**Retrospectiva:** _pendiente, la completa el equipo._
+**Retrospectiva:**
+
+- **Bien:** se acordaron con los otros squads los contratos de eventos que después se implementaron, y se definió el reparto de los casos integradores del grupo 4.
+- **Mal:** como era un sprint de planificación, los acuerdos quedaron en chats y reuniones y no en el repo. Hoy no se puede probar qué se acordó, con quién ni cuándo. Las correcciones del Hito 1 tampoco se mergearon en este sprint.
+- **Acciones:** todo acuerdo con otro squad se registra en `contratos-de-eventos.md` o en una bitácora (la de Máximo arrancó el 22/10), y ninguna rama queda abierta más de un sprint sin PR.
 
 ---
 
@@ -100,7 +107,11 @@ funcional de eventos entre servicios.
 
 El #52 es la base sobre la que se montaron después los casos integradores de todos.
 
-**Retrospectiva:** _pendiente, la completa el equipo._
+**Retrospectiva:**
+
+- **Bien:** con el #52 entró la integración real con el bus de CityPass+, que fue la base de los casos de todos. Además, se cerraron los seis bugs del testeo pre-Hito.
+- **Mal:** solo hubo 4 PRs y el resto se trabó esperando a otros. Hubo PRs sin revisar durante días (el #57 esperó desde el 22/10), dependencias de otros squads sin respuesta (token, namespace y campos de `ActividadCreada`) y casos sin rama todavía, entre ellos el de Tomás. `main` se quedó en el #50 del 16/10.
+- **Acciones:** cualquier integrante puede aprobar, no hace falta esperar al dueño del módulo. Las dependencias de otros squads se reclaman en el grupo con fecha. Si un caso está bloqueado, se avanza en una rama aparte para no frenar el PR que está en revisión.
 
 ---
 
@@ -131,7 +142,11 @@ coordinación entre squads.
 
 **Releases a `main`:** #72 (Login federado e integración con el bus), #75, #77, #86 y #93.
 
-**Retrospectiva:** _pendiente, la completa el equipo._
+**Retrospectiva:**
+
+- **Bien:** fue el sprint de más volumen: 39 PRs y los seis casos integradores con código. Entraron el login federado y el consumo por Kafka, y hubo cinco releases a `main`.
+- **Mal:** recién en este sprint apareció que cada caso necesitaba una métrica para Analítica, y no estaba claro quién la definía: si nosotros o ellos. Hubo idas y vueltas con Analítica. También hubo fallas que solo aparecieron contra el bus real, como mensajes que no se podían decodificar, versiones en el tipo del evento y la URL del gateway.
+- **Acciones:** cada métrica se acuerda por escrito con el referente de Analítica de cada caso (la de Tomás quedó acordada el 04/11 con Francisco Csik y está en `contratos-de-eventos.md`). Cada caso se prueba contra el bus de test antes de pedir revisión, no solo con tests unitarios.
 
 ---
 
@@ -156,4 +171,8 @@ ajuste de interfaces.
 **Evidencia del cierre:** suites del CI de `main` en
 [evidencia-despliegue.md](../devops/evidencia-despliegue.md#suites-de-tests-en-el-ci-de-main-18112026).
 
-**Retrospectiva:** _pendiente, la completa el equipo._
+**Retrospectiva:**
+
+- **Bien:** fue un cierre ordenado. Se ajustaron las interfaces con Emergencias, Espacios y Analítica, y cada caso quedó verificado en producción con su evento en la consola del bus (el de Tomás, el 17/11). Hubo cuatro releases a `main` y el último entró el 18/11, antes del freeze.
+- **Mal:** la documentación de cierre (sprints 2 a 6, ADRs y diagramas) se escribió al final y reconstruida, cuando se tendría que haber ido completando sprint a sprint. También hubo cambios de contrato a último momento, como la v3 de `ActividadCreada` y las coberturas PREVENTIVA de Emergencias, que obligaron a hacer fixes en la última semana.
+- **Acciones:** para una próxima entrega, cerrar cada sprint con su documento y su retro el último día, y congelar los contratos entre squads una semana antes del hito.
