@@ -3,6 +3,9 @@
 - **Estado:** Aceptado
 - **Fecha:** 2026-08-20
 - **Decisores:** Squad 4
+- **Superseded parcialmente por:** [ADR-010](ADR-010-integracion-real-con-el-bus.md), que define
+  el driver `platform` (gateway HTTP, Kafka y webhook) y descarta el driver `rabbitmq`. La interfaz
+  `EventPublisher` y el outbox de este ADR siguen vigentes.
 
 ## Contexto
 

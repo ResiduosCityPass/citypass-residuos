@@ -34,7 +34,7 @@ export const distanciaKm = (a: Punto, b: Punto): number => distanciaMetros(a, b)
  * Los candidatos a `radioMetros` o menos del centro, con su distancia, en el
  * orden en que vinieron.
  *
- * ponytail: los eventos del bus recorren todos los contenedores activos en
+ * atajo: los eventos del bus recorren todos los contenedores activos en
  * memoria. Alcanza para cientos; con miles, pasar a la consulta por radio de
  * `ContenedorCercanoRepository` (CU-11).
  */

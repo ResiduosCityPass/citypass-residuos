@@ -124,7 +124,7 @@ Reglas de la tolerancia:
   lado.
 - **Un aviso de resolución de un reclamo que no conocemos no hace nada.** Puede ser de un reclamo
   que no tapaba ningún contenedor.
-- Las listas viven en constantes en un solo lugar y llevan un comentario `ponytail:`. Cuando se
+- Las listas viven en constantes en un solo lugar y llevan un comentario `atajo:`. Cuando se
   cierre el contrato, se recortan a los nombres reales.
 - Si el aviso no llega nunca, el vencimiento automático cubre el caso.
 

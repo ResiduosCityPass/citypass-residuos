@@ -76,6 +76,29 @@ Workflow verificado:
 - Deploy: el job final acepto los hooks de API y frontend. El dashboard de Render mostro ambos
   servicios en estado `Deployed` para `807bc6b`.
 
+## Suites de tests en el CI de `main` (18/11/2026)
+
+Resultado del último CI de `main` antes del Hito 2. Se copia acá porque los reportes que sube el
+workflow como artefactos vencen a los 90 días.
+
+- Run: <https://github.com/ResiduosCityPass/citypass-residuos/actions/runs/44359742686>, del
+  release #129 (commit `5faac22`, 2026-11-18 17:32 UTC). `main` y `develop` tenían el mismo código.
+- Los cinco jobs terminaron en `success`: backend, frontend, imágenes Docker, SonarQube Cloud y
+  Deploy — Render.
+
+| Suite | Archivos | Tests | Statements | Branches | Functions | Lines |
+|---|---|---|---|---|---|---|
+| Backend, unitarios (`npm run test:cov`) | 78 | 963 aprobados de 963 | 89,52% | 90,38% | 87,22% | 89,06% |
+| Backend, integrales contra PostgreSQL 16 (`npm run test:cov:e2e`) | 20 | 189 aprobados de 189 | 80,35% | 57,40% | 82,26% | 80,03% |
+| Frontend (`npm run cobertura`) | 47 | 490 aprobados de 490 | 92,94% | 87,43% | 89,38% | 95,06% |
+
+El umbral de 60% de `coverageThreshold` se aplica a los unitarios del backend. Las suites
+integrales corren contra un PostgreSQL real levantado como servicio del job, con las migraciones
+aplicadas. Cubren las consultas del ORM, la distancia de CU-11 y los guards globales.
+
+Chequeo posterior del despliegue: `GET https://citypass-residuos-api.onrender.com/api/v1/health`
+respondió `{"status":"ok","service":"residuos-service"}` el 2026-11-19 a las 00:38 UTC.
+
 ## CD hacia Render
 
 El deploy productivo se gestiona con el Blueprint de Render declarado en `render.yaml`.
