@@ -25,6 +25,34 @@ Tres restricciones nuevas:
    así que maquetar es un paso extra. Se hace igual, para fijar el sistema visual con las cuatro
    pantallas a la vista en vez de descubrirlo pantalla por pantalla.
 
+## Opciones consideradas
+
+### Design system
+
+| Opción | A favor | En contra |
+|---|---|---|
+| **Tokens en CSS (custom properties) + componentes propios** (elegida) | Sin dependencias nuevas; la paleta de CityPass+ queda en un solo archivo; cada componente hace solo lo que necesitamos | Hay que escribir y testear los componentes base nosotros |
+| Librería de componentes con tema (MUI, Chakra) | Componentes accesibles y probados desde el día uno | Trae su propio lenguaje visual, que choca con el design system de CityPass+; suma peso al bundle para 7 piezas |
+| Tailwind con la paleta en la config | Rápido para maquetar | Dependencia y paso de build nuevos; los estilos se reparten en clases dentro del JSX en vez de vivir en un solo lugar |
+| Seguir con estilos sueltos por pantalla | Cero trabajo hoy | Es lo que había: hexadecimales repetidos y cada pantalla con su criterio |
+
+### Navegación
+
+| Opción | A favor | En contra |
+|---|---|---|
+| **`react-router-dom`** (elegida) | Estándar de React; cada pantalla tiene URL, el botón atrás funciona y se puede abrir `/contenedores/:id` directo | Una dependencia más |
+| Estado en `App.jsx` (qué pantalla mostrar) | Sin dependencias | Sin URLs: no hay link directo a un contenedor y el botón atrás saca de la app |
+| Framework con router propio (Next.js) | Router incluido | Cambia el stack decidido en [ADR-006](ADR-006-stack-frontend.md) para resolver solo la navegación |
+
+### Datos falsos mientras se diseña
+
+| Opción | A favor | En contra |
+|---|---|---|
+| **Servidor en memoria detrás de `api/residuos.js`, elegido por variable de entorno** (elegida) | Las pantallas no saben si hablan con el mock o con la API; conectar es apagar una variable; el mock falla con los mismos `code` que el backend | Hay que mantener el mock alineado con la API |
+| MSW (interceptar `fetch`) | Simula a nivel de red, más realista | Dependencia y service worker nuevos para lo mismo que resuelve una función |
+| `json-server` u otro proceso aparte | Rápido de levantar | Otro proceso para correr; no reproduce los errores de negocio (`409`, `ZONA_CON_CONTENEDORES`) |
+| Datos fijos dentro de cada componente | Lo más rápido | Hay que sacarlos a mano pantalla por pantalla al conectar, y el error nunca se diseña |
+
 ## Decisión
 
 ### 1. El design system vive en un único archivo de tokens

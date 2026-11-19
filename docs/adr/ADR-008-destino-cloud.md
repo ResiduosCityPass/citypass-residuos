@@ -3,6 +3,9 @@
 - **Estado:** Aceptado
 - **Fecha:** 2026-09-03
 - **Decisores:** Ramiro Souto (DevOps), Squad 4
+- **Superseded parcialmente por:** [ADR-010](ADR-010-integracion-real-con-el-bus.md) — RabbitMQ no
+  se despliega: la API publica y consume en el bus del Squad 1 (`EVENT_BUS_DRIVER=platform`). La
+  vista de despliegue actual está en [diagramas.md](../arquitectura/diagramas.md#9-despliegue-en-la-nube)
 
 ## Contexto
 

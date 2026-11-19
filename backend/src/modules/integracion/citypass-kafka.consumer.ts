@@ -24,7 +24,7 @@ import { IntegracionService, SobreGateway } from './application/integracion.serv
  * `IntegracionService.procesar` y los que todavia no maneja. Un tipo sin manejo
  * se ignora ahi, asi que no hace falta mantener una lista aparte.
  *
- * ponytail: kafkajs resuelve la expresion contra los topicos que existen al
+ * atajo: kafkajs resuelve la expresion contra los topicos que existen al
  * conectarse. Un tipo que se registre despues entra en el proximo arranque (en
  * Render free es seguido, porque la API se duerme).
  */

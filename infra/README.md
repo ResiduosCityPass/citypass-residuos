@@ -101,6 +101,11 @@ Los hooks se guardan como secretos de GitHub (`RENDER_DEPLOY_HOOK_API` y
 `RENDER_DEPLOY_HOOK_FRONTEND`); Render queda con `autoDeployTrigger: off` para no ejecutar un
 segundo deploy por la deteccion automatica del push.
 
+El job espera que ambos servicios publiquen el commit validado. Comprueba el health de la API,
+la versión y el HTML del frontend y su JavaScript principal. Un timeout hace fallar el job.
+Ver [verificación del despliegue](../docs/devops/verificacion-despliegue.md) y
+[ADR-014](../docs/adr/ADR-014-verificacion-del-despliegue.md).
+
 Para crear el entorno en Render:
 
 1. Crear un Blueprint desde el repositorio.

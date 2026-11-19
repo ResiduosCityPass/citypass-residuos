@@ -157,7 +157,7 @@ export class IntegracionTypeormRepository
   }
 
   async resumenEvaluaciones(desde: Date | null): Promise<{ evaluados: number; afectan: number }> {
-    // ponytail: se lee del outbox porque un reclamo que no tapa nada no deja
+    // atajo: se lee del outbox porque un reclamo que no tapa nada no deja
     // otra fila. Recorre todos los ReclamoEvaluado: alcanza para los de una
     // demo. Si el outbox se empieza a purgar, hace falta una tabla propia.
     // Como la define contratos-de-eventos.md: por reclamoId distinto, y si hay

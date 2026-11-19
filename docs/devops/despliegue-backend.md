@@ -213,8 +213,9 @@ El job usa dos secretos del repositorio, que no se versionan:
 - `RENDER_DEPLOY_HOOK_API`
 - `RENDER_DEPLOY_HOOK_FRONTEND`
 
-Son los deploy hooks de los servicios correspondientes en Render. Al terminar el job hay que
-confirmar el estado final en el dashboard y correr los chequeos de la seccion anterior.
+Son los deploy hooks de los servicios correspondientes en Render. El job fija ambos al commit
+validado y espera que API y frontend publiquen esa revision; una respuesta aceptada del hook no
+alcanza para terminar en verde. Ver [verificacion automatica](verificacion-despliegue.md).
 
 ## 8. Evidencia del despliegue
 
