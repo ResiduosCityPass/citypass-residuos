@@ -46,13 +46,13 @@ flowchart LR
         cu04(("CU-04<br/>Reportar nivel<br/>de llenado"))
         cu05(("CU-05<br/>Detectar contenedor<br/>crítico"))
         cu06(("CU-06<br/>Detectar riesgo<br/>de incendio"))
-        cu12(("CU-12<br/>Predecir<br/>saturación"))
     end
 
     subgraph operacion["Operación"]
         cu07(("CU-07<br/>Ver mapa<br/>en tiempo real"))
         cu08(("CU-08<br/>Generar<br/>ruta óptima"))
         cu09(("CU-09<br/>Asignar ruta a<br/>camión y chofer"))
+        cu12(("CU-12<br/>Predecir<br/>saturación"))
     end
 
     subgraph campo["En la calle"]
@@ -72,7 +72,6 @@ flowchart LR
     operador --> cu08
     operador --> cu09
     operador --> cu12
-    cu08 -. usa .-> cu12
 
     chofer --> cu10
     ciudadano --> cu11
@@ -80,12 +79,14 @@ flowchart LR
     admin -.- operador
 ```
 
-**Dos relaciones que vale leer con atención:**
+**Dos aclaraciones sobre el diagrama:**
 
 - **CU-04 incluye CU-05 y CU-06.** Cada lectura que entra dispara la evaluación de ambas reglas.
   No son casos de uso que alguien invoque: ocurren como consecuencia de la ingesta.
-- **CU-08 usa CU-12.** El ruteo considera los contenedores críticos de hoy más los que la
-  predicción indica que van a cruzar el umbral durante el turno.
+- **CU-12 es una consulta independiente.** El operador la ve en el detalle de cada contenedor
+  (`GET /contenedores/:id/prediccion`). El ruteo de CU-08 no la consulta: arma la ruta con los
+  contenedores que ya están críticos, más los reforzados por un evento y los pendientes de
+  recuperación tras una contingencia.
 
 ---
 

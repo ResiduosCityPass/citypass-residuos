@@ -101,9 +101,16 @@ eventos del dominio no le interesan a nadie fuera del módulo.
 - El dominio no cambió: los casos de uso escriben en el outbox igual que en el Sprint 1. La
   integración real fue una clase de transporte, un traductor y dos puntos de entrada, como
   anticipaba el ADR-003.
-- Entrega *at-least-once* en las dos direcciones. Al publicar, `data.eventId` es estable entre
-  reintentos del outbox, aunque el gateway genere un `metadata.eventId` nuevo en cada POST. Al
-  consumir, se deduplica por `eventId`.
+- Entrega *at-least-once* en las dos direcciones. Al consumir, se deduplica por `eventId`.
+- Al publicar, el gateway genera un `metadata.eventId` nuevo en cada POST. **Solo los eventos
+  climáticos** (`contratos-climaticos.ts`) llevan además un `data.eventId` estable entre
+  reintentos del outbox. Los demás que arma el traductor (`traductor-gateway.ts`) no lo llevan.
+- **Riesgo de duplicados:** si el gateway publica un evento pero tarda más que el timeout, el
+  despachador lo da por fallido y lo reintenta. Para los eventos sin `data.eventId`, el reintento
+  llega como un evento distinto y el consumidor no puede deduplicarlo. El timeout de 45 s reduce
+  ese caso, porque casi todas las respuestas lentas llegan antes, pero no lo elimina. La mejora es
+  agregar `data.eventId` a todos los contratos, lo que requiere registrar los esquemas nuevos en el
+  catálogo del gateway.
 - Kafka resuelve la expresión regular contra los tópicos que existen al conectarse. Un tipo
   registrado después entra en el próximo arranque, y en Render free eso pasa seguido.
 - Los contratos de cada evento, publicados y consumidos, están en
