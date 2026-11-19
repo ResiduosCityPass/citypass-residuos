@@ -26,9 +26,11 @@ dinámica de rutas de recolección.
 | Backend | NestJS 11 + TypeScript | [ADR-001](docs/adr/ADR-001-stack-tecnologico.md) |
 | Persistencia | PostgreSQL 16 + TypeORM | [ADR-002](docs/adr/ADR-002-persistencia.md) |
 | Frontend | React 19 + Vite + Leaflet | [ADR-006](docs/adr/ADR-006-stack-frontend.md), [ADR-007](docs/adr/ADR-007-design-system-y-mocks.md) |
-| Mensajería | RabbitMQ (local) → bus del Squad 1 | [ADR-003](docs/adr/ADR-003-integracion-event-bus.md) |
-| Identidad | JWT emitido por el Squad 2 (LDAP) | [ADR-005](docs/adr/ADR-005-seguridad-identidad.md) |
-| CI/CD | GitHub Actions | — |
+| Mensajería | Bus del Squad 1: outbox → gateway HTTP para publicar; Kafka y webhook para consumir | [ADR-003](docs/adr/ADR-003-integracion-event-bus.md), [ADR-010](docs/adr/ADR-010-integracion-real-con-el-bus.md), [ADR-012](docs/adr/ADR-012-tolerancia-a-contratos-entre-squads.md) |
+| Identidad | Login federado del Squad 2 (LDAP + JWT RS256/JWKS) | [ADR-005](docs/adr/ADR-005-seguridad-identidad.md), [ADR-009](docs/adr/ADR-009-identidad-de-los-choferes.md), [ADR-013](docs/adr/ADR-013-endpoints-fuera-del-login-federado.md) |
+| Métricas | Tablero de Analítica (Squad 8) embebido | [ADR-011](docs/adr/ADR-011-tablero-de-analitica-embebido.md) |
+| Cloud | Render con `render.yaml` (IaC) | [ADR-008](docs/adr/ADR-008-destino-cloud.md) |
+| CI/CD | GitHub Actions: lint, build, tests, Docker, SonarQube y deploy con compuerta | [Despliegue en la nube](docs/arquitectura/diagramas.md#9-despliegue-en-la-nube) |
 
 ## Estructura del repositorio
 

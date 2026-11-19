@@ -2,6 +2,7 @@
 
 - **Estado:** Aceptado
 - **Superseded parcialmente por:** [ADR-009](ADR-009-identidad-de-los-choferes.md) — los choferes no son usuarios del Squad 2
+- **Complementado por:** [ADR-013](ADR-013-endpoints-fuera-del-login-federado.md) — inventario vigente de los endpoints fuera del login federado
 - **Fecha:** 2026-08-20
 - **Decisores:** Squad 4 (Adriel Pasik, Francisco Isola)
 

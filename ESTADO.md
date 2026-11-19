@@ -1,12 +1,31 @@
 # Módulo de Residuos — estado, casos de uso y pendientes
 
-Squad 4 · Actualizado al **2026-09-21**
+Squad 4 · Estado general al **2026-11-18** · Detalle de los casos de uso del Hito 1 al **2026-09-21**
 
 Qué hace cada caso de uso, dónde vive en el código, qué reglas no se pueden pasar por alto, y qué
 falta. Es el único documento de estado del módulo.
 
 Para el contrato de la API endpoint por endpoint, con capturas reales de cada respuesta, ver
 [docs/arquitectura/guia-frontend.md](docs/arquitectura/guia-frontend.md).
+
+---
+
+## Estado al Hito 2 (18/11)
+
+Lo que cambió desde el Hito 1. Las secciones siguientes describen los 12 casos de uso propios,
+que siguen vigentes.
+
+| | |
+|---|---|
+| Integración con el bus | Real, con `EVENT_BUS_DRIVER=platform`: se publica por el gateway del Squad 1 y se consume por Kafka y por el webhook ([ADR-010](docs/adr/ADR-010-integracion-real-con-el-bus.md)) |
+| Identidad | Login federado del Squad 2 en producción (`AUTH_MODE=federated`, RS256/JWKS). Excepciones inventariadas en [ADR-013](docs/adr/ADR-013-endpoints-fuera-del-login-federado.md) |
+| Casos integradores | CU-INT-01 (emergencias que cortan la circulación), CU-INT-02 (autos que bloquean contenedores), CU-01 A7 de Emergencias (intervención), recolección después de un evento masivo y reservas de Espacios, y criticidad climática (suspensión y recuperación) |
+| Métricas | Tablero de Analítica embebido en la pantalla Métricas ([ADR-011](docs/adr/ADR-011-tablero-de-analitica-embebido.md)) |
+| Desplegado | Render, `main` igual a `develop` al 18/11. El deploy solo corre si pasan todos los jobs del CI |
+| Tests | Backend: 963 unitarios y 189 integrales contra PostgreSQL. Frontend: 490. Todos en verde en el CI de `main` del 18/11 ([evidencia](docs/devops/evidencia-despliegue.md#suites-de-tests-en-el-ci-de-main-18112026)) |
+
+Contratos de cada evento: [contratos-de-eventos.md](docs/arquitectura/contratos-de-eventos.md).
+Diagramas actualizados, con la vista de despliegue: [diagramas.md](docs/arquitectura/diagramas.md).
 
 ---
 
@@ -70,6 +89,10 @@ Después, `npm run saturacion` lleva un contenedor al rojo en unos segundos y `n
 dispara una alerta crítica. Son las dos cosas que conviene poder provocar a voluntad.
 
 ### El token
+
+> **Desde el Sprint 3, en Render se entra con el Login federado del Squad 2.** Lo que sigue describe
+> los tokens locales del Hito 1, que se siguen usando en desarrollo. Los endpoints que no exigen
+> el JWT humano están listados en el [ADR-013](docs/adr/ADR-013-endpoints-fuera-del-login-federado.md).
 
 Todos los endpoints están protegidos menos el de CU-11. Hasta que el Squad 2 publique el login
 federado (Sprint 3), los tokens se firman localmente con `npm run token:dev -- <ROL>` y duran 8

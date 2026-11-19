@@ -15,6 +15,8 @@ el mismo commit que el código que describen, y GitHub los renderiza solo.
 | [5. Secuencia: ingesta y detección](#5-secuencia--ingesta-y-detección-cu-04-cu-05-cu-06) | CU-04, CU-05, CU-06 |
 | [6. Secuencia: ciclo de recolección](#6-secuencia--ciclo-de-recolección-cu-08-cu-09-cu-10) | CU-08, CU-09, CU-10 |
 | [7. Máquinas de estado](#7-máquinas-de-estado) | Contenedor, alerta y ruta |
+| [8. Secuencia: evento masivo](#8-secuencia--recolección-después-de-un-evento-masivo-caso-transversal-del-squad-3) | Caso transversal del squad 3 |
+| [9. Despliegue en la nube](#9-despliegue-en-la-nube) | Render, CI/CD y servicios de otros squads |
 | [Entidad-relación](modelo-de-datos.md) | En su propio documento, junto al modelo |
 
 ---
@@ -99,11 +101,11 @@ flowchart TB
     residuos["<b>Módulo de Residuos</b><br/>Squad 4<br/><br/>Monitorea contenedores,<br/>detecta alertas y planifica<br/>la recolección"]
 
     subgraph plataforma["Plataforma CityPass+"]
-        bus["<b>Bus de eventos</b><br/>Squad 1"]
+        bus["<b>Bus de eventos</b><br/>Squad 1 · gateway + Kafka"]
         identidad["<b>Login federado</b><br/>Squad 2<br/>LDAP + JWT"]
-        emergencias["<b>Emergencias</b><br/>Squad 6"]
         reclamos["<b>Reclamos</b><br/>Squad 5"]
-        movilidad["<b>Movilidad</b><br/>Squad 3"]
+        emergencias["<b>Emergencias</b><br/>Squad 6"]
+        espacios["<b>Espacios Públicos</b><br/>Squad 7"]
         analitica["<b>Analítica</b><br/>Squad 8"]
     end
 
@@ -115,13 +117,14 @@ flowchart TB
     sensores -->|"lecturas cada 15 min<br/>X-Sensor-Key"| residuos
 
     identidad -->|"emite el JWT que<br/>protege los endpoints"| residuos
-    residuos -->|"publica eventos<br/>de su dominio"| bus
-    bus -->|"incendios"| emergencias
-    bus -->|"métricas"| analitica
-    reclamos -->|"reclamos de residuos"| bus
-    movilidad -->|"calles cortadas"| bus
-    emergencias -->|"incidentes que<br/>bloquean zonas"| bus
+    residuos -->|"publica alertas, recolecciones,<br/>refuerzos e intervenciones"| bus
+    reclamos -->|"autos que bloquean<br/>contenedores (CU-INT-02)"| bus
+    emergencias -->|"emergencias que cortan<br/>la circulación (CU-INT-01)"| bus
+    espacios -->|"actividades masivas, reservas<br/>y criticidad climática"| bus
     bus -->|"eventos de otros<br/>módulos"| residuos
+    bus -->|"AlertaGenerada"| reclamos
+    bus -->|"todos los eventos<br/>de Residuos"| analitica
+    analitica -->|"tablero embebido<br/>(ADR-011)"| residuos
 
     style residuos fill:#1f6f54,stroke:#0d3b2e,color:#ffffff
 ```
@@ -146,29 +149,48 @@ flowchart TB
 
     subgraph modulo["Módulo de Residuos"]
         api["<b>API REST</b><br/>NestJS + TypeScript<br/><i>Casos de uso, reglas<br/>y autorización</i>"]
-        despachador["<b>Despachador de outbox</b><br/><i>Publica los eventos<br/>pendientes con reintentos</i>"]
-        db[("<b>PostgreSQL</b><br/>Dominio + tabla outbox")]
+        consumidor["<b>Consumidor Kafka</b><br/><i>CitypassKafkaConsumer</i>"]
+        webhook["<b>Webhook</b><br/><i>POST /webhooks/citypass</i>"]
+        despachador["<b>Despachador de outbox</b><br/><i>Traduce y publica los<br/>eventos pendientes</i>"]
+        db[("<b>PostgreSQL</b><br/>Dominio + outbox +<br/>eventos recibidos")]
     end
 
-    bus["<b>Bus de eventos</b><br/>Squad 1"]
-    idp["<b>Emisor de identidad</b><br/>Squad 2"]
+    subgraph eda["Bus de CityPass+ · Squad 1"]
+        gateway["<b>Gateway HTTP</b><br/>catálogo + registry Avro"]
+        kafka["<b>Kafka</b>"]
+    end
+    idp["<b>Login federado</b><br/>Squad 2 · JWKS + OAuth"]
+    bi["<b>Analítica</b><br/>Squad 8"]
 
     spa -->|"REST + JSON<br/>Bearer JWT"| api
+    spa -->|"iframe del tablero<br/>cookie de vista"| api
     simulador -->|"POST /lecturas<br/>X-Sensor-Key"| api
     api -->|"SQL"| db
-    api -.->|"verifica la firma<br/>del token"| idp
+    api -.->|"verifica la firma<br/>del token (JWKS)"| idp
+    api -->|"GET /embed/residuos<br/>token del usuario"| bi
     despachador -->|"lee pendientes<br/>marca publicados"| db
-    despachador -->|"publica"| bus
-    bus -.->|"suscripciones"| api
+    despachador -->|"POST del evento<br/>token de servicio"| gateway
+    despachador -.->|"client_credentials"| idp
+    gateway --> kafka
+    kafka -->|"SASL OAUTHBEARER<br/>Avro"| consumidor
+    gateway -.->|"dispatcher con<br/>?token="| webhook
+    consumidor -->|"IntegracionService.procesar<br/>idempotente por eventId"| db
+    webhook -->|"mismo procesar"| db
 
     style api fill:#1f6f54,stroke:#0d3b2e,color:#ffffff
     style despachador fill:#2f7d63,stroke:#0d3b2e,color:#ffffff
+    style consumidor fill:#2f7d63,stroke:#0d3b2e,color:#ffffff
 ```
 
 **Por qué el despachador es una pieza aparte y no una función más de la API:** porque publicar y
 atender requests son dos ritmos distintos. La API responde en milisegundos; el despachador
 reintenta con backoff durante minutos si el bus está caído. Mezclarlos haría que una falla del
 broker se sintiera como lentitud de la API.
+
+**Por qué hay dos entradas para los eventos de otros módulos:** Kafka es la vía que recomienda EDA
+y no pierde eventos, pero con la API dormida en Render nadie lo lee. El webhook la despierta. Los
+dos terminan en el mismo `procesar`, que descarta los `eventId` repetidos. La decisión está en el
+[ADR-010](../adr/ADR-010-integracion-real-con-el-bus.md).
 
 ---
 
@@ -181,42 +203,49 @@ flowchart LR
     subgraph productor["Productor · Módulo de Residuos"]
         reglas["Motor de reglas<br/>CU-05 · CU-06"]
         rutas["Rutas<br/>CU-08 · CU-09 · CU-10"]
+        integ["Casos integradores<br/>CU-INT-01 · CU-INT-02<br/>eventos masivos · clima"]
         outbox[("<b>Tabla outbox</b><br/>evento_pendiente")]
-        desp["Despachador"]
+        desp["Despachador<br/>+ traductor"]
     end
 
-    subgraph canales["Canales / Tópicos"]
-        t1["residuos.contenedor.critico"]
-        t2["residuos.incendio.detectado"]
-        t3["residuos.contenedor.vaciado"]
-        t4["residuos.ruta.generada"]
-        t5["residuos.ruta.asignada"]
+    subgraph canales["Tópicos del catálogo · com.citypass.residuos.*"]
+        t1["AlertaGenerada"]
+        t2["RecoleccionCompletada"]
+        t3["RefuerzoProgramado"]
+        t4["ReclamoEvaluado"]
+        t5["IntervencionProgramada<br/>IntervencionCompletada<br/>IntervencionActualizada"]
+        t6["ServicioAfectado · RecuperacionPendiente<br/>RecuperacionHabilitada · ServicioRestablecido"]
     end
 
     subgraph consumidores["Consumidores"]
-        c1["Emergencias<br/>Squad 6"]
         c2["Analítica<br/>Squad 8"]
         c3["Reclamos<br/>Squad 5"]
+        c4["Espacios Públicos<br/>Squad 7"]
     end
 
+    interno["Solo internos: el traductor<br/>devuelve null para ruta generada,<br/>asignada, recalculada y parada omitida"]
     dlq["<b>Dead letter</b><br/>estado FALLIDO<br/><i>queda para inspección</i>"]
 
     reglas -->|"escribe en la misma<br/>transacción"| outbox
     rutas -->|"escribe en la misma<br/>transacción"| outbox
+    integ -->|"escribe en la misma<br/>transacción"| outbox
     outbox --> desp
     desp -->|"reintenta con<br/>backoff exponencial"| t1
     desp --> t2
     desp --> t3
     desp --> t4
     desp --> t5
+    desp --> t6
+    desp -.-> interno
     desp -.->|"agotados los<br/>reintentos"| dlq
 
     t1 --> c2
     t1 --> c3
-    t2 --> c1
+    t2 --> c2
     t3 --> c2
     t4 --> c2
     t5 --> c2
+    t6 --> c4
 
     style outbox fill:#1f6f54,stroke:#0d3b2e,color:#ffffff
     style dlq fill:#7a2e2e,stroke:#3d1717,color:#ffffff
@@ -242,15 +271,18 @@ volumen—. Emergencias puede estar caído y nuestra ingesta sigue andando.
 
 ### Eventos a los que nos suscribimos
 
-| Canal | Squad | Qué hacemos al recibirlo |
+| Tópico (`com.citypass.…`) | Squad | Qué hacemos al recibirlo |
 |---|---|---|
-| `emergencias.incidente.creado` | 6 | Bloqueamos la zona: sus contenedores quedan fuera del ruteo |
-| `movilidad.calle.cortada` | 3 | Se excluye el tramo del cálculo de ruta |
-| `reclamos.creado` | 5 | Si es de residuos, sube la prioridad del contenedor |
+| `emergencias.EmergenciaCreada` | 6 | Si corta la circulación, bloqueamos las zonas cercanas y omitimos sus paradas pendientes (CU-INT-01) |
+| `emergencias.EmergenciaActualizada` | 6 | Al resolverse, desbloqueamos. Si la causa incluye residuos, programamos una intervención (CU-01 A7) |
+| `reclamos.ReclamoCreado` y `ReclamoReclasificado` | 5 | Si un auto tapa un contenedor, lo sacamos del ruteo y recalculamos las rutas vivas (CU-INT-02) |
+| `reclamos.ReclamoActualizado` | 5 | Con `RESUELTO`, destapamos los contenedores del reclamo |
+| `espacios.ActividadCreada`, `ActividadModificada` y `EventoCancelado` | 7 | Zona del evento y escuadrilla de refuerzo a la salida, o su cancelación |
+| `espacios.CriticidadClimaticaConfirmada` y `…Finalizada` | 7 | Suspensión y recuperación del servicio en las zonas afectadas |
 
-> Los nombres de estos tres son **supuestos**, derivados de la descripción de cada módulo en el
-> enunciado. Hay que confirmarlos con cada squad. Ver
-> [contratos-de-eventos.md](contratos-de-eventos.md).
+Las variantes de nombre que también se aceptan, y los campos de cada evento, están en
+[contratos-de-eventos.md](contratos-de-eventos.md). El criterio para aceptarlas está en el
+[ADR-012](../adr/ADR-012-tolerancia-a-contratos-entre-squads.md).
 
 ---
 
@@ -571,6 +603,71 @@ contenedores de la plaza ya estén en la próxima ruta.
 **Por qué se reusa el refuerzo de CU-INT-01:** el ruteo ya sabía sumar contenedores no críticos
 durante una ventana de tiempo. La escuadrilla es eso mismo, así que no hizo falta tocar el módulo
 `rutas`.
+
+---
+
+## 9. Despliegue en la nube
+
+Lo que corre hoy en Render, declarado en [`render.yaml`](../../render.yaml)
+([ADR-008](../adr/ADR-008-destino-cloud.md)), y cómo llega cada cambio a producción.
+
+```mermaid
+flowchart LR
+    dev["Push o merge<br/>a main"]
+
+    subgraph gha["GitHub Actions · ci.yml"]
+        back["Backend<br/>lint · build · unitarios<br/>integrales con Postgres"]
+        front["Frontend<br/>lint · build · tests"]
+        docker["Build de imágenes<br/>Docker"]
+        sonar["SonarQube Cloud"]
+        deploy["Deploy hooks<br/>solo en main y<br/>si todo pasa"]
+    end
+
+    subgraph render["Render · región Virginia"]
+        static["<b>citypass-residuos-frontend</b><br/>static site<br/>rewrite /api/v1/metricas/*"]
+        api["<b>citypass-residuos-api</b><br/>web service Docker<br/>health: /api/v1/health"]
+        pg[("<b>PostgreSQL 16</b><br/>administrado<br/>migraciones al arrancar")]
+    end
+
+    subgraph externos["Servicios de otros squads"]
+        login["Login federado<br/>JWKS + OAuth"]
+        gw["Gateway EDA + Kafka"]
+        bi["Analítica · Azure"]
+    end
+
+    usuario["Navegador"]
+
+    dev --> back
+    dev --> front
+    dev --> docker
+    back --> sonar
+    front --> sonar
+    back --> deploy
+    front --> deploy
+    docker --> deploy
+    sonar --> deploy
+    deploy --> api
+    deploy --> static
+
+    usuario -->|"HTTPS"| static
+    usuario -->|"HTTPS · Bearer"| api
+    static -.->|"rewrite del tablero"| api
+    api --> pg
+    api -->|"JWKS · client_credentials"| login
+    api -->|"publica · consume"| gw
+    api -->|"embed del tablero"| bi
+
+    style api fill:#1f6f54,stroke:#0d3b2e,color:#ffffff
+```
+
+- **Infraestructura como código:** `render.yaml` define los tres recursos y sus variables. Los
+  secretos (`JWT_SECRET`, `GATEWAY_CLIENT_SECRET`, `GATEWAY_WEBHOOK_TOKEN`) se declaran
+  `sync: false` y se cargan en Render, nunca en el repo.
+- **Despliegue continuo con compuerta:** `autoDeployTrigger: off`. Render no despliega por su
+  cuenta: el último job del CI llama a los deploy hooks solo si los anteriores pasaron.
+- **Plan gratuito:** la API se duerme por inactividad. Por eso hay dos vías de consumo
+  ([ADR-010](../adr/ADR-010-integracion-real-con-el-bus.md)).
+- Evidencia: [evidencia-despliegue.md](../devops/evidencia-despliegue.md).
 
 ---
 
